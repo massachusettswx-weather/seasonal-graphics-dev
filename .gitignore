@@ -72,3 +72,4 @@ data/_aifs_step.grib2
 *.part
 data/_gefs_*.grib2
 data/_polz_*.grib
+data/.no_gate

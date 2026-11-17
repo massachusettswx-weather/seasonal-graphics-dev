@@ -503,6 +503,36 @@
    "init": "2026-11",
    "status": "accepted",
    "_t0": 1794950700.7552762
+  },
+  {
+   "job": "d505586e-fe72-4479-a064-4be1ddd163ce",
+   "tag": "ukmo-gloseas6",
+   "chunk": 0,
+   "centre": "ukmo",
+   "system": "610",
+   "init": "2026-11",
+   "status": "accepted",
+   "_t0": 1794950834.505964
+  },
+  {
+   "job": "ef1cf8f5-e573-48eb-b3ed-6022ffc88e91",
+   "tag": "ukmo-gloseas6",
+   "chunk": 0,
+   "centre": "ukmo",
+   "system": "610",
+   "init": "2026-11",
+   "status": "accepted",
+   "_t0": 1794950962.7510347
+  },
+  {
+   "job": "7d2bc5fa-8b2d-4e64-a661-dd978a4aa25f",
+   "tag": "ukmo-gloseas6",
+   "chunk": 0,
+   "centre": "ukmo",
+   "system": "610",
+   "init": "2026-11",
+   "status": "accepted",
+   "_t0": 1794951090.92765
   }
  ],
  "stall": false,

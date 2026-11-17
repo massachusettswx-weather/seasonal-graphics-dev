@@ -58,6 +58,15 @@ if [ -n "${SITE_PASSWORD:-}" ]; then
     echo "wrote data/.dev_gate_password (mode 600)"
 fi
 
+# The development copy's password gate can be switched off deliberately.  The
+# switch lives in the secret store too, so it survives the wipe: without it
+# the next rebuild would put the gate back and lock the owner out again.
+if [ "${SITE_NO_GATE:-}" = "1" ] || [ "${SITE_NO_GATE:-}" = "true" ]; then
+    mkdir -p data
+    : > data/.no_gate
+    echo "wrote data/.no_gate - the development copy will be published open"
+fi
+
 # a quick check that the key is actually accepted, so a stale key is caught
 # here and not three hours into a queue
 if [ -f .cdsapirc ] && command -v curl >/dev/null 2>&1; then

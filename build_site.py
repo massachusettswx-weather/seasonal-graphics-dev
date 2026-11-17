@@ -428,6 +428,18 @@ def _gate_password():
             pw = open(pf).read().strip()
     return pw
 
+# The gate can be switched OFF deliberately: the development copy is then
+# readable by anyone with the link (GitHub Pages needs a public repository on
+# the free plan, so the files themselves are already reachable - the gate only
+# ever covered the rendered pages).  Set DEV_NO_GATE=1, or drop a file called
+# data/.no_gate, to publish it open.  The default is still ON.
+def _gate_disabled():
+    v = os.environ.get("DEV_NO_GATE", "").strip().lower()
+    if v in ("1", "true", "yes", "on"):
+        return True
+    return os.path.exists(os.path.join(HERE, "data", ".no_gate"))
+
+GATE_DISABLED = _gate_disabled() if SITE_DEV else False
 GATE_PASSWORD = _gate_password() if SITE_DEV else ""
 GATE_HASH = ""
 # The hash of the development copy's password, as it was published.  It is
@@ -445,7 +457,11 @@ GATE_HASH_FALLBACK = ("147df6f124b15703ddc1fdd2c74dde703d3333aa3382910"
 # so this costs nothing.
 GATE_HASH_OLD = ("866da46e2e6cd6f6b5aa489cb6a738be078fe7bda1f638a3b8"
                  "bea8d1d55993c2")
-if GATE_PASSWORD:
+if GATE_DISABLED:
+    sys.stderr.write(
+        "the password gate is DISABLED - the development copy will be "
+        "readable by anyone with the link.\n")
+elif GATE_PASSWORD:
     import hashlib
     GATE_HASH = hashlib.sha256(GATE_PASSWORD.encode()).hexdigest()
 elif SITE_DEV:
@@ -1265,9 +1281,20 @@ def main():
     build_spv(reg)
     build_maps_page(reg)
     copy_map_assets()
-    if SITE_DEV:
+    if SITE_DEV and GATE_HASH:
         build_login_page()
     else:
+        # no gate: a login page left over from an earlier build would be a
+        # page that works, but nothing points at it any more
+        for junk in ("login.html",):
+            jp = os.path.join(SITE, junk)
+            if os.path.exists(jp):
+                os.remove(jp)
+                sys.stderr.write("removed the stale %s (the gate is off)\n"
+                                 % junk)
+        gp = os.path.join(SITE, "data", "gate.json")
+        if os.path.exists(gp):
+            os.remove(gp)
         # the operational site has no gate - make sure no login page is
         # left over from a development build
         lp = os.path.join(SITE, "login.html")

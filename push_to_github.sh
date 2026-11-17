@@ -128,7 +128,19 @@ echo ">> building the site for this target"
 python3 -u build_registry.py | sed 's/^/   /'
 python3 -u build_site.py | sed 's/^/   /'
 
+# The gate can be switched off deliberately (DEV_NO_GATE=1, or a file called
+# data/.no_gate).  The build then carries no gate at all and the copy is
+# readable by anyone with the link.  Say so out loud, because it is a
+# deliberate act and not a broken build.
+GATE_OFF=0
 if [ "$SITE_DEV" = "1" ]; then
+  case "$(printf '%s' "${DEV_NO_GATE:-}" | tr 'A-Z' 'a-z')" in
+    1|true|yes|on) GATE_OFF=1 ;;
+  esac
+  [ -f data/.no_gate ] && GATE_OFF=1
+fi
+
+if [ "$SITE_DEV" = "1" ] && [ "$GATE_OFF" = "0" ]; then
   # The development copy must be private.  The gate is the block of script in
   # the head of every page that carries the password hash; if the build
   # produced a page without it, nothing is published - an open development
@@ -154,6 +166,10 @@ if [ "$SITE_DEV" = "1" ]; then
     exit 2
   fi
   echo "   password gate present in $gated page(s) + the login page"
+elif [ "$SITE_DEV" = "1" ]; then
+  echo "   NOTE: the password gate is OFF - the development copy is readable"
+  echo "         by anyone with the link.  (Set DEV_NO_GATE=0 and remove"
+  echo "         data/.no_gate to put the gate back.)"
 fi
 
 if [ -z "$(git status --porcelain)" ]; then
