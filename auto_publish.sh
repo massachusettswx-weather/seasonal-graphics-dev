@@ -14,6 +14,19 @@
 # ---------------------------------------------------------------------------
 set -u
 cd "$(dirname "$0")"
+
+# THE BUILD TARGET.  The publisher pushes to the DEVELOPMENT repository, so
+# everything it builds has to be the DEVELOPMENT site - otherwise the dev
+# copy would carry the operational addresses in its links and its header.
+# (The push script rebuilds for its own target as well, but a build that is
+# committed with no working token never reaches the push, and an
+# operational build committed to the dev repository is a stale copy of the
+# live site on the dev address.)
+export SITE_DEV=1
+export SITE_URL="https://matthew22-cmd.github.io/seasonal-graphics-dev/"
+export SITE_REPO_URL="https://github.com/Matthew22-cmd/seasonal-graphics-dev"
+export HOME="${HOME:-/workspace/.home}"
+export PYTHONPATH="${PYTHONPATH:-/workspace/.home/.local/lib/python3.11/site-packages}"
 # The token lives in data/.github_token with mode 600, not on the command
 # line, so it is never visible in the process list.  It is passed as the
 # first argument for compatibility and written into the file.
@@ -124,7 +137,7 @@ while true; do
                     log "published"
                 fi
             fi
-            python3 -u verify_site.py >> logs_auto_publish.log 2>&1
+            python3 -u verify_site.py "$SITE_URL" >> logs_auto_publish.log 2>&1
             rm -f /workspace/seasonal-graphics-site.zip
             ( cd docs && zip -qr /workspace/seasonal-graphics-site.zip . )
         fi

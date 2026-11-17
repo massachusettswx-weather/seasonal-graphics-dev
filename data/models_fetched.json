@@ -13,11 +13,11 @@
   "note": "mean of the 6 C3S seasonal systems; ECMWF SEAS5 on the 1 Nov 2026 init, the rest on 1 Oct 2026"
  },
  "cfsv2": {
-  "init": "2026-11",
-  "leads": 6,
-  "members": 40,
   "name": "NOAA CFSv2",
-  "source": "NCEP CPC"
+  "init": "2026-12",
+  "members": 40,
+  "source": "NCEP CPC",
+  "leads": 6
  },
  "cmcc-sps4": {
   "centre": "cmcc",

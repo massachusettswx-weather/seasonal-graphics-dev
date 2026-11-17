@@ -39,7 +39,7 @@ if ! python3 -c "import requests, eccodes, PIL" >/dev/null 2>&1; then
     log "putting the python packages back"
     pip install --break-system-packages -q --index-url https://pypi.org/simple \
         --target "$SITE" requests eccodes numcodecs Pillow s3fs zarr \
-        >/dev/null 2>&1
+        h5netcdf h5py >/dev/null 2>&1
 fi
 export PYTHONPATH="$SITE:${PYTHONPATH:-}"
 if ! python3 -c "import requests, eccodes, PIL" >/dev/null 2>&1; then
