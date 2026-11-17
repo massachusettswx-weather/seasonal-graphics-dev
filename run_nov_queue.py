@@ -282,6 +282,14 @@ def all_steps():
 # ----------------------------------------------------------------- helpers
 def target_for(tag, kind):
     d = os.path.join(MDIR, tag)
+    # The working tree is disposable - a sandbox rebuild wipes data/models
+    # and the folders with it, so the model's own folder is made here
+    # rather than being assumed.  Without this every download lands on a
+    # missing directory and the result is thrown away.
+    try:
+        os.makedirs(d, exist_ok=True)
+    except OSError:
+        pass
     return {
         "snow": os.path.join(d, "snowfall_monthly.grib"),
         "sst": os.path.join(d, "sst_monthly.grib"),
