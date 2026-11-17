@@ -335,3 +335,35 @@ outputs."  Two things were wrong, and both are fixed:
   writes `data/.dev_gate_password` from it, and the published fallback
   hash in `build_site.py` is that password's hash, so a wiped tree still
   opens with the same password.
+
+### The owner's second round (17 Nov, 20:50)
+
+- **The password did not work in the owner's browser.**  The reason was a
+  **cached login page**: the comparison happens in the browser, so a page
+  that still carried the old hash rejected the new password for ever.
+  The login page now **fetches the live hash** from `data/gate.json`
+  with a timestamp in the query, so the page always asks which password
+  is current; the inline hash is only the fallback if the fetch fails.
+  The gate's redirect also carries a cache-buster, so a cached page
+  cannot loop.  Tested with a deliberately stale login page: it signs in
+  with the current password, and a wrong password is still refused.
+- **The globe now floats in space**: a deterministic starfield and two
+  faint nebula glows are painted under the globe, and the sea is a clear
+  step lighter than the sky (`#12395c` against `#02060d`) with an
+  atmosphere rim, so the globe never dissolves into the background in
+  dark mode.
+- **The colour bar is the static panels' bar**: the whole width, the
+  ladder's intervals as the segments, and the keys on the same
+  boundaries.  It used to be 32 fixed 16-pixel blocks in a full-width
+  row, so it stopped half way across and the keys sat on nothing.
+- **"Snow depth" is gone from the map's wording**: the caption reads
+  "Accumulated snowfall, inches (... ) on the published 0-300 in scale",
+  the right-hand end is "300 in", and the hover readout says "in".
+- **Five models are on the map now**: NOAA CFSv2, NOAA SFSv1 and three
+  C3S centres (ECCC canSIPS, METFR System 9, UKMO GloSeas6-GC5.1).
+  The C3S anomaly needs each centre's hindcast climate, which is still
+  in the queue.
+- **The export test was the one publishing "SYNTHETIC TEST"**: it runs
+  the exporter, which writes the model index, and its cleanup restored
+  the wrong file.  Both tests now rebuild the index from the manifests
+  that are actually there.

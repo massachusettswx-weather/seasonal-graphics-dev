@@ -40,7 +40,8 @@ def main():
             pg.on("pageerror", lambda e: errors.append("PAGEERROR " + str(e)))
             pg.add_init_script("localStorage.setItem('devgate', %r);" % gate)
             pg.goto("http://127.0.0.1:%d/maps.html" % port)
-            pg.wait_for_timeout(6000)
+            # five models on the map now, so the rasters take a while
+            pg.wait_for_timeout(12000)
             pg.screenshot(path=os.path.join(out, "fix_globe.png"))
 
             # the model that is on the map
@@ -57,7 +58,9 @@ def main():
 
             # zoom in on the globe
             for _ in range(3):
-                pg.query_selector('.mapctl button[data-z="in"]').click()
+                btn = pg.query_selector('.mapctl button[data-z="in"]')
+                if btn:
+                    btn.click()
                 pg.wait_for_timeout(700)
             pg.wait_for_timeout(1200)
             pg.screenshot(path=os.path.join(out, "fix_globe_zoom.png"))
