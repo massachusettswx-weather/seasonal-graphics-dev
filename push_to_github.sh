@@ -88,12 +88,16 @@ if [ "$SITE_DEV" = "1" ]; then
   if [ -z "${DEV_GATE_PASSWORD:-}" ] && [ -f data/.dev_gate_password ]; then
     DEV_GATE_PASSWORD="$(tr -d '\n' < data/.dev_gate_password)"
   fi
-  if [ -z "${DEV_GATE_PASSWORD:-}" ]; then
-    echo "ERROR: the development copy needs a password." >&2
-    echo "       Put one in data/.dev_gate_password or set DEV_GATE_PASSWORD." >&2
-    exit 2
+  if [ -n "${DEV_GATE_PASSWORD:-}" ]; then
+    export DEV_GATE_PASSWORD
+  else
+    # No plaintext password - a wiped tree loses data/.dev_gate_password.
+    # The builder then falls back to the PUBLISHED gate hash, so the
+    # development copy keeps exactly the password the owner already has and
+    # stays private.  The gate is VERIFIED in the built pages below: a build
+    # without a gate is never published.
+    echo "   no gate password file - keeping the published gate hash"
   fi
-  export DEV_GATE_PASSWORD
 fi
 
 # The token comes from the first argument, or from data/.github_token (mode
@@ -119,6 +123,34 @@ echo ">> building the site for this target"
 # new URL instead of being served from the cache.
 python3 -u build_registry.py | sed 's/^/   /'
 python3 -u build_site.py | sed 's/^/   /'
+
+if [ "$SITE_DEV" = "1" ]; then
+  # The development copy must be private.  The gate is the block of script in
+  # the head of every page that carries the password hash; if the build
+  # produced a page without it, nothing is published - an open development
+  # copy is worse than no development copy.
+  gated=0
+  for pg in docs/index.html docs/model.html docs/snow.html docs/spv.html \
+            docs/maps.html; do
+    [ -f "$pg" ] || continue
+    if grep -qE 'var H="[a-f0-9]{64}"' "$pg"; then
+      gated=$((gated+1))
+    else
+      echo "ERROR: $pg has no password gate - the development copy would be" >&2
+      echo "       public.  Nothing is published.  Check the build." >&2
+      exit 2
+    fi
+  done
+  # The login page IS the gate: it must carry the hash to compare the typed
+  # password against (it must NOT carry the redirect script - that would
+  # bounce the visitor straight back out of the login page).
+  if ! grep -qE '[a-f0-9]{64}' docs/login.html; then
+    echo "ERROR: docs/login.html carries no password hash - the development" >&2
+    echo "       copy would be public.  Nothing is published." >&2
+    exit 2
+  fi
+  echo "   password gate present in $gated page(s) + the login page"
+fi
 
 if [ -z "$(git status --porcelain)" ]; then
   echo ">> working tree clean"
