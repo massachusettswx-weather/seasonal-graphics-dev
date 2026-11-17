@@ -1,6 +1,6 @@
 # Seasonal forecast graphics
 
-**[Seasonal Forecast Graphics](https://matthew22-cmd.github.io/seasonal-graphics-dev/)**
+**[Seasonal Forecast Graphics](https://massachusettswx-weather.github.io/seasonal-graphics/)**
 — the site this copy serves. That address is the site's home page and the
 default entry point; the `/index.html` form is the same page but is not the
 address to publish.
