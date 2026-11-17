@@ -312,3 +312,26 @@ outputs."  Two things were wrong, and both are fixed:
   the end of the source array and extrapolated.  The longitudes are now
   put in the same convention first.  The global and the CONUS fields now
   agree (35.9 in vs 35.6 in at 45N 100W).
+
+### The owner's 17 Nov late corrections: the keys, our colours, dark mode
+
+- **The colour bar now carries its keys** - the ladder's own levels,
+  every other one (0.01, 1, 3, 5, 7, 9, 13, 17, 21, 26, 36, 52, 72, 108,
+  156, 216), on the same boundaries the static panels' colour bar uses.
+  The map legend was a stripe with two numbers on it; the panels' bar
+  has always had the keys, and the map is the same map.
+- **The map has OUR earth, not the pale blue-and-beige** every other
+  weather site uses: a deep navy sea (#0d2233), a slate land (#2a3642),
+  cool steel coastlines.  The field's own colours are now the only
+  bright thing on the map.  The bottom of the ladder ("no snow") is
+  transparent on the map - on the static panels it is the white of the
+  paper, and on a dark map a white fringe round every snow field is
+  exactly the artefact the owner complained about.
+- **The site has a dark mode**: a button in the header, the theme in
+  `localStorage`, and the theme read back in the head before anything is
+  drawn, so a dark screen never flashes white.
+- **The gate password is known again**: `wx-seasonal-2026`.  It is in the
+  encrypted secret store as `SITE_PASSWORD` and `tools/restore_secrets.sh`
+  writes `data/.dev_gate_password` from it, and the published fallback
+  hash in `build_site.py` is that password's hash, so a wiped tree still
+  opens with the same password.
