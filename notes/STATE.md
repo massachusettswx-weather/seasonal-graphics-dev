@@ -4,7 +4,8 @@
 sandbox is wiped, the working tree goes with it, but this file comes back
 with the repository. Read it first, and update it before you end a session.
 
-Last updated: **17 Nov 2026, 03:40 UTC** (after the sandbox wipe of 16-17 Nov)
+Last updated: **17 Nov 2026, 09:00 UTC** (after the sandbox wipe of 16-17 Nov,
+and after the global map rebuild)
 
 ## The two sites
 
@@ -31,15 +32,58 @@ approval.** Everything is built and checked on the dev site first.
   configurations (flat equirectangular, a draggable orthographic globe, a
   north-polar disc), with the polar cap section's two sectors marked
 
-### The interactive maps (17 Nov 2026)
+### The interactive maps (17 Nov 2026) - REBUILT as one big world map
 
-Built by `export_snow_map.py` -> `docs/data/snowmap_<tag>.json` ->
-`assets/js/maps.js`. Six models carry a snowfall field (the ECCC as the
-pooled 40-member canSIPS); the JMA and the BoM have no snowfall at all.
+`export_snow_map.py` -> `docs/data/snowmap_<tag>.json` + one 8-bit
+greyscale PNG per field -> `assets/js/maps.js`.
 
-**The field is currently only the eastern United States** (a 1 degree box,
-21-52N / 129-61W) painted onto the world. The next task is to make it the
-**full worldwide model output**, with the anomalies alongside the totals.
+**The field is now the WHOLE WORLD on the model's own grid** - no
+interpolation, no resampling - and it comes in two flavours: the
+accumulated snowfall, and the **anomaly against that model's own hindcast
+climate** (the only honest baseline; the ECCC is genuinely ~3x drier).
+
+The map is one canvas with the vectors on top:
+* the earth (ocean, land, lakes) is painted on the canvas, the field is
+  painted over it, and the coastlines are drawn in the SVG above;
+* the field is drawn **pixel by pixel**: d3's `projection.invert()` turns
+  each screen pixel back into a longitude and a latitude, and the field is
+  sampled there.  The inverse is the expensive part, so it is cached as a
+  **sampling plan** per view and the timeline only re-reads the field;
+* the controls: the model, the field (snowfall / anomaly), a **timeline**
+  (the run total and one button per lead month, with a play button), and
+  the three views (flat / globe / polar).  The globe can be dragged and
+  scrolled to zoom.
+
+The two traps that are already known and fixed:
+
+* the exporter's flat array runs **lon-major** and the browser walks it
+  **lat-major** - writing one and reading the other turns a smooth field
+  into horizontal stripes while the JS still draws 48 colour bands and
+  shows no error. The transpose happens on the way out.
+* d3's `rotate([lambda, phi])` puts `(-lambda, -phi)` at the centre of an
+  orthographic globe, so the globe opens over North America with
+  `rot: [95, -35]`.
+
+**Two more traps this time round:**
+* `projection.invert()` does NOT clip: on the globe it answers for the far
+  side of the world as well, so the field was painted on the dark sky
+  outside the limb.  The plan now skips the pixels outside the disc (the
+  globe's radius is the scale; the polar disc's radius is `k * pi / 2`).
+* a sector ring that jumps across the antimeridian is drawn as a line
+  straight across the map - the longitudes have to stay **unwrapped** and
+  let d3 cut the antimeridian.
+
+### The tests
+
+* `tools/test_export_map.py` - the exporter against a synthetic model: the
+  unit arithmetic, the anomaly against the model's own climate, the mask,
+  the ladder quantisation and the raster sizes.  All the checks pass.
+* `tools/test_maps_page.py` - the page in a headless browser with a
+  synthetic model: the globe, the flat map, the polar view, the timeline
+  and the anomaly toggle, with the console watched for errors.
+
+**Both tests need no key and no queue - they run in seconds.**  That is
+the point: the code can be checked while the store is busy.
 
 Two traps that are already known and fixed:
 

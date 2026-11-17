@@ -443,6 +443,28 @@
     d3.json("data/snowmap_" + tag + ".json").then(function (d) {
       try {
         state.manifest = d;
+        /* a model without its own hindcast climate has no honest anomaly:
+           the toggle is switched off and says why */
+        var ab = document.querySelectorAll("#snowfield button");
+        Array.prototype.forEach.call(ab, function (b) {
+          if (b.dataset.field !== "anom") { return; }
+          if (d.anom_available === false) {
+            b.disabled = true;
+            b.style.opacity = 0.45;
+            b.title = "this model has no hindcast climate, so there is " +
+              "nothing to measure the anomaly against";
+          } else {
+            b.disabled = false;
+            b.style.opacity = "";
+            b.title = "";
+          }
+        });
+        if (d.anom_available === false && state.field === "anom") {
+          state.field = "total";
+          Array.prototype.forEach.call(ab, function (b) {
+            b.classList.toggle("on", b.dataset.field === "total");
+          });
+        }
         buildTimeline();
         drawLegend();
         loadField();
@@ -450,8 +472,7 @@
       } catch (e) {
         fail("the field could not be drawn: " + e);
       }
-    }).catch(function (e) {
-      var n = el("mapload");
+    }).catch(function (e) {      var n = el("mapload");
       if (n) {
         n.style.display = "block";
         n.textContent = "The snowfall field could not be loaded: " + e;

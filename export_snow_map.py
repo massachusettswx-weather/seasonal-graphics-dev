@@ -166,6 +166,8 @@ def main():
         cg = os.path.join(d, "snowfall_hindcast.grib")
         if not os.path.exists(fg):
             fg = os.path.join(d, "snowfall_monthly.npz")
+        if not os.path.exists(cg):
+            cg = os.path.join(d, "snowfall_hindcast.npz")
         if not os.path.exists(fg):
             print("skip %s (no snowfall)" % tag)
             continue
@@ -194,9 +196,14 @@ def main():
 
         # the model's OWN hindcast climate - the only honest baseline
         clim = {}
+        has_clim = False
         if os.path.exists(cg):
             for step, ym, la0, lo0, v in PSM.read_any(cg):
                 clim.setdefault(ym, []).append((la0, lo0, v))
+            has_clim = bool(clim)
+        if not has_clim:
+            print("  %s: no hindcast climate - the anomaly cannot be drawn"
+                  % tag, flush=True)
 
         monthly_in = []
         labels = []
@@ -242,6 +249,10 @@ def main():
         finite = np.abs(np.concatenate([a[np.isfinite(a)] for a in anom_in]
                                        + [total_anom[np.isfinite(total_anom)]]))
         scale = nice_scale(np.percentile(finite, 99.5) if finite.size else 4.0)
+        # the mask is the model's OWN climate for the month the anomaly is
+        # about: a place where the model expects no snow in December is not
+        # "drier than normal in December", whatever it does in January
+        masks = [c < PSM.ANOM_MASK_CLIM for c in clim_in]
         mask = total_clim < PSM.ANOM_MASK_CLIM
 
         # ---- write the rasters ----
@@ -252,7 +263,7 @@ def main():
             write_png(os.path.join(OUT, fn_t),
                       quantise_total(monthly_in[k], levels))
             a = np.array(anom_in[k], dtype=float)
-            a[mask] = np.nan
+            a[masks[k]] = np.nan
             write_png(os.path.join(OUT, fn_a), quantise_anom(a, scale))
             files.append({"ym": "%04d-%02d" % ym, "label": lab,
                           "total": fn_t, "anom": fn_a})
@@ -281,6 +292,7 @@ def main():
             "ramp": ramp,
             "anom_colors": anom_colors,
             "anom_scale": float(scale),
+            "anom_available": bool(has_clim),
             "months": files,
             "total": {"total": fn_t, "anom": fn_a},
         }
@@ -294,6 +306,7 @@ def main():
               % (tag, len(yms), len(lats0), len(lons0), size, png))
         summary.append(tag)
         exported[tag] = {"months": files, "grid": out["grid"],
+                         "anom_available": bool(has_clim),
                          "monthly_in": monthly_in, "total_in": total_in,
                          "anom_in": anom_in, "total_anom": total_anom,
                          "total_clim": total_clim}
@@ -323,6 +336,10 @@ def main():
         finite = np.abs(np.concatenate([a[np.isfinite(a)] for a in anoms]
                                        + [total_anom[np.isfinite(total_anom)]]))
         scale = nice_scale(np.percentile(finite, 99.5) if finite.size else 4.0)
+        # the mask is the model's OWN climate for the month the anomaly is
+        # about: a place where the model expects no snow in December is not
+        # "drier than normal in December", whatever it does in January
+        masks = [c < PSM.ANOM_MASK_CLIM for c in clim_in]
         mask = total_clim < PSM.ANOM_MASK_CLIM
         files = []
         for k, f in enumerate(ref["months"]):
@@ -345,6 +362,8 @@ def main():
             "levels": levels, "colors": colors, "ramp": ramp,
             "anom_colors": anom_colors,
             "anom_scale": float(scale),
+            "anom_available": all(exported[t].get("anom_available", False)
+                                  for t in MULTI_MEMBERS),
             "months": files,
             "total": {"total": fn_t, "anom": fn_a},
         }
