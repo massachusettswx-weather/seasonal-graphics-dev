@@ -221,11 +221,24 @@ def main():
             for f in os.listdir(DATA):
                 if f.startswith("snowmap_%s" % TAG):
                     os.remove(os.path.join(DATA, f))
-            # put the real model index back
-            bak = os.path.join(DATA, "snowmap_tags.json.bak")
-            if os.path.exists(bak):
-                shutil.copyfile(bak, os.path.join(DATA, "snowmap_tags.json"))
-                os.remove(bak)
+            # put the real model index back, rebuilt from the manifests
+            # that are actually there - restoring a saved copy can put
+            # back a picker entry for a model the site does not have
+            import export_snow_map as ESM
+            tags = []
+            state = {}
+            for f in sorted(os.listdir(DATA)):
+                if not (f.startswith("snowmap_") and f.endswith(".json")):
+                    continue
+                if f in ("snowmap_tags.json",):
+                    continue
+                tag = f[len("snowmap_"):-len(".json")]
+                if tag == TAG:
+                    continue
+                m = json.load(open(os.path.join(DATA, f)))
+                tags.append(tag)
+                state[tag] = {"name": m.get("name", tag), "init": m.get("init", "")}
+            ESM.write_index(tags, state)
             print("cleaned up the test files")
     return 0
 

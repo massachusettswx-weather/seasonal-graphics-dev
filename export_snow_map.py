@@ -161,6 +161,28 @@ def house_palette():
     return levels, colors, ladder_lut(levels, colors), anom_colors
 
 
+def write_index(tags, state):
+    """The list the maps page reads to build its model picker.
+
+    ONE place writes it.  The page's picker is built from this file, so a
+    model that is listed but not there is a broken entry in the picker (and
+    a 404 for its rasters) - and that is exactly what a test run that
+    leaves its own model behind used to publish.
+    """
+    index = []
+    for tag in tags:
+        meta = state.get(tag, {})
+        index.append({"tag": tag,
+                      "name": "C3S Multi-Model Mean" if tag == "c3s-multi"
+                      else meta.get("name", tag),
+                      "init": meta.get("init", "")})
+    with open(os.path.join(OUT, "snowmap_tags.json"), "w") as f:
+        json.dump(index, f)
+    with open(os.path.join(DATA, "snowmap_tags.json"), "w") as f:
+        json.dump(tags, f)
+    return index
+
+
 def main():
     import plot_snow_models as PSM
     from plot_snow_ref import MONTH_NAMES
@@ -401,17 +423,7 @@ def main():
         summary.append(tag)
 
     # the list the maps page reads to build its model picker
-    index = []
-    for tag in summary:
-        meta = state.get(tag, {})
-        index.append({"tag": tag,
-                      "name": "C3S Multi-Model Mean" if tag == "c3s-multi"
-                      else meta.get("name", tag),
-                      "init": meta.get("init", "")})
-    with open(os.path.join(OUT, "snowmap_tags.json"), "w") as f:
-        json.dump(index, f)
-    with open(os.path.join(DATA, "snowmap_tags.json"), "w") as f:
-        json.dump(summary, f)
+    write_index(summary, state)
     print("exported %d models" % len(summary))
 
 
