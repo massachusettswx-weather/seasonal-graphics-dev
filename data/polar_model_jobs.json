@@ -643,8 +643,9 @@
    "chunk": 30,
    "end": 45,
    "job": "ac1bd1f2-e7ba-4f74-92c0-50f3052edbd6",
-   "status": "accepted",
-   "init": "2026-11"
+   "status": "decoded",
+   "init": "2026-11",
+   "members": 51
   }
  ]
 }
