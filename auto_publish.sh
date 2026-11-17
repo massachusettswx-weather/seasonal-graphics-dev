@@ -95,6 +95,11 @@ while true; do
             # ensemble before anything is rendered
             python3 -u build_cansips.py >> logs_auto_publish.log 2>&1
             python3 -u plot_snow_models.py --unit snow >> logs_auto_publish.log 2>&1
+            # the interactive map: the same fields, on the model's OWN global
+            # grid, with the anomaly against the model's own hindcast
+            # climate.  It has to be rebuilt whenever the data changes, or
+            # the map on the site is a month out of date with the panels.
+            python3 -u export_snow_map.py >> logs_auto_publish.log 2>&1
             python3 -u plot_snow_multi.py >> logs_auto_publish.log 2>&1
             python3 -u plot_enso.py >> logs_auto_publish.log 2>&1
             # the polar-cap time-height sections.  Every system that has a

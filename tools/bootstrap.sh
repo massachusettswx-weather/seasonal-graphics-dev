@@ -11,18 +11,20 @@
 # WHAT SURVIVES AND WHAT DOES NOT
 # -------------------------------
 #   survives  the code, the published site and the small derived data
-#             (both GitHub repositories, and the agent's memory)
+#             (both GitHub repositories, the encrypted secret store and the
+#             agent's memory)
 #   does NOT  data/models/** (the model GRIBs - bulky, gitignored),
 #             .cdsapirc and data/.github_token (the credentials), and the
 #             python packages
 #
 # So this script:
 #   1. clones the development repository (or pulls, if it is already here)
-#   2. writes the credentials back out of the environment
-#   3. puts the python packages back
+#   2. puts the python packages back
+#   3. writes the credentials back out of the environment - they come from
+#      the encrypted secret store, which survives the reset
 #   4. recovers the model data: the job ids are tracked, so the results can
 #      often be downloaded again WITHOUT queueing for them
-#   5. prints what is still missing
+#   5. starts the workers and prints what is alive and what is waiting
 #
 # USAGE
 #   export CDS_API_KEY=<the cds key>        # from the encrypted secret store
@@ -39,16 +41,16 @@ if [ "${1:-}" != "--pull" ]; then
         git clone --depth 50 "$REPO_URL" "$HERE" || exit 1
     else
         echo "== the checkout is already here - pulling"
-        git -C "$HERE" pull --ff-only || echo "   (the pull did not apply - carry on with what is here)"
+        git -C "$HERE" pull --ff-only || \
+            echo "   (the pull did not apply - carry on with what is here)"
     fi
 fi
+cd "$HERE"
 
-echo "== credentials"
-./tools/restore_secrets.sh || echo "   (no credentials yet - the fetches will not work)"
+echo "== the toolchain and the credentials"
+./tools/auto_run.sh || echo "   (auto_run.sh did not finish cleanly)"
 
-echo "== python packages"
-./tools/restore_env.sh || echo "   (the packages did not install - the GRIB readers will fail)"
-
+echo ""
 echo "== the model data"
 if [ -f .cdsapirc ]; then
     python3 tools/recover_jobs.py || true
@@ -67,7 +69,8 @@ if os.path.exists(reg):
     have, miss = [], []
     for tag, rec in st.items():
         d = os.path.join(root, "data", "models", tag)
-        ok = os.path.exists(os.path.join(d, "snowfall_monthly.grib"))
+        ok = os.path.exists(os.path.join(d, "snowfall_monthly.grib")) or \
+             os.path.exists(os.path.join(d, "snowfall_monthly.npz"))
         (have if ok else miss).append(tag)
     print("   model data present :", ", ".join(have) or "-")
     print("   model data missing :", ", ".join(miss) or "-")

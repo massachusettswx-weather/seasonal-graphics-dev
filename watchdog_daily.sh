@@ -9,7 +9,7 @@
 # on 10 November 2026, so this watchdog deliberately does NOT restart the
 # fetch loop or the publisher any more - it only keeps the toolchain ready
 # for restart_nov_init.sh.
-cd /workspace/seas5
+cd "$(cd "$(dirname "$0")" && pwd)" || exit 1
 
 while true; do
   if ! python3 -c "import requests, eccodes, numcodecs" > /dev/null 2>&1; then

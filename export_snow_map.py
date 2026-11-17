@@ -84,7 +84,7 @@ def quantise_total(field_in, levels):
     hi = float(levels[-1])
     v = np.where(np.isfinite(field_in), field_in, hi)
     t = (np.log10(np.maximum(v, lo)) - np.log10(lo)) / (np.log10(hi) - np.log10(lo))
-    out = np.round(np.clip(t, 0.0, 1.0) * 254.0).astype(np.uint8)
+    out = np.round(np.clip(t, 0.0, 1.0) * 254.0).astype(np.uint8)  # NaN-safe
     out[v > hi] = OVER
     out[v <= 0.0] = 0
     return out
@@ -93,6 +93,7 @@ def quantise_total(field_in, levels):
 def quantise_anom(field_in, scale):
     """signed anomaly -> 0..254 over +-scale, 255 = masked."""
     a = np.clip((field_in + scale) / (2.0 * scale), 0.0, 1.0) * 254.0
+    a = np.where(np.isfinite(a), a, 0.0)
     out = np.round(a).astype(np.uint8)
     out[~np.isfinite(field_in)] = OVER
     out[field_in < -scale] = 0
@@ -162,12 +163,18 @@ def main():
         if tag in POOLED_INTO:
             continue
         d = os.path.join(MDIR, tag)
-        fg = os.path.join(d, "snowfall_monthly.grib")
-        cg = os.path.join(d, "snowfall_hindcast.grib")
+        # the map is the WHOLE WORLD.  The centres that serve a global
+        # field already have one; the NOAA systems are read over a box for
+        # the panels, so their global field is written beside it as
+        # snowfall_monthly_global.npz and is preferred here.
+        fg = os.path.join(d, "snowfall_monthly_global.npz")
+        cg = os.path.join(d, "snowfall_hindcast_global.npz")
         if not os.path.exists(fg):
-            fg = os.path.join(d, "snowfall_monthly.npz")
-        if not os.path.exists(cg):
-            cg = os.path.join(d, "snowfall_hindcast.npz")
+            fg = os.path.join(d, "snowfall_monthly.grib")
+            cg = os.path.join(d, "snowfall_hindcast.grib")
+            if not os.path.exists(fg):
+                fg = os.path.join(d, "snowfall_monthly.npz")
+                cg = os.path.join(d, "snowfall_hindcast.npz")
         if not os.path.exists(fg):
             print("skip %s (no snowfall)" % tag)
             continue
@@ -279,7 +286,10 @@ def main():
             "tag": tag,
             "name": meta.get("name", tag),
             "init": init,
-            "members": len(by_step[yms[0]]),
+            # the number of members the mean is made of: the .npz fields
+            # carry the ensemble MEAN, so the file holds one "member" - the
+            # real count comes from the registry
+            "members": int(meta.get("members") or len(by_step[yms[0]])),
             # the model's own grid, north to south and west to east
             "grid": {"lat0": float(lats0[0]), "dlat": float(abs(lats0[1] - lats0[0]))
                      if len(lats0) > 1 else 1.0,

@@ -198,6 +198,98 @@ def fetch(init="202611", exp=EXP, tag="sfsv1"):
     print("registered %s in models_fetched.json" % tag)
 
 
+def fetch_global(init="202611", exp=EXP, tag="sfsv1"):
+    """The WHOLE WORLD field, for the interactive map.
+
+    The panels are drawn over the eastern United States, so `fetch()` reads
+    only that box.  The map is the whole world, so this reads the whole
+    globe: the model's own 0.5 degree grid, nothing resampled, and the
+    ensemble mean over the members (the map does not need the spread).
+
+    The model's own hindcast climate comes from the same reforecast store,
+    so the anomaly on the map is measured against the model's own climate
+    and not against somebody else's.
+
+    The convention is the one the renderer expects: latitudes descending,
+    longitudes from -180 to 180, and a rate in m w.e. s-1.
+    """
+    fs = _fs()
+    fz = open_zarr(fs, forecast_path(init, exp))
+    lat = np.asarray(fz["lat"][:]); lon = np.asarray(fz["lon"][:])
+    nlead = int(fz["lead"].shape[0])
+    nmem = int(fz["member"].shape[0])
+    months = lead_months(init, nlead)
+    ts = fz["tsnowpsfc"]; pr = fz["pratesfc"]
+    print("global forecast %s: %d members x %d lead months, grid %dx%d"
+          % (init, nmem, nlead, len(lat), len(lon)), flush=True)
+    mean = np.zeros((nlead, len(lat), len(lon)), np.float32)
+    for k in range(nlead):
+        y, m = months[k]
+        t = np.asarray(ts[:, k])
+        p = np.asarray(pr[:, k])
+        s = snowfall_from(t, p, y, m)
+        mean[k] = s.mean(axis=0)
+        print("  lead %d (%04d-%02d): snowfall max %.1f kg/m2  mean %.2f"
+              % (k, y, m, mean[k].max(), mean[k].mean()), flush=True)
+
+    # the model's own hindcast climate: the 35-year reforecast for the same
+    # calendar month
+    clim = None
+    try:
+        rz = open_zarr(fs, reforecast_path(int(init[4:6]), exp))
+        rts = rz["tsnowpsfc"]; rpr = rz["pratesfc"]
+        nyr = int(rts.shape[0])
+        print("global reforecast: %d years x %d members x %d leads"
+              % (nyr, int(rts.shape[1]), nlead), flush=True)
+        clim = np.zeros_like(mean)
+        for k in range(nlead):
+            y, m = months[k]
+            acc = None
+            for yi in range(nyr):
+                t = np.asarray(rts[yi, :, k])
+                p = np.asarray(rpr[yi, :, k])
+                s = snowfall_from(t, p, y, m).mean(axis=0)
+                acc = s if acc is None else acc + s
+            clim[k] = acc / nyr
+            print("  clim lead %d (%04d-%02d): max %.1f kg/m2"
+                  % (k, y, m, clim[k].max()), flush=True)
+    except Exception as e:
+        print("no global reforecast (%s) - the map will have no anomaly for "
+              "this model" % str(e)[:120], flush=True)
+
+    # the renderer's convention: latitudes descending, longitudes -180..180
+    lats = lat[::-1].copy()
+    lons = np.where(lon > 180, lon - 360, lon)
+    order = np.argsort(lons)
+    lons = lons[order]
+    mean = mean[:, ::-1, :][:, :, order]
+    sec_all = np.array([calendar.monthrange(y, m)[1] * 86400.0
+                        for (y, m) in months])
+
+    os.makedirs(os.path.join(MDIR, tag), exist_ok=True)
+    np.savez_compressed(os.path.join(MDIR, tag, "snowfall_monthly_global.npz"),
+                        months=np.array(["%04d-%02d" % m for m in months]),
+                        values=(mean[None, :, :, :] / 1000.0 /
+                                sec_all[None, :, None, None]).astype(np.float32),
+                        lat=lats, lon=lons,
+                        meta=np.array(json.dumps(
+                            dict(tag=tag, name="NOAA SFSv1 (SFS Beta %s)" % exp,
+                                 init="%s-%s" % (init[:4], init[4:6]),
+                                 members=nmem, source="NOAA NODD %s" % exp,
+                                 whole_world=True))))
+    print("wrote %s/snowfall_monthly_global.npz" % tag)
+    if clim is not None:
+        c = clim[:, ::-1, :][:, :, order]
+        np.savez_compressed(os.path.join(MDIR, tag, "snowfall_hindcast_global.npz"),
+                            months=np.array(["%04d-%02d" % m for m in months]),
+                            values=(c[None, :, :, :] / 1000.0 /
+                                    sec_all[None, :, None, None]).astype(np.float32),
+                            lat=lats, lon=lons,
+                            meta=np.array(json.dumps(
+                                dict(init="%s-%s" % (init[:4], init[4:6])))))
+        print("wrote %s/snowfall_hindcast_global.npz" % tag)
+
+
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
@@ -206,10 +298,14 @@ if __name__ == "__main__":
                          "store holds")
     ap.add_argument("--exp", default=EXP)
     ap.add_argument("--tag", default="sfsv1")
+    ap.add_argument("--global-only", action="store_true",
+                    help="only read the whole world (for the map)")
     a = ap.parse_args()
     init = a.init or newest_init(exp=a.exp)
     if not init:
         print("   no init found in the forecast store")
         raise SystemExit(1)
     print("   the SFS init: %s" % init)
-    fetch(init, a.exp, a.tag)
+    if not a.global_only:
+        fetch(init, a.exp, a.tag)
+    fetch_global(init, a.exp, a.tag)

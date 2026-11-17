@@ -5,7 +5,7 @@
 # The sandbox rebuilds every hour or two and wipes the installed packages
 # and every background process, so this is the first thing to run after
 # one of those.  The published site is not affected - it lives on GitHub.
-cd /workspace/seas5 || exit 1
+cd "$(cd "$(dirname "$0")" && pwd)" || exit 1
 
 # The toolchain.  It goes into the USER site, which lives under the
 # workspace (/workspace/.home) and therefore survives the rebuild - the
