@@ -33,7 +33,7 @@
 #   ./tools/bootstrap.sh --pull             # only update an existing checkout
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
-REPO_URL="https://github.com/Matthew22-cmd/seasonal-graphics-dev.git"
+REPO_URL="https://github.com/massachusettswx-weather/seasonal-graphics-dev.git"
 
 if [ "${1:-}" != "--pull" ]; then
     if [ ! -f "$HERE/README.md" ]; then

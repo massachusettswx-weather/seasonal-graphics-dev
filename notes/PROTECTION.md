@@ -37,7 +37,7 @@ three, and the working tree only ever holds what can be rebuilt.**
 ```bash
 export CDS_API_KEY=<the cds key>
 export GITHUB_TOKEN=<the github pat>
-git clone --depth 50 https://github.com/Matthew22-cmd/seasonal-graphics-dev.git
+git clone --depth 50 https://github.com/massachusettswx-weather/seasonal-graphics-dev.git
 cd seasonal-graphics-dev
 ./tools/bootstrap.sh
 ```

@@ -4,7 +4,7 @@ There are TWO sites and they are two repositories:
 
 | | repository | address |
 |---|---|---|
-| **dev** | `Matthew22-cmd/seasonal-graphics-dev` | `https://matthew22-cmd.github.io/seasonal-graphics-dev/` |
+| **dev** | `massachusettswx-weather/seasonal-graphics-dev` | `https://massachusettswx-weather.github.io/seasonal-graphics-dev/` |
 | **operational** | `massachusettswx-weather/seasonal-graphics` | `https://massachusettswx-weather.github.io/seasonal-graphics/` |
 
 ```bash
@@ -59,14 +59,24 @@ force is needed.
 
 ## What the token can and cannot do
 
-The token belongs to `Matthew22-cmd`.  It can create the development
-repository (under its own account) and it is a write collaborator on the
-operational one.  It **cannot** create a repository under
-`massachusettswx-weather` - that account's repositories have to be created
-by hand.  If the development copy is wanted under the main account, create
-`massachusettswx-weather/seasonal-graphics-dev` by hand, add the token
-account as a collaborator, and point the script at it with
-`GITHUB_DEV_OWNER=massachusettswx-weather`.
+**17 Nov 2026:** the token in the encrypted store belongs to
+`massachusettswx-weather`, which owns the **operational** repository and
+**cannot** write to `Matthew22-cmd/seasonal-graphics-dev` (GitHub reports
+`permissions: {push: false}` - pull only).  So the development copy now
+lives at `massachusettswx-weather/seasonal-graphics-dev` - a separate
+repository, the same gate, and the only place the pipeline publishes.
+The operational repository is still never touched without the owner's
+explicit `--prod --approved`.
+
+To put the development copy back under the personal account, add
+`massachusettswx-weather` as a write collaborator on
+`Matthew22-cmd/seasonal-graphics-dev` and point the script at it with
+`GITHUB_DEV_OWNER=Matthew22-cmd` (the URL in `auto_publish.sh` follows
+the owner).
+
+The older token belonged to `Matthew22-cmd`, which could create the
+development repository under its own account and was a write
+collaborator on the operational one.
 
 ## The approval gate (16 Nov 2026)
 

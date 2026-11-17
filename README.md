@@ -182,7 +182,7 @@ There are TWO sites, and they are two repositories:
 
 | | repository | address | what goes there |
 |---|---|---|---|
-| **dev** | `Matthew22-cmd/seasonal-graphics-dev` | `https://matthew22-cmd.github.io/seasonal-graphics-dev/` | everything, always |
+| **dev** | `massachusettswx-weather/seasonal-graphics-dev` | `https://massachusettswx-weather.github.io/seasonal-graphics-dev/` | everything, always |
 | **operational** | `massachusettswx-weather/seasonal-graphics` | `https://massachusettswx-weather.github.io/seasonal-graphics/` | only what has been promoted |
 
 ```bash

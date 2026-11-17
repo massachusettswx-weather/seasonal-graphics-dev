@@ -1,1 +1,1 @@
-[{"tag": "cfsv2", "name": "NOAA CFSv2", "init": "2026-12"}, {"tag": "sfsv1", "name": "NOAA SFSv1", "init": "2026-11"}]
+[{"tag": "cfsv2", "name": "NOAA CFSv2", "init": "2026-12"}, {"tag": "eccc-cansips", "name": "ECCC canSIPS", "init": "2026-11"}, {"tag": "sfsv1", "name": "NOAA SFSv1", "init": "2026-11"}]

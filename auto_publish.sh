@@ -23,8 +23,8 @@ cd "$(dirname "$0")"
 # operational build committed to the dev repository is a stale copy of the
 # live site on the dev address.)
 export SITE_DEV=1
-export SITE_URL="https://matthew22-cmd.github.io/seasonal-graphics-dev/"
-export SITE_REPO_URL="https://github.com/Matthew22-cmd/seasonal-graphics-dev"
+export SITE_URL="https://massachusettswx-weather.github.io/seasonal-graphics-dev/"
+export SITE_REPO_URL="https://github.com/massachusettswx-weather/seasonal-graphics-dev"
 export HOME="${HOME:-/workspace/.home}"
 export PYTHONPATH="${PYTHONPATH:-/workspace/.home/.local/lib/python3.11/site-packages}"
 # The token lives in data/.github_token with mode 600, not on the command

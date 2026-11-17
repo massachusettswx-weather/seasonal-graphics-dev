@@ -11,7 +11,7 @@ after the global map rebuild, and after the auto-run was wired)
 
 | | repository | address |
 |---|---|---|
-| **dev** | `Matthew22-cmd/seasonal-graphics-dev` | <https://matthew22-cmd.github.io/seasonal-graphics-dev/> |
+| **dev** | `massachusettswx-weather/seasonal-graphics-dev` | <https://massachusettswx-weather.github.io/seasonal-graphics-dev/> |
 | **operational** | `massachusettswx-weather/seasonal-graphics` | <https://massachusettswx-weather.github.io/seasonal-graphics/> |
 
 The old name `seasonal-snow` no longer exists - the repository was renamed
@@ -241,11 +241,11 @@ global grid as its GRIB arrives.
 
 **The one blocker: the PAT cannot push the dev repo.**  The token
 belongs to `massachusettswx-weather`, which has **pull-only** on
-`Matthew22-cmd/seasonal-graphics-dev` (GitHub says `permissions: {push:
+`massachusettswx-weather/seasonal-graphics-dev` (GitHub says `permissions: {push:
 false}`) and owns the **operational** repo, which is not to be touched
 without approval.  Two ways out, both the owner's call:
   - add `massachusettswx-weather` as a collaborator with write access on
-    `Matthew22-cmd/seasonal-graphics-dev` (keeps the dev URL); or
+    `massachusettswx-weather/seasonal-graphics-dev` (keeps the dev URL); or
   - let the dev copy live in a repo the token owns
     (`massachusettswx-weather/seasonal-graphics-dev`), which changes the
     dev URL but lets the pipeline run unattended from then on.
@@ -262,3 +262,30 @@ without approval.  Two ways out, both the owner's call:
   password they already have, and the publisher now **verifies the gate
   is in the built pages** before anything is pushed - a development copy
   without a gate is never published.
+
+### The development copy has moved (17 Nov, 20:05)
+
+The PAT in the secret store belongs to `massachusettswx-weather`, which
+has **pull-only** on `Matthew22-cmd/seasonal-graphics-dev` - so the
+pipeline could not publish anywhere.  The development copy now lives in
+**`massachusettswx-weather/seasonal-graphics-dev`**, a repository of its
+own that the token owns, and the site is live at
+<https://massachusettswx-weather.github.io/seasonal-graphics-dev/> (the
+same password gate, the same pages).  **The operational repository is
+untouched** - it is still `massachusettswx-weather/seasonal-graphics`,
+and `--prod` still needs the owner's explicit approval.
+
+The old URL (`Matthew22-cmd/seasonal-graphics-dev`) still serves the
+build from before the map corrections, and it cannot be updated from
+here.  To put the development copy back under the personal account, add
+`massachusettswx-weather` as a write collaborator on that repository and
+point the script at it with `GITHUB_DEV_OWNER=Matthew22-cmd`.
+
+Two things that had to be fixed to get the first push through:
+- the local clone was **shallow** (depth 50 from the old repo), so
+  pushing to an empty repository failed with "did not receive expected
+  object".  The full history was fetched once; after that a depth-50
+  clone pushes cleanly (tested), which is what the keepalive does after
+  every rebuild.
+- `push_to_github.sh` now derives the development URL from
+  `GITHUB_DEV_OWNER` instead of hard-coding the old owner.
