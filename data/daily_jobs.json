@@ -423,6 +423,76 @@
    "init": "2026-11",
    "status": "accepted",
    "_t0": 1794949672.255445
+  },
+  {
+   "job": "4981cb72-038b-47db-89be-ef4cff2cc946",
+   "tag": "ukmo-gloseas6",
+   "chunk": 0,
+   "centre": "ukmo",
+   "system": "610",
+   "init": "2026-11",
+   "status": "accepted",
+   "_t0": 1794949800.6701756
+  },
+  {
+   "job": "894b4e9d-7543-4e7d-b2ce-ff658fb066db",
+   "tag": "ukmo-gloseas6",
+   "chunk": 0,
+   "centre": "ukmo",
+   "system": "610",
+   "init": "2026-11",
+   "status": "accepted",
+   "_t0": 1794949929.0047562
+  },
+  {
+   "job": "3e2fe52e-f3c4-406f-a27f-6335836a40c7",
+   "tag": "ukmo-gloseas6",
+   "chunk": 0,
+   "centre": "ukmo",
+   "system": "610",
+   "init": "2026-11",
+   "status": "accepted",
+   "_t0": 1794950058.1668568
+  },
+  {
+   "job": "4087812e-9040-40d1-8bb0-6c24cc164533",
+   "tag": "ukmo-gloseas6",
+   "chunk": 0,
+   "centre": "ukmo",
+   "system": "610",
+   "init": "2026-11",
+   "status": "accepted",
+   "_t0": 1794950186.6112664
+  },
+  {
+   "job": "4160c41f-ded6-4e70-be7f-b4183408f886",
+   "tag": "ukmo-gloseas6",
+   "chunk": 0,
+   "centre": "ukmo",
+   "system": "610",
+   "init": "2026-11",
+   "status": "accepted",
+   "_t0": 1794950314.6264427
+  },
+  {
+   "job": "e55a90fd-71ee-4f65-942e-54c53f3ba9a9",
+   "tag": "ukmo-gloseas6",
+   "chunk": 0,
+   "centre": "ukmo",
+   "system": "610",
+   "init": "2026-11",
+   "status": "accepted",
+   "_t0": 1794950443.06086
+  },
+  {
+   "job": "6e015179-68aa-467a-aff3-3df8d3eb4fbd",
+   "tag": "ukmo-gloseas6",
+   "chunk": 0,
+   "centre": "ukmo",
+   "system": "610",
+   "init": "2026-11",
+   "status": "accepted",
+   "_t0": 1794950572.1513278
   }
  ],
  "stall": false,

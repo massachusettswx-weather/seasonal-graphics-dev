@@ -507,6 +507,11 @@ def build_login_page():
  border:0;border-radius:4px;background:#1f4c44;color:#fff;cursor:pointer}
 .gate .err{color:#a11;min-height:1.2em;font-size:.85rem;margin:.6rem 0 0}
 .gate .stamp{font-size:.72rem;color:#8a8a8a;margin:.9rem 0 0}
+.gate .row{display:flex;gap:1rem;align-items:center;justify-content:center;
+  margin-top:.7rem;font-size:.8rem;color:#666}
+.gate .show{display:flex;gap:.35rem;align-items:center;cursor:pointer}
+.gate .link{background:none;border:0;color:#1f4c44;text-decoration:underline;
+  cursor:pointer;font:inherit;padding:0}
 </style>
 </head>
 <body>
@@ -514,8 +519,12 @@ def build_login_page():
 <h1>Seasonal Forecast Graphics</h1>
 <p>Development copy &mdash; this site is private.<br>Enter the development password.</p>
 <form id="f">
-<input id="pw" type="password" placeholder="password" autofocus autocomplete="current-password">
+<input id="pw" type="password" placeholder="password" autofocus autocomplete="off">
 <button type="submit">Sign in</button>
+<div class="row">
+<label class="show"><input type="checkbox" id="showpw"> show the password</label>
+<button type="button" id="clearpw" class="link">clear the field</button>
+</div>
 </form>
 <p class="err" id="msg"></p>
 <p class="stamp">the copy built __STAMP__</p>
@@ -523,6 +532,16 @@ def build_login_page():
 <script>
 var HASH=__HASH__;
 var OLD=__OLD__;
+/* a password manager can silently fill the field in with an old password,
+   and the reader cannot see it, so the field can be shown and cleared */
+document.getElementById('showpw').addEventListener('change',function(e){
+  var f=document.getElementById('pw');
+  f.type=e.target.checked?'text':'password';
+});
+document.getElementById('clearpw').addEventListener('click',function(){
+  var f=document.getElementById('pw');
+  f.value=''; f.focus();
+});
 /* The hash is FETCHED, not taken from this page's own copy: a browser
    that still holds an old login page would otherwise reject the current
    password forever, because the comparison happens in the browser.  The
@@ -543,7 +562,9 @@ async function sha256(s){
 document.getElementById('f').addEventListener('submit',async function(e){
   e.preventDefault();
   var live=await freshHash();
-  var typed=document.getElementById('pw').value.replace(/^\s+|\s+$/g,'');
+  var typed=document.getElementById('pw').value
+      .replace(/[`'\"\u2018\u2019\u201c\u201d]/g,'')
+      .replace(/^\s+|\s+$/g,'');
   var h=await sha256(typed);
   var hl=await sha256(typed.toLowerCase());
   if(h===live||h===HASH||h===OLD||hl===live||hl===HASH||hl===OLD){
@@ -551,7 +572,8 @@ document.getElementById('f').addEventListener('submit',async function(e){
     location.replace('index.html');
   }else{
     document.getElementById('msg').textContent=
-      'That password does not match. Check for a stray space or a capital letter.';
+      'That password does not match. If your browser filled the field in, '+
+      'clear it and type the password yourself.';
   }
 });
 </script>
