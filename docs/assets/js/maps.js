@@ -60,8 +60,12 @@
   /* ---------------------------------------------------------------- */
   /* the earth, painted under the field                               */
 
-  var OCEAN = "#dce8f2";
-  var LAND = "#f2ede0";
+  /* OUR earth, not the pale blue-and-beige that every other weather site
+     uses: a deep navy sea and a slate land, with the coastlines in a cool
+     steel blue.  The field's own colours are then the only bright thing
+     on the map, and the map is unmistakably ours. */
+  var OCEAN = "#0d2233";
+  var LAND = "#2a3642";
 
   function paintEarth(ctx, proj, W, H) {
     /* the ocean: the sphere, or the rectangle on the flat map */
@@ -221,6 +225,11 @@
     }
     var ramp = man.colors || man.ramp;
     var rampRGB = lutRGB || (ramp || []).map(hexToRgb);
+    /* the bottom of the ladder is "no snow".  On the static panels that is
+       the white of the paper; on the map it has to be the earth showing
+       through, or the dark map carries a bright white fringe round every
+       snow field. */
+    var bottomRGB = hexToRgb((man.colors || ["#ffffff"])[0]);
     var anomRGB = (man.anom_colors || []).map(hexToRgb);
     var bytes = r.bytes;
     var alpha = isAnom ? 0.82 : 1.0;
@@ -247,6 +256,8 @@
           if (v < 0.5) { continue; }          /* no snow */
           var col = lutRGB ? lutRGB[Math.min(255, Math.round(v))]
                            : rampRGB[rampIndex(v, ramp)];
+          if (col[0] === bottomRGB[0] && col[1] === bottomRGB[1] &&
+              col[2] === bottomRGB[2]) { continue; }   /* the bottom colour */
         }
         var o = k * 4;
         bp[o] = col[0] * alpha + bp[o] * (1 - alpha);
@@ -682,6 +693,21 @@
         man.name + ", " + man.members + " members" +
         (man.init ? ", " + man.init + " init" : "") +
         ") on the published 0-300 in snow-depth scale";
+      /* THE KEYS: the ladder's own levels, every other one - the same set
+         the static panels' colour bar carries, on the same boundaries.
+         Without them the bar is a stripe with two numbers and nobody can
+         read a value off it. */
+      var lv = man.levels || [];
+      var keys = document.createElement("div");
+      keys.className = "keys";
+      for (var j = 0; j < lv.length; j += 2) {
+        var sp = document.createElement("span");
+        sp.textContent = (lv[j] < 1 && lv[j] !== 0.25 ? lv[j] : Math.round(lv[j]));
+        sp.style.left = (j * 100 / lv.length) + "%";
+        if (j === 0) { sp.className = "first"; }
+        keys.appendChild(sp);
+      }
+      wrap.appendChild(keys);
     }
     ends.appendChild(lo);
     ends.appendChild(hi);

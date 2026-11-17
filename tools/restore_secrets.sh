@@ -46,6 +46,18 @@ else
     rc=1
 fi
 
+# The development copy's gate password lives here too.  The password file is
+# gitignored, so a wipe takes it with the tree, and without it the builder
+# falls back to the PUBLISHED hash - which must be the hash of the password
+# the owner actually has.  Keeping the password in the secret store means
+# the gate never drifts away from the password that is written down.
+if [ -n "${SITE_PASSWORD:-}" ]; then
+    mkdir -p data
+    printf '%s' "$SITE_PASSWORD" > data/.dev_gate_password
+    chmod 600 data/.dev_gate_password
+    echo "wrote data/.dev_gate_password (mode 600)"
+fi
+
 # a quick check that the key is actually accepted, so a stale key is caught
 # here and not three hours into a queue
 if [ -f .cdsapirc ] && command -v curl >/dev/null 2>&1; then

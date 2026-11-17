@@ -207,7 +207,9 @@ def main():
               var n = 0, land = 0;
               for (var i = 0; i < d.length; i += 4) {
                 if (d[i+3] > 0) { n++; }
-                if (Math.abs(d[i] - 242) < 6 && Math.abs(d[i+1] - 237) < 6) { land++; }
+                /* our own land colour: the slate the map is painted with */
+                if (Math.abs(d[i] - 42) < 6 && Math.abs(d[i+1] - 54) < 6 &&
+                    Math.abs(d[i+2] - 66) < 6) { land++; }
               }
               return n + ' painted pixels, ' + land + ' of them land';
             }""")

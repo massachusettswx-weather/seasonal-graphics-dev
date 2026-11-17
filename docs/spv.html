@@ -6,10 +6,20 @@
 <title>Stratosphere &middot; Seasonal Forecast Graphics &middot; DEVELOPMENT COPY</title>
 <link rel="canonical" href="https://massachusettswx-weather.github.io/seasonal-graphics-dev/spv.html">
 <link rel="stylesheet" href="assets/css/style.css?v=20261117202502">
+<script>(function(){var H="147df6f124b15703ddc1fdd2c74dde703d3333aa3382910a411e6f5ee61b9f26";try{if(localStorage.getItem('devgate')!==H){location.replace('login.html');return;}}catch(e){}})();</script>
+<script>
+/* the theme is read back before anything is drawn, so a dark screen never
+   flashes white */
+(function(){
+  try{var t=localStorage.getItem('theme');
+    if(t){document.documentElement.setAttribute('data-theme',t);}}catch(e){}
+})();
+</script>
 <header class="top">
   <h1><a href="https://massachusettswx-weather.github.io/seasonal-graphics-dev/">Seasonal Forecast Graphics</a></h1>
   <span class="sub">ECMWF SEAS5 &amp; C3S seasonal systems &middot; December 2026 &amp; November 2026 inits &middot; <strong>DEVELOPMENT COPY</strong></span>
   <span class="spacer"></span>
+  <button class="themebtn" id="themebtn" type="button">Dark</button>
   <a href="https://github.com/massachusettswx-weather/seasonal-graphics-dev" target="_blank"
      rel="noopener">GitHub</a>
 </header>
@@ -165,6 +175,22 @@ renderPolar();
   <span><strong>@Massachusettswx</strong></span>
 </footer>
 </div>
-<script>(function(){var H="866da46e2e6cd6f6b5aa489cb6a738be078fe7bda1f638a3b8bea8d1d55993c2";try{if(localStorage.getItem('devgate')!==H){location.replace('login.html');return;}}catch(e){}})();</script>
+<script>
+(function(){
+  var b=document.getElementById('themebtn'); if(!b){return;}
+  function label(){
+    var t=document.documentElement.getAttribute('data-theme');
+    b.textContent=(t==='dark')?'Light':'Dark';
+  }
+  label();
+  b.addEventListener('click',function(){
+    var t=document.documentElement.getAttribute('data-theme');
+    t=(t==='dark')?'light':'dark';
+    document.documentElement.setAttribute('data-theme',t);
+    try{localStorage.setItem('theme',t);}catch(e){}
+    label();
+  });
+})();
+</script>
 </body>
 </html>

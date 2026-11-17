@@ -78,6 +78,36 @@ CSS = """
   --ink:#12151a; --muted:#5b6472; --line:#e3e7ee; --bg:#f6f7f9;
   --card:#ffffff; --accent:#12263f; --accent2:#c2410c;
 }
+/* DARK MODE (asked for on 17 Nov 2026).  The theme is a data-theme on the
+   html element: the button in the header sets it, the browser remembers
+   it, and the first thing the page does is read it back, so there is no
+   white flash on a dark screen. */
+:root[data-theme="dark"]{
+  --ink:#e7eef6; --muted:#96a6b8; --line:#25313f; --bg:#0a1017;
+  --card:#121b25; --accent:#12263f; --accent2:#e2600f;
+}
+:root[data-theme="dark"] nav.tabs{background:#0e1620}
+:root[data-theme="dark"] .tag{background:#1a2431; color:#b8c6d5; border-color:#2a3644}
+:root[data-theme="dark"] .tag.ok{background:#15311f; color:#82d3a3; border-color:#255033}
+:root[data-theme="dark"] .tag.no{background:#2d1a16; color:#e79c87; border-color:#4c2b23}
+:root[data-theme="dark"] a.btn{background:#1a2431; color:#dbe7f3; border-color:#2a3644}
+:root[data-theme="dark"] a.btn:hover{background:#243244}
+:root[data-theme="dark"] a.btn.primary{background:#1d4f7a; border-color:#1d4f7a}
+:root[data-theme="dark"] button.ctrl.ghost{background:#1a2431; color:#cfe0f5}
+:root[data-theme="dark"] .seg .segbtn.ghost{background:#1a2431; color:#cfe0f5}
+:root[data-theme="dark"] .seg .segbtn.on{background:#1d4f7a; border-color:#1d4f7a}
+:root[data-theme="dark"] select.ctrl{background:#1a2431; color:#e7eef6; border-color:#2a3644}
+:root[data-theme="dark"] table th{background:#1a2431; color:#c3d0dd}
+:root[data-theme="dark"] .var .thumb{background:#1a2431}
+:root[data-theme="dark"] .maptimeline .tlbtn{background:#1a2431; color:#dbe6f2; border-color:#2a3644}
+:root[data-theme="dark"] .maptimeline .tlbtn.on{background:#1d4f7a; color:#fff; border-color:#1d4f7a}
+:root[data-theme="dark"] .mapviews button{background:#1a2431; color:#dbe7f3}
+:root[data-theme="dark"] .mapviews button.active{background:#1d4f7a; border-color:#1d4f7a}
+:root[data-theme="dark"] .maplegend .bar{border-color:#2a3644}
+.themebtn{font:inherit; font-size:12.5px; padding:5px 13px; cursor:pointer;
+  border:1px solid rgba(207,224,245,.4); background:transparent; color:#cfe0f5;
+  border-radius:999px; margin-right:2px}
+.themebtn:hover{background:rgba(207,224,245,.14)}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{
@@ -191,18 +221,18 @@ a{color:#1c4b8a}
   border-radius:999px}
 .mapviews button.active{background:#12263f; color:#fff; border-color:#12263f}
 .mapbox{position:relative; width:100%; overflow:hidden; border-radius:10px;
-  border:1px solid #1c2430; background-color:#05070e;
+  border:1px solid #16344b; background-color:#061523;
   background-image:
-    radial-gradient(1px 1px at 12% 22%, rgba(255,255,255,.85), transparent),
-    radial-gradient(1px 1px at 34% 68%, rgba(255,255,255,.55), transparent),
-    radial-gradient(1.4px 1.4px at 58% 14%, rgba(255,255,255,.8), transparent),
-    radial-gradient(1px 1px at 76% 44%, rgba(255,255,255,.5), transparent),
-    radial-gradient(1.3px 1.3px at 88% 78%, rgba(255,255,255,.7), transparent),
-    radial-gradient(1px 1px at 22% 86%, rgba(255,255,255,.45), transparent),
-    radial-gradient(1.2px 1.2px at 46% 38%, rgba(255,255,255,.6), transparent),
-    radial-gradient(1px 1px at 66% 92%, rgba(255,255,255,.5), transparent),
-    radial-gradient(1px 1px at 92% 12%, rgba(255,255,255,.6), transparent),
-    radial-gradient(140% 120% at 50% 50%, rgba(38,74,140,.35), transparent 70%);
+    radial-gradient(1px 1px at 12% 22%, rgba(190,220,245,.75), transparent),
+    radial-gradient(1px 1px at 34% 68%, rgba(190,220,245,.5), transparent),
+    radial-gradient(1.4px 1.4px at 58% 14%, rgba(210,232,250,.7), transparent),
+    radial-gradient(1px 1px at 76% 44%, rgba(190,220,245,.45), transparent),
+    radial-gradient(1.3px 1.3px at 88% 78%, rgba(210,232,250,.6), transparent),
+    radial-gradient(1px 1px at 22% 86%, rgba(190,220,245,.4), transparent),
+    radial-gradient(1.2px 1.2px at 46% 38%, rgba(210,232,250,.55), transparent),
+    radial-gradient(1px 1px at 66% 92%, rgba(190,220,245,.45), transparent),
+    radial-gradient(1px 1px at 92% 12%, rgba(210,232,250,.55), transparent),
+    radial-gradient(140% 120% at 50% 50%, rgba(22,61,92,.45), transparent 70%);
 }
 .mapbox svg{display:block; width:100%; height:auto; touch-action:none}
 .mapnote{font-size:12.5px; color:var(--muted); margin:12px 0 0; max-width:60rem}
@@ -210,19 +240,27 @@ a{color:#1c4b8a}
 #maptip{position:absolute; display:none; pointer-events:none; z-index:5;
   background:rgba(8,12,20,.9); color:#fff; font-size:12px; padding:3px 7px;
   border-radius:4px; white-space:nowrap}
-/* the map's own colours: a pale Earth on a dark sky */
-.ocean{fill:#eaf1f7; stroke:#c3ced8; stroke-width:.6}
-.grat{fill:none; stroke:#b6c2cc; stroke-width:.5; stroke-dasharray:2 3; opacity:.75}
-.country{fill:#f7f4ec; stroke:#38424f; stroke-width:.45}
-.country:hover{fill:#ffe9b0}
-.lake{fill:#dfe9f2; stroke:#c3ced8; stroke-width:.35}
-.land{fill:#f7f4ec; stroke:#38424f; stroke-width:.4}
+/* the map's own colours: OUR earth, not the pale blue-and-beige of every
+   other weather site - a deep navy sea, a slate land, cool steel coasts.
+   The field's own colours are the only bright thing on the map. */
+.ocean{fill:#0d2233; stroke:#16344b; stroke-width:.6}
+.grat{fill:none; stroke:#2d4f68; stroke-width:.5; stroke-dasharray:2 3; opacity:.9}
+.country{fill:#2a3642; stroke:#8fb2c9; stroke-width:.45}
+.country:hover{fill:#3d4f61}
+.lake{fill:#0d2233; stroke:#16344b; stroke-width:.35}
+.land{fill:#2a3642; stroke:#8fb2c9; stroke-width:.4}
 .snowband{stroke:none}
 .maplegend{display:flex; align-items:center; gap:8px; flex-wrap:wrap;
   margin:0 0 10px; font-size:12px; color:var(--muted)}
 .maplegend .bar{display:flex; height:12px; border:1px solid #1c2430;
   border-radius:2px; overflow:hidden}
 .maplegend .bar i{display:block; width:16px; height:100%}
+/* the colour bar's keys: the ladder's own levels, every other one, on the
+   same boundaries the static panels' colour bar uses */
+.maplegend .keys{position:relative; width:100%; height:13px; margin-top:1px}
+.maplegend .keys span{position:absolute; transform:translateX(-50%);
+  font-size:10.5px; color:var(--muted); white-space:nowrap; line-height:1}
+.maplegend .keys span.first{transform:translateX(0)}
 .maplegend .ends{display:flex; justify-content:space-between; width:100%;
   margin-top:-2px; font-size:11px}
 .outerring{fill:none; stroke:#8b97a3; stroke-width:.9}
@@ -321,6 +359,7 @@ def header(active):
   <h1><a href="%s">Seasonal Forecast Graphics</a></h1>
   <span class="sub">%s%s</span>
   <span class="spacer"></span>
+  <button class="themebtn" id="themebtn" type="button">Dark</button>
   <a href="%s" target="_blank"
      rel="noopener">GitHub</a>
 </header>
@@ -398,8 +437,8 @@ GATE_HASH = ""
 # one they already have.  (The hash cannot be turned back into the
 # password, but it does not have to - the password is what the visitor
 # types, and this is what the page compares.)
-GATE_HASH_FALLBACK = ("866da46e2e6cd6f6b5aa489cb6a738be078fe7bda1f638a3b8"
-                      "bea8d1d55993c2")
+GATE_HASH_FALLBACK = ("147df6f124b15703ddc1fdd2c74dde703d3333aa3382910"
+                      "a411e6f5ee61b9f26")
 if GATE_PASSWORD:
     import hashlib
     GATE_HASH = hashlib.sha256(GATE_PASSWORD.encode()).hexdigest()
@@ -502,16 +541,41 @@ def page(title, active, body, version=""):
 <link rel="canonical" href="%s">
 <link rel="stylesheet" href="assets/css/style.css%s">
 %s
+<script>
+/* the theme is read back before anything is drawn, so a dark screen never
+   flashes white */
+(function(){
+  try{var t=localStorage.getItem('theme');
+    if(t){document.documentElement.setAttribute('data-theme',t);}}catch(e){}
+})();
+</script>
+%s
 </head>
 <body>
 %s
 <div class="wrap">
 %s
 </div>
-%s
+<script>
+(function(){
+  var b=document.getElementById('themebtn'); if(!b){return;}
+  function label(){
+    var t=document.documentElement.getAttribute('data-theme');
+    b.textContent=(t==='dark')?'Light':'Dark';
+  }
+  label();
+  b.addEventListener('click',function(){
+    var t=document.documentElement.getAttribute('data-theme');
+    t=(t==='dark')?'light':'dark';
+    document.documentElement.setAttribute('data-theme',t);
+    try{localStorage.setItem('theme',t);}catch(e){}
+    label();
+  });
+})();
+</script>
 </body>
-</html>""" % (title, DEV_TAG, canonical, v, header(active), body, footer(),
-              gate_script())
+</html>""" % (title, DEV_TAG, canonical, v, gate_script(), header(active),
+              body, footer())
 
 
 # --------------------------------------------------------------------------
