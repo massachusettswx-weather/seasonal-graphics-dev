@@ -20,25 +20,33 @@
   <div class="crumb"><a href="https://matthew22-cmd.github.io/seasonal-graphics-dev/">&larr; All models</a> &middot;
     <a href="maps.html">Maps</a></div>
   <h2 class="sec">Maps</h2>
-  <p class="lead">The whole world in three configurations, drawn from
-  Natural Earth 1:50m data: the flat map on an equirectangular grid, the
-  globe you can spin, and the polar projection with the pole at the
-  centre. The two sectors of the polar cap section - the North Pacific
-  and the North Atlantic, 60N&ndash;90N - are marked on all three, in
-  the colours the charts on the stratosphere page use.</p>
+  <p class="lead">One map and one timeline: the whole world with the
+  seasonal snowfall painted on it, drawn from Natural Earth 1:50m data.
+  The field is the model's own output - every grid cell the model came on,
+  nothing resampled - and it can be read as the accumulated snowfall or as
+  the anomaly against that model's own hindcast climate. The map can be
+  the flat world on an equirectangular grid, the globe you can spin, or
+  the polar projection with the pole at the centre; the two sectors of the
+  polar cap section - the North Pacific and the North Atlantic,
+  60N&ndash;90N - are marked on all three, in the colours the charts on
+  the stratosphere page use.</p>
   <div class="mapviews" id="mapviews">
     <button data-view="flat">2D Map</button>
     <button data-view="globe" class="active">3D Globe</button>
     <button data-view="polar">Polar</button>
   </div>
   <div class="picker">
-    <label for="snowModel">Snowfall</label>
+    <label for="snowModel">Model</label>
     <select id="snowModel" class="ctrl"></select>
-    <label for="snowMonth">Period</label>
-    <select id="snowMonth" class="ctrl"></select>
+    <div class="seg" id="snowfield">
+      <button class="segbtn ghost on" data-field="total">Snowfall</button>
+      <button class="segbtn ghost" data-field="anom">Anomaly vs the model's own climate</button>
+    </div>
   </div>
   <div class="maplegend" id="maplegend"></div>
+  <div class="maptimeline" id="maptimeline"></div>
   <div class="mapbox" id="mapbox">
+    <canvas id="mapcanvas"></canvas>
     <svg id="mapsvg"></svg>
     <div id="maptip"></div>
   </div>

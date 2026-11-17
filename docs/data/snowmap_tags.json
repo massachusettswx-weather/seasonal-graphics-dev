@@ -1,1 +1,1 @@
-[{"tag": "cmcc-sps4", "name": "CMCC SPS4", "init": "2026-11"}, {"tag": "dwd-gcfs2", "name": "DWD GCFS2.2", "init": "2026-11"}, {"tag": "eccc-cansips", "name": "ECCC canSIPS", "init": "2026-11"}, {"tag": "ecmwf-seas5", "name": "ECMWF SEAS5", "init": "2026-11"}, {"tag": "meteo-france-s9", "name": "METFR System 9", "init": "2026-11"}, {"tag": "ukmo-gloseas6", "name": "UKMO GloSeas6-GC5.1", "init": "2026-11"}]
+[{"tag": "testmodel", "name": "TEST MODEL", "init": "2026-11"}]

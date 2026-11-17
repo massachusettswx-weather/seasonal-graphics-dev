@@ -232,6 +232,22 @@ a{color:#1c4b8a}
 .outerring{fill:none; stroke:#8b97a3; stroke-width:.9}
 .equator{fill:none; stroke:#8b9199; stroke-width:.8}
 .pole{fill:#12263f; stroke:none}
+/* the maps page: the earth and the snowfall field are painted on a canvas
+   UNDER the vectors, so the SVG's fills must not cover them */
+.mapbox canvas{position:absolute; left:0; top:0; display:block; z-index:1}
+.mapbox svg{position:relative; z-index:2}
+.mapbox .ocean{fill:none}
+.mapbox .lake{fill:none}
+.mapbox .country{fill:none}
+.mapbox .country:hover{fill:none; stroke:#c8860d; stroke-width:1.1}
+/* the timeline: the run, one button per lead month */
+.maptimeline{display:flex; gap:6px; flex-wrap:wrap; margin:0 0 10px;
+  align-items:center}
+.maptimeline .tlbtn{font:inherit; font-size:12.5px; padding:6px 12px;
+  cursor:pointer; border:1px solid var(--line); background:var(--card);
+  color:var(--text); border-radius:999px}
+.maptimeline .tlbtn.on{background:#12263f; color:#fff; border-color:#12263f}
+.maptimeline button.ctrl{padding:6px 11px}
 """
 
 
@@ -369,13 +385,23 @@ def _gate_password():
 
 GATE_PASSWORD = _gate_password() if SITE_DEV else ""
 GATE_HASH = ""
+# The hash of the development copy's password, as it was published.  It is
+# kept here so that a wiped working tree cannot silently make the PRIVATE
+# development copy public: without the password file the gate still
+# refuses everyone who does not have the password, and the owner keeps the
+# one they already have.  (The hash cannot be turned back into the
+# password, but it does not have to - the password is what the visitor
+# types, and this is what the page compares.)
+GATE_HASH_FALLBACK = ("866da46e2e6cd6f6b5aa489cb6a738be078fe7bda1f638a3b8"
+                      "bea8d1d55993c2")
 if GATE_PASSWORD:
     import hashlib
     GATE_HASH = hashlib.sha256(GATE_PASSWORD.encode()).hexdigest()
 elif SITE_DEV:
+    GATE_HASH = GATE_HASH_FALLBACK
     sys.stderr.write(
-        "WARNING: the development copy has no gate password "
-        "(data/.dev_gate_password) - the site will be public.\n")
+        "no gate password file - keeping the published gate hash so the "
+        "development copy stays private.\n")
 
 
 def gate_script():
@@ -990,34 +1016,47 @@ render();
 def build_maps_page(reg):
     """The interactive Natural Earth maps page.
 
-    Three views of the same geography - the flat world, the globe and the
-    polar region with the two sectors - drawn in the browser from the
-    Natural Earth 1:50m files that are committed to the repository.  The
-    script and the map data are copied into the site by copy_map_assets().
+    One map and one timeline: the whole world with the seasonal snowfall
+    painted on it.  The field is the model's own output - every grid cell
+    the model came on, nothing resampled - and it can be read as the
+    accumulated snowfall or as the anomaly against that model's own
+    hindcast climate.  Three views of the same geography - the flat world,
+    the globe and the polar region with the two sectors - drawn in the
+    browser from the Natural Earth 1:50m files that are committed to the
+    repository.  The script and the map data are copied into the site by
+    copy_map_assets().
     """
     body = """<div class="card">
   <div class="crumb"><a href="__SITE__">&larr; All models</a> &middot;
     <a href="maps.html">Maps</a></div>
   <h2 class="sec">Maps</h2>
-  <p class="lead">The whole world in three configurations, drawn from
-  Natural Earth 1:50m data: the flat map on an equirectangular grid, the
-  globe you can spin, and the polar projection with the pole at the
-  centre. The two sectors of the polar cap section - the North Pacific
-  and the North Atlantic, 60N&ndash;90N - are marked on all three, in
-  the colours the charts on the stratosphere page use.</p>
+  <p class="lead">One map and one timeline: the whole world with the
+  seasonal snowfall painted on it, drawn from Natural Earth 1:50m data.
+  The field is the model's own output - every grid cell the model came on,
+  nothing resampled - and it can be read as the accumulated snowfall or as
+  the anomaly against that model's own hindcast climate. The map can be
+  the flat world on an equirectangular grid, the globe you can spin, or
+  the polar projection with the pole at the centre; the two sectors of the
+  polar cap section - the North Pacific and the North Atlantic,
+  60N&ndash;90N - are marked on all three, in the colours the charts on
+  the stratosphere page use.</p>
   <div class="mapviews" id="mapviews">
     <button data-view="flat">2D Map</button>
     <button data-view="globe" class="active">3D Globe</button>
     <button data-view="polar">Polar</button>
   </div>
   <div class="picker">
-    <label for="snowModel">Snowfall</label>
+    <label for="snowModel">Model</label>
     <select id="snowModel" class="ctrl"></select>
-    <label for="snowMonth">Period</label>
-    <select id="snowMonth" class="ctrl"></select>
+    <div class="seg" id="snowfield">
+      <button class="segbtn ghost on" data-field="total">Snowfall</button>
+      <button class="segbtn ghost" data-field="anom">Anomaly vs the model's own climate</button>
+    </div>
   </div>
   <div class="maplegend" id="maplegend"></div>
+  <div class="maptimeline" id="maptimeline"></div>
   <div class="mapbox" id="mapbox">
+    <canvas id="mapcanvas"></canvas>
     <svg id="mapsvg"></svg>
     <div id="maptip"></div>
   </div>

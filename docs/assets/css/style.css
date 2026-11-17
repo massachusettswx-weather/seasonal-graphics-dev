@@ -157,3 +157,19 @@ a{color:#1c4b8a}
 .outerring{fill:none; stroke:#8b97a3; stroke-width:.9}
 .equator{fill:none; stroke:#8b9199; stroke-width:.8}
 .pole{fill:#12263f; stroke:none}
+/* the maps page: the earth and the snowfall field are painted on a canvas
+   UNDER the vectors, so the SVG's fills must not cover them */
+.mapbox canvas{position:absolute; left:0; top:0; display:block; z-index:1}
+.mapbox svg{position:relative; z-index:2}
+.mapbox .ocean{fill:none}
+.mapbox .lake{fill:none}
+.mapbox .country{fill:none}
+.mapbox .country:hover{fill:none; stroke:#c8860d; stroke-width:1.1}
+/* the timeline: the run, one button per lead month */
+.maptimeline{display:flex; gap:6px; flex-wrap:wrap; margin:0 0 10px;
+  align-items:center}
+.maptimeline .tlbtn{font:inherit; font-size:12.5px; padding:6px 12px;
+  cursor:pointer; border:1px solid var(--line); background:var(--card);
+  color:var(--text); border-radius:999px}
+.maptimeline .tlbtn.on{background:#12263f; color:#fff; border-color:#12263f}
+.maptimeline button.ctrl{padding:6px 11px}

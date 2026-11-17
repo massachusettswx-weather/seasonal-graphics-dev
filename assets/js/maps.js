@@ -1,19 +1,39 @@
 /* ------------------------------------------------------------------
    Interactive Natural Earth maps for the seasonal graphics site.
 
-   Three configurations of the WHOLE WORLD, in the spirit of the
-   ECMWF interactive viewer:
+   One map, one timeline.  The whole world, drawn from Natural Earth
+   1:50m data that is committed to the repository, with the seasonal
+   snowfall painted on it:
 
      2D Map   the flat world on an equirectangular grid
      3D Globe the same world on an orthographic globe you can spin
      Polar    the same world on a north polar projection - the whole
               Earth, centred on the pole
 
-   The two sectors of the polar cap section - the North Pacific and
-   the North Atlantic, 60N-90N - are marked on all three, in the
-   colours the static charts use.  The base map is Natural Earth 1:50m
-   data that is committed to the repository, so the site never depends
-   on a download at build time.
+   The field is the model's OWN output - the whole world, at the grid the
+   model came on, with no resampling - and it comes in two flavours: the
+   accumulated snowfall, and the anomaly against that model's own
+   hindcast climate.
+
+   HOW THE FIELD IS DRAWN
+   ----------------------
+   The exporter writes each field as an 8-bit greyscale PNG, one byte per
+   cell, on the model's own grid.  Here the PNG is decoded into a byte
+   array and the map is painted PIXEL BY PIXEL: d3's projection can invert
+   a screen point back to a longitude and a latitude, so every pixel of
+   the canvas asks the projection where it is and samples the field
+   there.
+
+   That inverse is the expensive part, and the timeline makes it expensive
+   a lot: moving along the months must not re-invert the map.  So the
+   inverse is done ONCE per view and cached as a sampling plan - for
+   every pixel, which cell it lands in and how far into it - and moving
+   along the timeline then only re-reads the field and re-colours the
+   pixels, which is fast.
+
+   The earth itself (the ocean and the land) is painted on the same
+   canvas underneath the field, with the coastlines drawn over it in the
+   SVG above, so nothing is hidden by an opaque fill.
    ------------------------------------------------------------------ */
 (function () {
   "use strict";
@@ -34,7 +54,7 @@
      colour: "#3d7fd1", ink: "#0d2f5e"}
   ];
 
-  /* The polar view keeps the arrangement of the static charts: the pole
+  /* the polar view keeps the arrangement of the static charts: the pole
      at the centre, Greenwich at the BOTTOM, the Pacific at the top and
      the Atlantic at the bottom.  d3's azimuthal projections put the
      projection's own longitude at the bottom, so the rotation is 0. */
@@ -42,128 +62,216 @@
 
   /* the globe opens over North America, where the snowfall field is:
      d3's rotate() puts (-lambda, -phi) at the centre */
-  var state = {view: "globe", data: {}, rot: [95, -35], drag: null,
-               snow: {tag: null, month: -1, data: null, index: null}};
+  var state = {view: "globe", rot: [95, -35], drag: null, zoom: 1,
+               field: "total", month: -1, tag: null, manifest: null,
+               raster: null, plan: null, index: null, timer: null,
+               data: {}};
 
   function el(id) { return document.getElementById(id); }
 
   /* ---------------------------------------------------------------- */
+  /* the earth, painted under the field                               */
 
-  function sectorRing(s) {
-    /* The sector as a lat/lon ring: the bottom edge along 60N, up the
-       far meridian to the pole, and back down the near meridian.
-       Two things matter here:
-         - the ring must NOT run along 90N.  The pole is a single point
-           on the sphere, so a ring that follows the 90N parallel is
-           degenerate and d3 reads it as covering the whole globe.
-         - the winding decides which side of the ring d3 treats as the
-           inside, so the ring goes out along the near meridian first.
-           Wound the other way d3 reads the complement - the whole
-           globe - as the sector. */
-    var lon1 = (s.lon1 > s.lon0) ? s.lon1 : s.lon1 + 360;
-    return [[s.lon0 % 360, 60],
-            [lon1 % 360, 90],
-            [lon1 % 360, 60],
-            [s.lon0 % 360, 60]];
-  }
+  var OCEAN = "#dce8f2";
+  var LAND = "#f2ede0";
 
-  function sectorPoly(s) {
-    return {type: "Polygon", coordinates: [sectorRing(s)]};
-  }
-
-  function sectorLabel(s, flat) {
-    var lon1 = (s.lon1 > s.lon0) ? s.lon1 : s.lon1 + 360;
-    var lon = (s.lon0 + (lon1 - s.lon0) / 2) % 360;
-    /* on the flat map the Pacific sector straddles the map's edge, so its
-       label sits inside the eastern piece instead of on the seam */
-    if (flat && s.flatLabelLon !== undefined) { lon = s.flatLabelLon; }
-    return [lon, 74];
-  }
-
-  function drawSectors(g, path, proj, label, flat) {
-    var s = SECTORS.map(function (sec) {
-      return {sec: sec, poly: sectorPoly(sec), at: sectorLabel(sec, flat)};
-    });
-    g.selectAll("path.sector").data(s).join("path")
-      .attr("class", "sector")
-      .attr("fill", function (d) { return d.sec.colour; })
-      .attr("d", function (d) { return path(d.poly); });
-    if (label) {
-      /* d3's geoPath returns null for a point that falls outside the
-         projection's clip extent - on the globe that is a sector on the
-         far side - so the label is only placed when it has a position. */
-      g.selectAll("text.sector").data(s).join("text")
-        .attr("class", "sectorlabel")
-        .attr("fill", function (d) { return d.sec.ink; })
-        .text(function (d) { return d.sec.name; })
-        .each(function (d) {
-          /* the projection returns the position, or null when the point
-             is not visible - on the globe that is the far side */
-          var q = proj(d.at);
-          d3.select(this)
-            .attr("x", q ? q[0] : -999)
-            .attr("y", q ? q[1] : -999)
-            .attr("display", q ? null : "none");
-        });
+  function paintEarth(ctx, proj, W, H) {
+    /* the ocean: the sphere, or the rectangle on the flat map */
+    ctx.clearRect(0, 0, W, H);
+    var path = d3.geoPath(proj, ctx);
+    if (state.view === "flat") {
+      ctx.fillStyle = OCEAN;
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      ctx.fillStyle = OCEAN;
+      ctx.beginPath();
+      path({type: "Sphere"});
+      ctx.fill();
     }
-  }
-
-  function capLine() {
-    var c = [];
-    for (var i = 0; i <= 360; i++) { c.push([i % 360, 60]); }
-    return {type: "LineString", coordinates: c};
+    /* the land and the lakes, clipped to the sphere: on the polar
+       projection Antarctica's ring runs right around the disc and would
+       otherwise paint over the sky */
+    ctx.save();
+    ctx.beginPath();
+    path({type: "Sphere"});
+    ctx.clip();
+    if (state.data.land) {
+      ctx.fillStyle = LAND;
+      ctx.beginPath();
+      path(state.data.land);
+      ctx.fill();
+    }
+    if (state.data.lakes) {
+      ctx.fillStyle = OCEAN;
+      ctx.beginPath();
+      path(state.data.lakes);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   /* ---------------------------------------------------------------- */
-  /* 2D map - the flat world                                         */
+  /* the sampling plan: the expensive part, done once per view         */
 
-  function drawFlat(svg, W, H) {
-    var proj = d3.geoEquirectangular()
-      .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"});
+  function buildPlan(proj, W, H) {
+    var man = state.manifest;
+    var g = man.grid;
+    var nlat = g.nlat, nlon = g.nlon;
+    var plan = {W: W, H: H,
+                i0: new Int32Array(W * H), j0: new Int32Array(W * H),
+                fx: new Float32Array(W * H), fy: new Float32Array(W * H),
+                ok: new Uint8Array(W * H)};
+    var lat0 = g.lat0, dlat = g.dlat, lon0 = g.lon0, dlon = g.dlon;
+    /* On the globe, d3's invert() answers for the WHOLE sphere - it does
+       not clip to the visible hemisphere - so without this the field would
+       be painted on the dark sky outside the limb, showing the far side of
+       the world through the back of the planet.  The polar projection has
+       the same problem: its disc is the northern hemisphere, and the
+       azimuthal projection can invert the southern one as well. */
+    var disc = null;
+    if (state.view === "globe") {
+      var t = proj.translate();
+      disc = {cx: t[0], cy: t[1], r: proj.scale()};
+    } else if (state.view === "polar") {
+      var t2 = proj.translate();
+      /* the equidistant azimuthal projection puts the equator at
+         r = k * pi/2 */
+      disc = {cx: t2[0], cy: t2[1], r: proj.scale() * Math.PI / 2};
+    }
+    for (var y = 0; y < H; y++) {
+      for (var x = 0; x < W; x++) {
+        if (disc) {
+          var dx = x - disc.cx, dy = y - disc.cy;
+          if (dx * dx + dy * dy > disc.r * disc.r) { continue; }
+        }
+        var ll = proj.invert([x, y]);
+        if (!ll) { continue; }
+        var lon = ll[0], lat = ll[1];
+        if (lat > lat0 || lat < lat0 - (nlat - 1) * dlat) { continue; }
+        var fi = (lat0 - lat) / dlat;
+        var fj = ((lon - lon0) / dlon) % nlon;
+        if (fj < 0) { fj += nlon; }
+        var i0 = Math.floor(fi);
+        var j0 = Math.floor(fj);
+        if (i0 < 0) { i0 = 0; }
+        if (i0 > nlat - 2) { i0 = nlat - 2; }
+        if (j0 > nlon - 2) { j0 = nlon - 2; }
+        var k = y * W + x;
+        plan.i0[k] = i0;
+        plan.j0[k] = j0;
+        plan.fy[k] = fi - i0;
+        plan.fx[k] = fj - j0;
+        plan.ok[k] = 1;
+      }
+    }
+    return plan;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* the field                                                         */
+
+  /* the colour of a byte on the published ladder: the byte IS the
+     position on the ladder, so the ramp is read straight off it */
+  function rampIndex(byte, ramp) {
+    if (byte >= 255) { return ramp.length - 1; }
+    return Math.round(byte / 254 * (ramp.length - 1));
+  }
+
+  function anomIndex(byte, colors) {
+    if (byte >= 255) { return -1; }          /* masked */
+    return Math.round(byte / 254 * (colors.length - 1));
+  }
+
+  function hexToRgb(h) {
+    return [parseInt(h.substr(1, 2), 16),
+            parseInt(h.substr(3, 2), 16),
+            parseInt(h.substr(5, 2), 16)];
+  }
+
+  function paintField(ctx, W, H) {
+    var plan = state.plan, r = state.raster, man = state.manifest;
+    if (!plan || !r) { return; }
+    var nlon = man.grid.nlon;
+    var base = ctx.getImageData(0, 0, W, H);
+    var bp = base.data;
+    var isAnom = state.field === "anom";
+    var ramp = man.ramp || man.colors;
+    var rampRGB = ramp.map(hexToRgb);
+    var anomRGB = (man.anom_colors || []).map(hexToRgb);
+    var bytes = r.bytes;
+    var alpha = isAnom ? 0.82 : 1.0;
+
+    for (var y = 0; y < H; y++) {
+      for (var x = 0; x < W; x++) {
+        var k = y * W + x;
+        if (!plan.ok[k]) { continue; }
+        var i0 = plan.i0[k], j0 = plan.j0[k];
+        var fx = plan.fx[k], fy = plan.fy[k];
+        var a = bytes[i0 * nlon + j0];
+        var b = bytes[i0 * nlon + Math.min(j0 + 1, nlon - 1)];
+        var c = bytes[Math.min(i0 + 1, man.grid.nlat - 1) * nlon + j0];
+        var d = bytes[Math.min(i0 + 1, man.grid.nlat - 1) * nlon +
+                      Math.min(j0 + 1, nlon - 1)];
+        var v = (1 - fx) * ((1 - fy) * a + fy * c) +
+                fx * ((1 - fy) * b + fy * d);
+        if (isAnom) {
+          var ai = anomIndex(v, anomRGB);
+          if (ai < 0) { continue; }          /* masked: no snow expected */
+          if (v < 1.5 && v > 252.5) { continue; }   /* nothing to say */
+          var col = anomRGB[ai];
+        } else {
+          if (v < 0.5) { continue; }          /* no snow */
+          var col = rampRGB[rampIndex(v, ramp)];
+        }
+        var o = k * 4;
+        bp[o] = col[0] * alpha + bp[o] * (1 - alpha);
+        bp[o + 1] = col[1] * alpha + bp[o + 1] * (1 - alpha);
+        bp[o + 2] = col[2] * alpha + bp[o + 2] * (1 - alpha);
+        bp[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(base, 0, 0);
+  }
+
+  /* the value a byte stands for, for the tooltip */
+  function byteValue(byte) {
+    var man = state.manifest;
+    if (state.field === "anom") {
+      if (byte >= 255) { return null; }
+      var s = man.anom_scale || 10;
+      return (byte / 254 * 2 - 1) * s;
+    }
+    var levels = man.levels;
+    var t = Math.min(byte, 254) / 254 * (levels.length - 1);
+    var i = Math.floor(t), f = t - i;
+    var lo = levels[Math.min(i, levels.length - 1)];
+    var hi = levels[Math.min(i + 1, levels.length - 1)];
+    if (hi <= lo) { return lo; }
+    return Math.pow(lo, 1 - f) * Math.pow(hi, f);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* the vector layer                                                  */
+
+  function drawFlat(svg, proj, W, H) {
     var path = d3.geoPath(proj);
-
-    svg.append("path").datum({type: "Sphere"}).attr("class", "ocean")
-      .attr("d", path);
     svg.append("path").datum(d3.geoGraticule10()).attr("class", "grat")
       .attr("d", path);
-
     var g = svg.append("g");
     g.selectAll("path.country").data(state.data.countries.features)
-      .join("path").attr("class", "country").attr("d", path)
-      .on("mousemove", function (ev, d) {
-        var p = d3.pointer(ev, svg.node());
-        showTip(ev, d.properties.NAME, p[0], p[1]);
-      })
-      .on("mouseleave", hideTip);
+      .join("path").attr("class", "country").attr("d", path);
     g.selectAll("path.lake").data(state.data.lakes.features)
       .join("path").attr("class", "lake").attr("d", path);
-
-    drawSnow(g, path);
-
-    /* the cap's edge, at 60N */
-    svg.append("path").datum(capLine()).attr("class", "capedge")
-      .attr("d", path);
-
+    svg.append("path").datum(capLine()).attr("class", "capedge").attr("d", path);
     drawSectors(g, path, proj, true, true);
-
     note("The whole world on an equirectangular grid, with the two polar " +
          "sectors of the polar cap section marked. The equirectangular " +
          "projection squeezes the polar regions, which is why the polar " +
          "view exists.");
   }
 
-  /* ---------------------------------------------------------------- */
-  /* 3D globe                                                        */
-
-  function drawGlobe(svg, W, H) {
-    var proj = d3.geoOrthographic()
-      .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"})
-      .rotate(state.rot);
+  function drawGlobe(svg, proj, W, H) {
     var path = d3.geoPath(proj);
-
-    /* the limb: a soft blue rim, the way the atmosphere reads on the
-       ECMWF viewer */
-    var r = path({type: "Sphere"}).length;
     var defs = svg.append("defs");
     var grad = defs.append("radialGradient")
       .attr("id", "atmosgrad").attr("cx", "50%").attr("cy", "50%")
@@ -176,44 +284,25 @@
       .attr("stop-opacity", .75);
     grad.append("stop").attr("offset", "100%").attr("stop-color", "#a8d2ff")
       .attr("stop-opacity", 0);
-    svg.append("circle")
-      .attr("class", "atmos")
-      .attr("cx", W / 2).attr("cy", H / 2).attr("r", r * 1.16)
+    svg.append("circle").attr("class", "atmos")
+      .attr("cx", W / 2).attr("cy", H / 2).attr("r", path({type: "Sphere"}).length * 1.16)
       .attr("fill", "url(#atmosgrad)");
 
-    svg.append("path").datum({type: "Sphere"}).attr("class", "ocean")
-      .attr("d", path);
     svg.append("path").datum(d3.geoGraticule10()).attr("class", "grat")
       .attr("d", path);
-
     var g = svg.append("g");
     g.selectAll("path.country").data(state.data.countries.features)
-      .join("path").attr("class", "country").attr("d", path)
-      .on("mousemove", function (ev, d) {
-        var p = d3.pointer(ev, svg.node());
-        showTip(ev, d.properties.NAME, p[0], p[1]);
-      })
-      .on("mouseleave", hideTip);
+      .join("path").attr("class", "country").attr("d", path);
     g.selectAll("path.lake").data(state.data.lakes.features)
       .join("path").attr("class", "lake").attr("d", path);
-
-    drawSnow(g, path);
-
-    /* the cap's edge at 60N */
-    svg.append("path").datum(capLine()).attr("class", "capedge")
-      .attr("d", path);
-
+    svg.append("path").datum(capLine()).attr("class", "capedge").attr("d", path);
     drawSectors(g, path, proj, true);
 
-    /* the projection takes a bare [lon, lat]; d3's geoPath is the one
-       that wants a GeoJSON object */
     var pole = proj([0, 90]);
     if (pole) {
-      svg.append("circle")
-        .attr("class", "pole")
+      svg.append("circle").attr("class", "pole")
         .attr("cx", pole[0]).attr("cy", pole[1]).attr("r", 3);
     }
-
     svg.call(d3.drag()
       .on("start", function (ev) { state.drag = d3.pointer(ev, this); })
       .on("drag", function (ev) {
@@ -222,41 +311,29 @@
         state.rot[0] += dx * 0.45;
         state.rot[1] = Math.max(-90, Math.min(90, state.rot[1] - dy * 0.45));
         state.drag = p;
+        state.plan = null;
         draw();
       }));
 
-    note("The same world on an orthographic globe - drag it to spin. The " +
-         "polar cap is the ring north of 60N; the two sectors are marked " +
-         "in the colours the polar charts use.");
+    svg.on("wheel", function (ev) {
+      ev.preventDefault();
+      state.zoom = Math.max(1, Math.min(6, state.zoom * (ev.deltaY < 0 ? 1.12 : 1 / 1.12)));
+      state.plan = null;
+      draw();
+    });
+
+    note("The same world on an orthographic globe - drag it to spin, scroll " +
+         "to zoom. The polar cap is the ring north of 60N; the two sectors " +
+         "are marked in the colours the polar charts use.");
   }
 
-  /* ---------------------------------------------------------------- */
-  /* polar - the whole world on a north polar projection              */
-
-  function drawPolar(svg, W, H) {
-    var proj = d3.geoAzimuthalEquidistant()
-      .rotate(POLAR_ROT)
-      .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"});
+  function drawPolar(svg, proj, W, H) {
     var path = d3.geoPath(proj);
-
-    /* the globe as a disc */
-    svg.append("path").datum({type: "Sphere"}).attr("class", "ocean")
-      .attr("d", path);
-
     var g = svg.append("g");
     g.selectAll("path.country").data(state.data.countries.features)
-      .join("path").attr("class", "country").attr("d", path)
-      .on("mousemove", function (ev, d) {
-        var p = d3.pointer(ev, svg.node());
-        showTip(ev, d.properties.NAME, p[0], p[1]);
-      })
-      .on("mouseleave", hideTip);
+      .join("path").attr("class", "country").attr("d", path);
     g.selectAll("path.lake").data(state.data.lakes.features)
       .join("path").attr("class", "lake").attr("d", path);
-
-    drawSnow(g, path);
-
-    /* the graticule: the latitude circles and the longitude spokes */
     var grat = {type: "MultiLineString", coordinates: []};
     [60, 30].forEach(function (lat) {
       var c = [];
@@ -267,13 +344,8 @@
       grat.coordinates.push([[lon, 60], [lon, 90]]);
     }
     svg.append("path").datum(grat).attr("class", "grat").attr("d", path);
-
     drawSectors(g, path, proj, true);
-
-    /* the edge of the cap, at 60N, solid */
-    svg.append("path").datum(capLine()).attr("class", "capedge")
-      .attr("d", path);
-
+    svg.append("path").datum(capLine()).attr("class", "capedge").attr("d", path);
     note("The whole world on a north polar projection: the pole at the " +
          "centre, every continent radiating from it, the 60N edge of the " +
          "polar cap solid. The North Pacific sector is at the top and the " +
@@ -281,116 +353,236 @@
          "page.");
   }
 
-  /* ---------------------------------------------------------------- */
-  /* the snowfall layer                                                */
+  /* the 60N edge of the polar cap */
+  function capLine() {
+    var c = [];
+    for (var i = 0; i <= 360; i++) { c.push([i % 360, 60]); }
+    return {type: "LineString", coordinates: c};
+  }
 
-  /* The cells are drawn as one path per colour band, so a band of the
-     colour scale is a single element rather than a thousand. */
-  function drawSnow(g, path) {
-    var sn = state.snow;
-    if (!sn.data) { return; }
-    var d = sn.data;
-    var grid = d.grid;
-    var vals = (sn.month < 0) ? d.total : d.fields[sn.month];
-    if (!vals) { return; }
-    var levels = d.levels, colors = d.colors;
-    var ramp = d.ramp || colors;
-
-    /* the colour of each cell: the published ladder, interpolated */
-    var bands = {};
-    var i, j, k, v, band, idx;
-    for (i = 0; i < grid.nlat; i++) {
-      for (j = 0; j < grid.nlon; j++) {
-        k = i * grid.nlon + j;
-        v = vals[k];
-        if (v === null || v === undefined || !(v > 0)) { continue; }
-        band = 0;
-        for (var b = 0; b < levels.length; b++) {
-          if (v >= levels[b]) { band = b; }
-        }
-        /* interpolate inside the band, on the log scale the ladder uses */
-        var lo = levels[band];
-        var hi = (band + 1 < levels.length) ? levels[band + 1] : lo;
-        var f = 0;
-        if (hi > lo && v < hi) {
-          f = (Math.log(v) - Math.log(lo)) / (Math.log(hi) - Math.log(lo));
-        }
-        idx = Math.round((band + f) * (ramp.length - 1) / (levels.length - 1));
-        if (!bands[idx]) { bands[idx] = []; }
-        bands[idx].push(cell(grid, i, j));
+  /* the two sectors, in the colours the polar charts use */
+  function drawSectors(g, path, proj, showLabels, flatLabels) {
+    SECTORS.forEach(function (s) {
+      /* the longitudes are kept UNWRAPPED (120 to 240, not 120 to -120):
+         a ring that jumps across the antimeridian is drawn as a line
+         straight across the map, and d3 cuts the antimeridian for us when
+         the ring is continuous */
+      var ring = [];
+      for (var lat = 60; lat <= 90; lat += 2) {
+        ring.push([s.lon0, lat]);
       }
-    }
-    var keys = Object.keys(bands).map(Number).sort(function (a, b) { return a - b; });
-    keys.forEach(function (b) {
-      g.append("path")
-        .attr("class", "snowband")
-        .attr("fill", ramp[Math.min(b, ramp.length - 1)])
-        .attr("d", path({type: "MultiPolygon",
-                         coordinates: bands[b].map(function (c) { return [c]; })}));
+      for (var lon = s.lon0; lon <= s.lon1; lon += 2) {
+        ring.push([lon, 90]);
+      }
+      for (var lat2 = 90; lat2 >= 60; lat2 -= 2) {
+        ring.push([s.lon1, lat2]);
+      }
+      ring.push([s.lon0, 60]);
+      g.append("path").attr("class", "sector")
+        .attr("fill", s.colour).attr("fill-opacity", 0.35)
+        .attr("stroke", s.ink)
+        .attr("d", path({type: "Polygon", coordinates: [ring]}));
+      if (showLabels) {
+        var mid = (s.lon0 + s.lon1) / 2;
+        var p = proj([mid, 75]);
+        if (p) {
+          g.append("text").attr("class", "sectorlabel")
+            .attr("x", p[0]).attr("y", p[1]).attr("fill", s.ink)
+            .text(s.name);
+        }
+      }
     });
   }
 
-  /* one grid cell as a closed lon/lat ring */
-  function cell(grid, i, j) {
-    var lat1 = grid.lat0 - i * grid.dlat;
-    var lat2 = lat1 - grid.dlat;
-    var lon1 = grid.lon0 + j * grid.dlon;
-    var lon2 = lon1 + grid.dlon;
-    return [[lon1, lat1], [lon2, lat1], [lon2, lat2], [lon1, lat2], [lon1, lat1]];
+  /* ---------------------------------------------------------------- */
+  /* the field files                                                   */
+
+  function fieldFile() {
+    var man = state.manifest;
+    if (!man) { return null; }
+    var f = state.field === "anom" ? "anom" : "total";
+    if (state.month < 0) { return man.total[f]; }
+    var m = man.months[state.month];
+    return m ? m[f] : null;
   }
 
-  /* the colour legend, drawn from the field's own ladder */
-  function drawLegend() {
-    var box = el("maplegend"), sn = state.snow;
+  function loadField() {
+    var file = fieldFile();
+    if (!file) { return; }
+    var img = new Image();
+    img.onload = function () {
+      var c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      var ctx = c.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      var data = ctx.getImageData(0, 0, img.width, img.height).data;
+      var bytes = new Uint8Array(img.width * img.height);
+      for (var i = 0, j = 0; i < bytes.length; i++, j += 4) {
+        bytes[i] = data[j];
+      }
+      state.raster = {w: img.width, h: img.height, bytes: bytes};
+      draw();
+    };
+    img.onerror = function () {
+      var n = el("mapload");
+      if (n) {
+        n.style.display = "block";
+        n.textContent = "The field " + file + " could not be loaded.";
+      }
+    };
+    img.src = "data/" + file;
+  }
+
+  function loadModel(tag) {
+    state.tag = tag;
+    state.manifest = null;
+    state.raster = null;
+    state.plan = null;
+    state.month = -1;
+    if (!tag) { draw(); return; }
+    d3.json("data/snowmap_" + tag + ".json").then(function (d) {
+      try {
+        state.manifest = d;
+        buildTimeline();
+        drawLegend();
+        loadField();
+        draw();
+      } catch (e) {
+        fail("the field could not be drawn: " + e);
+      }
+    }).catch(function (e) {
+      var n = el("mapload");
+      if (n) {
+        n.style.display = "block";
+        n.textContent = "The snowfall field could not be loaded: " + e;
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* the timeline                                                      */
+
+  function buildTimeline() {
+    var box = el("maptimeline");
     if (!box) { return; }
     box.innerHTML = "";
-    if (!sn.data) { return; }
-    var d = sn.data;
+    var man = state.manifest;
+    if (!man) { return; }
+
+    var play = document.createElement("button");
+    play.className = "ctrl ghost";
+    play.textContent = "▶";
+    play.title = "play the run";
+    play.addEventListener("click", function () { togglePlay(); });
+    box.appendChild(play);
+
+    var mk = function (label, month, value) {
+      var b = document.createElement("button");
+      b.className = "tlbtn" + (state.month === value ? " on" : "");
+      b.textContent = label;
+      b.dataset.month = String(value);
+      b.addEventListener("click", function () {
+        stopPlay();
+        state.month = value;
+        markTimeline();
+        loadField();
+      });
+      box.appendChild(b);
+    };
+    mk("Total", -1, -1);
+    man.months.forEach(function (m, i) { mk(m.label, i, i); });
+  }
+
+  function markTimeline() {
+    var btns = document.querySelectorAll("#maptimeline .tlbtn");
+    Array.prototype.forEach.call(btns, function (b) {
+      b.classList.toggle("on", parseInt(b.dataset.month, 10) === state.month);
+    });
+  }
+
+  function togglePlay() {
+    if (state.timer) { stopPlay(); return; }
+    var man = state.manifest;
+    if (!man) { return; }
+    var next = state.month + 1;
+    if (next > man.months.length - 1) { next = -1; }
+    state.month = next;
+    markTimeline();
+    loadField();
+    state.timer = setInterval(function () {
+      var m = state.manifest;
+      if (!m) { stopPlay(); return; }
+      var n = state.month + 1;
+      if (n > m.months.length - 1) { stopPlay(); return; }
+      state.month = n;
+      markTimeline();
+      loadField();
+    }, 1100);
+    var pb = document.querySelector("#maptimeline button");
+    if (pb) { pb.textContent = "❚❚"; }
+  }
+
+  function stopPlay() {
+    if (state.timer) { clearInterval(state.timer); state.timer = null; }
+    var pb = document.querySelector("#maptimeline button");
+    if (pb) { pb.textContent = "▶"; }
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* the legend                                                        */
+
+  function drawLegend() {
+    var box = el("maplegend");
+    if (!box) { return; }
+    box.innerHTML = "";
+    var man = state.manifest;
+    if (!man) { return; }
     var wrap = document.createElement("div");
     wrap.style.width = "100%";
     var bar = document.createElement("div");
     bar.className = "bar";
-    d.colors.forEach(function (c) {
-      var i = document.createElement("i");
-      i.style.background = c;
-      bar.appendChild(i);
-    });
     var ends = document.createElement("div");
     ends.className = "ends";
     var lo = document.createElement("span");
-    lo.textContent = d.levels[0] + " in";
     var hi = document.createElement("span");
-    hi.textContent = d.levels[d.levels.length - 1] + " in of snow";
-    ends.appendChild(lo);
-    ends.appendChild(hi);
     var cap = document.createElement("div");
     cap.style.marginTop = "4px";
-    cap.textContent = "Snowfall, inches of snow depth (" + d.name +
-      ", " + d.members + " members) on the 0-300 in snow-depth scale";
+
+    if (state.field === "anom") {
+      (man.anom_colors || []).forEach(function (c) {
+        var i = document.createElement("i");
+        i.style.background = c;
+        bar.appendChild(i);
+      });
+      var s = man.anom_scale || 10;
+      lo.textContent = "-" + s + " in";
+      hi.textContent = "+" + s + " in";
+      cap.textContent = "Snowfall anomaly against the model's own hindcast " +
+        "climate (" + man.name + "), inches of snow depth - brown is less " +
+        "snow than the model expects, teal is more";
+    } else {
+      (man.ramp || man.colors).forEach(function (c) {
+        var i = document.createElement("i");
+        i.style.background = c;
+        bar.appendChild(i);
+      });
+      lo.textContent = man.levels[0] + " in";
+      hi.textContent = man.levels[man.levels.length - 1] + " in of snow";
+      cap.textContent = "Accumulated snowfall, inches of snow depth (" +
+        man.name + ", " + man.members + " members" +
+        (man.init ? ", " + man.init + " init" : "") +
+        ") on the published 0-300 in snow-depth scale";
+    }
+    ends.appendChild(lo);
+    ends.appendChild(hi);
     wrap.appendChild(bar);
     wrap.appendChild(ends);
     box.appendChild(wrap);
     box.appendChild(cap);
   }
 
-  function loadSnow(tag) {
-    var sn = state.snow;
-    sn.tag = tag;
-    sn.month = -1;
-    sn.data = null;
-    if (!tag) { draw(); return; }
-    d3.json("data/snowmap_" + tag + ".json").then(function (d) {
-      sn.data = d;
-      fillMonths();
-      drawLegend();
-      draw();
-    }).catch(function (e) {
-      var n = el("mapload");
-      if (n) { n.style.display = "block"; n.textContent = "The snowfall field could not be loaded: " + e; }
-    });
-  }
-
   /* ---------------------------------------------------------------- */
+  /* the tooltip                                                       */
 
   var tip = null;
   function showTip(ev, text, x, y) {
@@ -407,6 +599,40 @@
     if (n) { n.textContent = text; }
   }
 
+  /* anything that goes wrong has to say so on the page - a map that is
+     silently blank is worse than one that says it failed */
+  function fail(text) {
+    var n = el("mapload");
+    if (n) {
+      n.style.display = "block";
+      n.textContent = text;
+    }
+    if (window.console) { console.error(text); }
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* drawing                                                          */
+
+  function makeProjection(W, H) {
+    var proj;
+    if (state.view === "flat") {
+      proj = d3.geoEquirectangular()
+        .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"});
+    } else if (state.view === "globe") {
+      proj = d3.geoOrthographic()
+        .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"})
+        .rotate(state.rot);
+    } else {
+      proj = d3.geoAzimuthalEquidistant()
+        .rotate(POLAR_ROT)
+        .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"});
+    }
+    if (state.zoom !== 1) {
+      proj.scale(proj.scale() * state.zoom);
+    }
+    return proj;
+  }
+
   function draw() {
     if (!state.data.countries) { return; }
     var svg = d3.select("#mapsvg");
@@ -415,17 +641,64 @@
     var W = Math.max(320, Math.round(box.clientWidth));
     var H;
     if (state.view === "flat") {
-      H = Math.round(Math.min(560, Math.max(260, W * 0.46)));
+      H = Math.round(Math.min(620, Math.max(280, W * 0.50)));
     } else if (state.view === "polar") {
-      H = Math.round(Math.min(680, Math.max(360, W * 0.62)));
+      H = Math.round(Math.min(720, Math.max(380, W * 0.64)));
     } else {
-      H = Math.round(Math.min(600, Math.max(380, W * 0.62)));
+      H = Math.round(Math.min(640, Math.max(400, W * 0.64)));
     }
     svg.attr("width", W).attr("height", H)
       .attr("viewBox", "0 0 " + W + " " + H);
-    if (state.view === "flat") { drawFlat(svg, W, H); }
-    else if (state.view === "globe") { drawGlobe(svg, W, H); }
-    else { drawPolar(svg, W, H); }
+
+    var canvas = el("mapcanvas");
+    if (canvas) {
+      canvas.width = W;
+      canvas.height = H;
+      canvas.style.width = W + "px";
+      canvas.style.height = H + "px";
+    }
+
+    var proj = makeProjection(W, H);
+    if (state.manifest && !state.plan) {
+      state.plan = buildPlan(proj, W, H);
+    }
+    if (canvas) {
+      var ctx = canvas.getContext("2d");
+      paintEarth(ctx, proj, W, H);
+      paintField(ctx, W, H);
+    }
+
+    if (state.view === "flat") { drawFlat(svg, proj, W, H); }
+    else if (state.view === "globe") { drawGlobe(svg, proj, W, H); }
+    else { drawPolar(svg, proj, W, H); }
+
+    /* the tooltip reads the field under the pointer */
+    svg.on("mousemove", function (ev) {
+      if (!state.plan || !state.raster) { hideTip(); return; }
+      var p = d3.pointer(ev, svg.node());
+      var k = Math.round(p[1]) * state.plan.W + Math.round(p[0]);
+      if (k < 0 || k >= state.plan.W * state.plan.H || !state.plan.ok[k]) {
+        hideTip();
+        return;
+      }
+      var ll = proj.invert(p);
+      if (!ll) { hideTip(); return; }
+      var nlon = state.manifest.grid.nlon;
+      var i0 = state.plan.i0[k], j0 = state.plan.j0[k];
+      var v = state.raster.bytes[i0 * nlon + j0];
+      var val = byteValue(v);
+      var txt;
+      if (state.field === "anom") {
+        txt = (val === null) ? "no snow expected here"
+          : ((val >= 0 ? "+" : "") + val.toFixed(1) +
+             " in vs the model's own climate");
+      } else {
+        txt = (v < 0.5) ? "no snow" : (val.toFixed(1) + " in of snow");
+      }
+      txt = Math.abs(ll[1]).toFixed(1) + (ll[1] >= 0 ? "N" : "S") + " " +
+        Math.abs(ll[0]).toFixed(1) + (ll[0] >= 0 ? "E" : "W") + " · " + txt;
+      showTip(ev, txt, p[0], p[1]);
+    }).on("mouseleave", hideTip);
   }
 
   function load() {
@@ -456,6 +729,7 @@
 
   function setView(v) {
     state.view = v;
+    state.plan = null;
     var btns = document.querySelectorAll("#mapviews button");
     Array.prototype.forEach.call(btns, function (b) {
       b.classList.toggle("active", b.dataset.view === v);
@@ -465,49 +739,31 @@
     load();
   }
 
+  function setField(f) {
+    state.field = f;
+    var btns = document.querySelectorAll("#snowfield button");
+    Array.prototype.forEach.call(btns, function (b) {
+      b.classList.toggle("on", b.dataset.field === f);
+    });
+    drawLegend();
+    loadField();
+  }
+
   function initSnow() {
-    /* the model and month pickers, and the colour legend */
-    var msel = el("snowModel"), msel2 = el("snowMonth");
+    var msel = el("snowModel");
     d3.json("data/snowmap_tags.json").then(function (index) {
-      state.snow.index = index;
+      state.index = index;
       if (!msel) { return; }
       index.forEach(function (m, i) {
         var o = document.createElement("option");
         o.value = m.tag;
-        o.textContent = m.name;
+        o.textContent = m.name + (m.init ? " (" + m.init + ")" : "");
         if (i === 0) { o.selected = true; }
         msel.appendChild(o);
       });
-      msel.addEventListener("change", function () {
-        loadSnow(msel.value);
-        fillMonths();
-      });
-      fillMonths();
-      if (index.length) { loadSnow(index[0].tag); }
+      msel.addEventListener("change", function () { loadModel(msel.value); });
+      if (index.length) { loadModel(index[0].tag); }
     }).catch(function () {});
-  }
-
-  function fillMonths() {
-    var msel = el("snowMonth"), sn = state.snow;
-    if (!msel) { return; }
-    msel.innerHTML = "";
-    var o = document.createElement("option");
-    o.value = "-1";
-    o.textContent = "Total (init to end)";
-    o.selected = true;
-    msel.appendChild(o);
-    if (!sn.data) { return; }
-    sn.data.months.forEach(function (m, i) {
-      var e = document.createElement("option");
-      e.value = String(i);
-      e.textContent = m.label;
-      msel.appendChild(e);
-    });
-    msel.addEventListener("change", function () {
-      sn.month = parseInt(msel.value, 10);
-      draw();
-    });
-    sn.month = -1;
   }
 
   function init() {
@@ -516,7 +772,16 @@
     Array.prototype.forEach.call(btns, function (b) {
       b.addEventListener("click", function () { setView(b.dataset.view); });
     });
-    window.addEventListener("resize", draw);
+    var fbtns = document.querySelectorAll("#snowfield button");
+    Array.prototype.forEach.call(fbtns, function (b) {
+      b.addEventListener("click", function () { setField(b.dataset.field); });
+    });
+    window.addEventListener("resize", function () {
+      state.plan = null;
+      draw();
+    });
+    /* a handle on the state, for the browser console */
+    window.__maps = state;
     initSnow();
     setView(state.view);
   }
