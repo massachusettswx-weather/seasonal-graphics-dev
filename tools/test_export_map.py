@@ -178,12 +178,30 @@ def main():
               (os.path.getsize(man_p) / 1024.0))
     finally:
         json.dump(json.loads(backup), open(reg_p, "w"), indent=1)
-        with open(tags_p, "w") as f:
-            f.write(tags_backup)
         shutil.rmtree(os.path.join(MDIR, TAG), ignore_errors=True)
         for f in os.listdir(EX.OUT):
             if f.startswith("snowmap_%s" % TAG):
                 os.remove(os.path.join(EX.OUT, f))
+        # The exporter wrote the model index with the TEST MODEL in it, so
+        # the index is rebuilt here from the manifests that are actually
+        # there.  Restoring a saved copy is not enough: the copy is taken
+        # before the run and the run is what published the test model.
+        tags = []
+        state = {}
+        for f in sorted(os.listdir(EX.OUT)):
+            if not (f.startswith("snowmap_") and f.endswith(".json")):
+                continue
+            if f == "snowmap_tags.json":
+                continue
+            tag = f[len("snowmap_"):-len(".json")]
+            if tag == TAG:
+                continue
+            m = json.load(open(os.path.join(EX.OUT, f)))
+            tags.append(tag)
+            state[tag] = {"name": m.get("name", tag), "init": m.get("init", "")}
+        EX.write_index(tags, state)
+        with open(tags_p, "w") as f:
+            f.write(tags_backup)
         print("cleaned up")
 
     print("")

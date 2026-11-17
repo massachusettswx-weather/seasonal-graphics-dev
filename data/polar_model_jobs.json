@@ -646,6 +646,37 @@
    "status": "decoded",
    "init": "2026-11",
    "members": 51
+  },
+  {
+   "tag": "ecmwf-seas5",
+   "centre": "ecmwf",
+   "system": "51",
+   "chunk": 45,
+   "end": 60,
+   "job": "f0c7486a-12b9-4636-b199-38e420cd3979",
+   "status": "decoded",
+   "init": "2026-11",
+   "members": 51
+  },
+  {
+   "tag": "ecmwf-seas5",
+   "centre": "ecmwf",
+   "system": "51",
+   "chunk": 60,
+   "end": 75,
+   "job": "9d2d7d3d-caf1-4318-ae3c-3c5d9fe7afdd",
+   "status": "accepted",
+   "init": "2026-11"
+  },
+  {
+   "tag": "ecmwf-seas5",
+   "centre": "ecmwf",
+   "system": "51",
+   "chunk": 75,
+   "end": 90,
+   "job": "fd1afea8-f5b9-43df-84b1-ebb5639a0500",
+   "status": "accepted",
+   "init": "2026-11"
   }
  ]
 }
