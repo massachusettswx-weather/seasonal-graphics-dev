@@ -367,3 +367,17 @@ outputs."  Two things were wrong, and both are fixed:
   the exporter, which writes the model index, and its cleanup restored
   the wrong file.  Both tests now rebuild the index from the manifests
   that are actually there.
+
+## The dev gate: the owner was locked out by their OWN bookmark (17 Nov 2026)
+- The corrected copy lives at `massachusettswx-weather.github.io/seasonal-graphics-dev/`.
+  The OLD address `matthew22-cmd.github.io/seasonal-graphics-dev/` is STILL LIVE and
+  still serves the OLD build with the OLD gate hash (`866da46e...`) - so the new
+  password can never work there.  The owner was typing the new password into the
+  old page.  **Always ask which URL is on their screen before debugging a password.**
+- The login page now: fetches the live hash (`data/gate.json`), ignores case, and
+  strips spaces, quotes and backticks; it has a "show the password" tick box and a
+  "clear the field" button, because a password manager can silently fill in an old
+  password that the reader cannot see.
+- To get the corrected build back on the OLD address: add `massachusettswx-weather`
+  as a write collaborator on `Matthew22-cmd/seasonal-graphics-dev`, then set
+  `GITHUB_DEV_OWNER=Matthew22-cmd` and re-publish.
