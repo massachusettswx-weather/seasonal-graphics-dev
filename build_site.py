@@ -466,7 +466,7 @@ def gate_script():
     return (
         "<script>(function(){var H=%s;var O=%s;try{var g="
         "localStorage.getItem('devgate');"
-        "if(g!==H&&g!==O){"
+        "if(!g||(g!==H&&g!==O&&g.toLowerCase()!==H.toLowerCase()&&g.toLowerCase()!==O.toLowerCase())){"
         "location.replace('login.html?_='+Date.now());return;}}catch(e){}})();</script>"
         % (json.dumps(GATE_HASH), json.dumps(GATE_HASH_OLD)))
 
@@ -543,12 +543,15 @@ async function sha256(s){
 document.getElementById('f').addEventListener('submit',async function(e){
   e.preventDefault();
   var live=await freshHash();
-  var h=await sha256(document.getElementById('pw').value);
-  if(h===live||h===HASH||h===OLD){
+  var typed=document.getElementById('pw').value.replace(/^\s+|\s+$/g,'');
+  var h=await sha256(typed);
+  var hl=await sha256(typed.toLowerCase());
+  if(h===live||h===HASH||h===OLD||hl===live||hl===HASH||hl===OLD){
     try{localStorage.setItem('devgate',live);}catch(err){}
     location.replace('index.html');
   }else{
-    document.getElementById('msg').textContent='That password does not match.';
+    document.getElementById('msg').textContent=
+      'That password does not match. Check for a stray space or a capital letter.';
   }
 });
 </script>

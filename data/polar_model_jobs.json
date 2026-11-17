@@ -665,8 +665,9 @@
    "chunk": 60,
    "end": 75,
    "job": "9d2d7d3d-caf1-4318-ae3c-3c5d9fe7afdd",
-   "status": "accepted",
-   "init": "2026-11"
+   "status": "decoded",
+   "init": "2026-11",
+   "members": 51
   },
   {
    "tag": "ecmwf-seas5",
@@ -675,6 +676,27 @@
    "chunk": 75,
    "end": 90,
    "job": "fd1afea8-f5b9-43df-84b1-ebb5639a0500",
+   "status": "decoded",
+   "init": "2026-11",
+   "members": 51
+  },
+  {
+   "tag": "ecmwf-seas5",
+   "centre": "ecmwf",
+   "system": "51",
+   "chunk": 90,
+   "end": 105,
+   "job": "44d1af2d-b9e5-42cf-9651-175979b53919",
+   "status": "accepted",
+   "init": "2026-11"
+  },
+  {
+   "tag": "ecmwf-seas5",
+   "centre": "ecmwf",
+   "system": "51",
+   "chunk": 105,
+   "end": 120,
+   "job": "64269411-31b7-41ed-9325-b4c714589024",
    "status": "accepted",
    "init": "2026-11"
   }
