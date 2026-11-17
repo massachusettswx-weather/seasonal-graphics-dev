@@ -30,7 +30,7 @@ approval.** Everything is built and checked on the dev site first.
 * `enso.html` - the ENSO plumes
 * `maps.html` - the interactive maps: the whole world in three
   configurations (flat equirectangular, a draggable orthographic globe, a
-  north-polar disc), with the polar cap section's two sectors marked
+  north-polar disc)
 
 ### The interactive maps (17 Nov 2026) - REBUILT as one big world map
 
@@ -51,8 +51,38 @@ The map is one canvas with the vectors on top:
   **sampling plan** per view and the timeline only re-reads the field;
 * the controls: the model, the field (snowfall / anomaly), a **timeline**
   (the run total and one button per lead month, with a play button), and
-  the three views (flat / globe / polar).  The globe can be dragged and
-  scrolled to zoom.
+  the three views (flat / globe / polar).  The globe can be dragged to
+  spin, the flat map dragged to pan, the polar map dragged to spin around
+  the pole, and **every view zooms** - the buttons on the map (out, the
+  zoom, in, reset), the scroll wheel (about the pointer) or the keyboard
+  (`+`, `-`, `0`).
+
+**THE MAP CARRIES NO POLAR-SECTION FURNITURE.** The North Pacific and
+North Atlantic sector wedges and their labels belonged to the stratosphere
+page; they were painted over the Arctic on the snowfall map and had to go,
+and so did the 60N cap edge.  The maps page is a snowfall map, not a second
+copy of the polar charts.
+
+**WHICH MODELS ARE ON THE MAP:** only the ones with a **global** field on
+disk - the NOAA SFSv1 (its own 0.5 degree grid, the sharpest field on the
+site) and the NOAA CFSv2 (1.5 degree).  The CFSv2 is global because
+`fetch_era5_snow_arco.py --box global` builds the ERA5 1991-2020 snowfall
+climatology over the whole world and checkpoints **every year**
+(`data/era5_clim_ckpt/`), so a sandbox rebuild resumes the pull instead of
+starting again.  The C3S centres (ECMWF SEAS5, UKMO, METFR, ECCC canSIPS,
+CMCC, DWD) join the map by themselves the moment their global GRIBs are
+fetched - the exporter and the model picker are data-driven - but **that
+needs the CDS key**, which is not in the secret store yet.
+
+**THE DOMAIN TRAP (fixed 17 Nov 2026):** the sampling plan used to wrap
+the longitude (`% nlon`) instead of checking it against the model's own
+grid, so a field that does **not** cover the whole world was smeared
+around the entire globe - once round for every degree of longitude.  The
+longitude is now checked against the model's own domain, in the model's
+own convention (a field with `lon0 >= 0` is compared in 0..360, one with
+`lon0 < 0` in -180..180); a global field still wraps, which is what it
+must do.  `tools/test_maps_page.py` checks that no sector furniture is on
+the map and that the zoom works.
 
 The two traps that are already known and fixed:
 
