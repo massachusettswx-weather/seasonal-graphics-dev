@@ -73,9 +73,13 @@ if [ "$TARGET" = "prod" ]; then
   echo ">> target: the OPERATIONAL site (${SITE_URL})"
 else
   REPO="$DEV_REPO_NAME"
-  OWNER="${GITHUB_DEV_OWNER:-Matthew22-cmd}"
-  SITE_URL="https://matthew22-cmd.github.io/seasonal-graphics-dev/"
-  SITE_REPO_URL="https://github.com/Matthew22-cmd/seasonal-graphics-dev"
+  # The account that OWNS the development copy.  It is the account whose
+  # token can push it, so the pipeline can publish with nobody awake.  The
+  # development copy is a separate repository from the operational site
+  # and is never published to it.
+  OWNER="${GITHUB_DEV_OWNER:-massachusettswx-weather}"
+  SITE_URL="https://${OWNER}.github.io/${DEV_REPO_NAME}/"
+  SITE_REPO_URL="https://github.com/${OWNER}/${DEV_REPO_NAME}"
   SITE_DEV=1
   echo ">> target: the DEVELOPMENT site (${SITE_URL})"
 fi
@@ -211,7 +215,7 @@ echo ">> pushing"
 # The remote is ALWAYS left pointing at the DEVELOPMENT repository, even
 # after an --prod publish: a bare `git push` must never be able to reach the
 # operational site.
-DEV_REMOTE="https://github.com/${GITHUB_DEV_OWNER:-Matthew22-cmd}/${DEV_REPO_NAME}.git"
+DEV_REMOTE="https://github.com/${GITHUB_DEV_OWNER:-massachusettswx-weather}/${DEV_REPO_NAME}.git"
 cleanup_remote () {
     git remote set-url origin "$DEV_REMOTE" 2>/dev/null || true
 }
