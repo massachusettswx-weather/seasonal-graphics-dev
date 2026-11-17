@@ -221,7 +221,7 @@ a{color:#1c4b8a}
   border-radius:999px}
 .mapviews button.active{background:#12263f; color:#fff; border-color:#12263f}
 .mapbox{position:relative; width:100%; overflow:hidden; border-radius:10px;
-  border:1px solid #16344b; background-color:#061523;
+  border:1px solid #16344b; background-color:#02060d;
   background-image:
     radial-gradient(1px 1px at 12% 22%, rgba(190,220,245,.75), transparent),
     radial-gradient(1px 1px at 34% 68%, rgba(190,220,245,.5), transparent),
@@ -243,18 +243,18 @@ a{color:#1c4b8a}
 /* the map's own colours: OUR earth, not the pale blue-and-beige of every
    other weather site - a deep navy sea, a slate land, cool steel coasts.
    The field's own colours are the only bright thing on the map. */
-.ocean{fill:#0d2233; stroke:#16344b; stroke-width:.6}
-.grat{fill:none; stroke:#2d4f68; stroke-width:.5; stroke-dasharray:2 3; opacity:.9}
-.country{fill:#2a3642; stroke:#8fb2c9; stroke-width:.45}
-.country:hover{fill:#3d4f61}
-.lake{fill:#0d2233; stroke:#16344b; stroke-width:.35}
-.land{fill:#2a3642; stroke:#8fb2c9; stroke-width:.4}
+.ocean{fill:#12395c; stroke:#1b4d78; stroke-width:.6}
+.grat{fill:none; stroke:#4d7ea6; stroke-width:.5; stroke-dasharray:2 3; opacity:.8}
+.country{fill:#33445a; stroke:#9cc0d8; stroke-width:.45}
+.country:hover{fill:#4a5f79}
+.lake{fill:#12395c; stroke:#1b4d78; stroke-width:.35}
+.land{fill:#33445a; stroke:#9cc0d8; stroke-width:.4}
 .snowband{stroke:none}
 .maplegend{display:flex; align-items:center; gap:8px; flex-wrap:wrap;
   margin:0 0 10px; font-size:12px; color:var(--muted)}
-.maplegend .bar{display:flex; height:12px; border:1px solid #1c2430;
+.maplegend .bar{display:flex; width:100%; height:12px; border:1px solid #1c2430;
   border-radius:2px; overflow:hidden}
-.maplegend .bar i{display:block; width:16px; height:100%}
+.maplegend .bar i{display:block; flex:1 1 0; height:100%}
 /* the colour bar's keys: the ladder's own levels, every other one, on the
    same boundaries the static panels' colour bar uses */
 .maplegend .keys{position:relative; width:100%; height:13px; margin-top:1px}
@@ -467,7 +467,7 @@ def gate_script():
         "<script>(function(){var H=%s;var O=%s;try{var g="
         "localStorage.getItem('devgate');"
         "if(g!==H&&g!==O){"
-        "location.replace('login.html');return;}}catch(e){}})();</script>"
+        "location.replace('login.html?_='+Date.now());return;}}catch(e){}})();</script>"
         % (json.dumps(GATE_HASH), json.dumps(GATE_HASH_OLD)))
 
 
@@ -523,6 +523,18 @@ def build_login_page():
 <script>
 var HASH=__HASH__;
 var OLD=__OLD__;
+/* The hash is FETCHED, not taken from this page's own copy: a browser
+   that still holds an old login page would otherwise reject the current
+   password forever, because the comparison happens in the browser.  The
+   timestamp in the query defeats the cache, so the page always asks for
+   the hash that is live now.  The inline copy is the fallback if the
+   fetch fails. */
+function freshHash(){
+  return fetch('data/gate.json?_=' + Date.now(), {cache:'no-store'})
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ return (j && j.hash) ? j.hash : HASH; })
+    .catch(function(){ return HASH; });
+}
 async function sha256(s){
   const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));
   return Array.from(new Uint8Array(b)).map(function(x){
@@ -530,9 +542,10 @@ async function sha256(s){
 }
 document.getElementById('f').addEventListener('submit',async function(e){
   e.preventDefault();
+  var live=await freshHash();
   var h=await sha256(document.getElementById('pw').value);
-  if(h===HASH||h===OLD){
-    try{localStorage.setItem('devgate',HASH);}catch(err){}
+  if(h===live||h===HASH||h===OLD){
+    try{localStorage.setItem('devgate',live);}catch(err){}
     location.replace('index.html');
   }else{
     document.getElementById('msg').textContent='That password does not match.';
@@ -545,6 +558,14 @@ document.getElementById('f').addEventListener('submit',async function(e){
     html = html.replace("__STAMP__", stamp)
     with open(os.path.join(SITE, "login.html"), "w") as f:
         f.write(html)
+    # the hash the login page fetches, so a cached login page still knows
+    # the current password
+    try:
+        os.makedirs(os.path.join(SITE, "data"), exist_ok=True)
+        with open(os.path.join(SITE, "data", "gate.json"), "w") as f:
+            json.dump({"hash": GATE_HASH, "old": GATE_HASH_OLD}, f)
+    except OSError:
+        pass
 
 
 def page(title, active, body, version=""):

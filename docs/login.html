@@ -33,6 +33,18 @@
 <script>
 var HASH="147df6f124b15703ddc1fdd2c74dde703d3333aa3382910a411e6f5ee61b9f26";
 var OLD="866da46e2e6cd6f6b5aa489cb6a738be078fe7bda1f638a3b8bea8d1d55993c2";
+/* The hash is FETCHED, not taken from this page's own copy: a browser
+   that still holds an old login page would otherwise reject the current
+   password forever, because the comparison happens in the browser.  The
+   timestamp in the query defeats the cache, so the page always asks for
+   the hash that is live now.  The inline copy is the fallback if the
+   fetch fails. */
+function freshHash(){
+  return fetch('data/gate.json?_=' + Date.now(), {cache:'no-store'})
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ return (j && j.hash) ? j.hash : HASH; })
+    .catch(function(){ return HASH; });
+}
 async function sha256(s){
   const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));
   return Array.from(new Uint8Array(b)).map(function(x){
@@ -40,9 +52,10 @@ async function sha256(s){
 }
 document.getElementById('f').addEventListener('submit',async function(e){
   e.preventDefault();
+  var live=await freshHash();
   var h=await sha256(document.getElementById('pw').value);
-  if(h===HASH||h===OLD){
-    try{localStorage.setItem('devgate',HASH);}catch(err){}
+  if(h===live||h===HASH||h===OLD){
+    try{localStorage.setItem('devgate',live);}catch(err){}
     location.replace('index.html');
   }else{
     document.getElementById('msg').textContent='That password does not match.';

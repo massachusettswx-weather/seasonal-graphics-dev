@@ -60,12 +60,51 @@
   /* ---------------------------------------------------------------- */
   /* the earth, painted under the field                               */
 
-  /* OUR earth, not the pale blue-and-beige that every other weather site
-     uses: a deep navy sea and a slate land, with the coastlines in a cool
-     steel blue.  The field's own colours are then the only bright thing
-     on the map, and the map is unmistakably ours. */
-  var OCEAN = "#0d2233";
-  var LAND = "#2a3642";
+  /* OUR earth, floating in space: a deep blue sea and a slate land, with
+     the coastlines in a cool steel blue.  The sea is a clear step lighter
+     than the sky behind it, so the globe never dissolves into the
+     background, and the field's own colours are the only bright thing on
+     the map. */
+  var OCEAN = "#12395c";
+  var LAND = "#33445a";
+  var SPACE = "#02060d";
+
+  /* the sky: a deterministic starfield and a faint nebula, drawn under
+     the globe.  The same seed every time, so the sky does not jump about
+     as the map is redrawn. */
+  function paintSpace(ctx, W, H) {
+    ctx.fillStyle = SPACE;
+    ctx.fillRect(0, 0, W, H);
+    /* the nebula: two soft glows, nothing more */
+    var g1 = ctx.createRadialGradient(W * 0.72, H * 0.18, 0,
+                                      W * 0.72, H * 0.18, Math.max(W, H) * 0.55);
+    g1.addColorStop(0, "rgba(70,110,170,0.20)");
+    g1.addColorStop(1, "rgba(70,110,170,0)");
+    ctx.fillStyle = g1;
+    ctx.fillRect(0, 0, W, H);
+    var g2 = ctx.createRadialGradient(W * 0.22, H * 0.82, 0,
+                                      W * 0.22, H * 0.82, Math.max(W, H) * 0.45);
+    g2.addColorStop(0, "rgba(120,70,150,0.16)");
+    g2.addColorStop(1, "rgba(120,70,150,0)");
+    ctx.fillStyle = g2;
+    ctx.fillRect(0, 0, W, H);
+    /* the stars */
+    var seed = 20261117;
+    function rnd() {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    }
+    var n = Math.round((W * H) / 2600);
+    for (var i = 0; i < n; i++) {
+      var x = rnd() * W, y = rnd() * H;
+      var r = 0.35 + rnd() * 0.95;
+      var a = 0.18 + rnd() * 0.72;
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(226,238,255," + a.toFixed(3) + ")";
+      ctx.arc(x, y, r, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+  }
 
   function paintEarth(ctx, proj, W, H) {
     /* the ocean: the sphere, or the rectangle on the flat map */
@@ -75,10 +114,18 @@
       ctx.fillStyle = OCEAN;
       ctx.fillRect(0, 0, W, H);
     } else {
+      /* the sky the globe floats in */
+      paintSpace(ctx, W, H);
+      /* the atmosphere: a soft rim of light round the limb, so the globe
+         never dissolves into the background */
+      ctx.save();
+      ctx.shadowColor = "rgba(125,175,235,0.55)";
+      ctx.shadowBlur = 30;
       ctx.fillStyle = OCEAN;
       ctx.beginPath();
       path({type: "Sphere"});
       ctx.fill();
+      ctx.restore();
     }
     /* the land and the lakes, clipped to the sphere: on the polar
        projection Antarctica's ring runs right around the disc and would
@@ -679,31 +726,34 @@
       lo.textContent = "-" + s + " in";
       hi.textContent = "+" + s + " in";
       cap.textContent = "Snowfall anomaly against the model's own hindcast " +
-        "climate (" + man.name + "), inches of snow depth - brown is less " +
+        "climate (" + man.name + "), inches - brown is less " +
         "snow than the model expects, teal is more";
     } else {
-      (man.colors || man.ramp || []).forEach(function (c) {
+      /* the bar: the ladder's intervals, the same boundaries the static
+         panels' colour bar is drawn on, and the keys on those boundaries.
+         The bar used to be 32 fixed-width blocks in a full-width row, so
+         it stopped half way across and the keys sat on nothing. */
+      var lv = man.levels || [];
+      var nseg = Math.max(1, lv.length - 1);
+      (man.colors || []).slice(0, nseg).forEach(function (c) {
         var i = document.createElement("i");
         i.style.background = c;
         bar.appendChild(i);
       });
       lo.textContent = man.levels[0] + " in";
-      hi.textContent = man.levels[man.levels.length - 1] + " in of snow";
-      cap.textContent = "Accumulated snowfall, inches of snow depth (" +
+      hi.textContent = man.levels[man.levels.length - 1] + " in";
+      cap.textContent = "Accumulated snowfall, inches (" +
         man.name + ", " + man.members + " members" +
         (man.init ? ", " + man.init + " init" : "") +
-        ") on the published 0-300 in snow-depth scale";
+        ") on the published 0-300 in scale";
       /* THE KEYS: the ladder's own levels, every other one - the same set
-         the static panels' colour bar carries, on the same boundaries.
-         Without them the bar is a stripe with two numbers and nobody can
-         read a value off it. */
-      var lv = man.levels || [];
+         the static panels' colour bar carries, on the same boundaries. */
       var keys = document.createElement("div");
       keys.className = "keys";
       for (var j = 0; j < lv.length; j += 2) {
         var sp = document.createElement("span");
         sp.textContent = (lv[j] < 1 && lv[j] !== 0.25 ? lv[j] : Math.round(lv[j]));
-        sp.style.left = (j * 100 / lv.length) + "%";
+        sp.style.left = (j * 100 / nseg) + "%";
         if (j === 0) { sp.className = "first"; }
         keys.appendChild(sp);
       }
@@ -839,7 +889,7 @@
           : ((val >= 0 ? "+" : "") + val.toFixed(1) +
              " in vs the model's own climate");
       } else {
-        txt = (v < 0.5) ? "no snow" : (val.toFixed(1) + " in of snow");
+        txt = (v < 0.5) ? "no snow" : (val.toFixed(1) + " in");
       }
       txt = Math.abs(ll[1]).toFixed(1) + (ll[1] >= 0 ? "N" : "S") + " " +
         Math.abs(ll[0]).toFixed(1) + (ll[0] >= 0 ? "E" : "W") + " · " + txt;
