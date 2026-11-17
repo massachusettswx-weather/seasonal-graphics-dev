@@ -4,8 +4,8 @@
 sandbox is wiped, the working tree goes with it, but this file comes back
 with the repository. Read it first, and update it before you end a session.
 
-Last updated: **17 Nov 2026, 09:00 UTC** (after the sandbox wipe of 16-17 Nov,
-and after the global map rebuild)
+Last updated: **17 Nov 2026, 19:05 UTC** (after the sandbox wipe of 16-17 Nov,
+after the global map rebuild, and after the auto-run was wired)
 
 ## The two sites
 
@@ -105,6 +105,51 @@ BOM ACCESS-S2, NOAA SFSv1 (31), NOAA CFSv2 (40), C3S Multi-Model Mean.
 The JMA and the BoM carry no snowfall in the C3S seasonal product
 (`MarsNoDataError` on param 172144) - the ENSO plume and the 10 hPa wind
 only.
+
+## The auto-run (17 Nov 2026, overnight)
+
+The pipeline now keeps itself up, and the DEVELOPMENT site is the only
+target it ever pushes to.
+
+* **The publisher** (`auto_publish.sh`) watches the model data and, when
+  anything changes, rebuilds the panels, **the map**, the registry and the
+  pages, commits and pushes.  The map export is now in that chain
+  (`export_snow_map.py`), so the world map can never be a month out of
+  date with the panels.
+* **It builds the DEVELOPMENT site.**  `SITE_DEV=1` and the dev addresses
+  are exported in the publisher: without that, a build made while the
+  token was missing would commit an operational copy into the development
+  repository - a stale copy of the live site on the dev address.
+* **`tools/auto_run.sh`** is the one command that puts everything back
+  after a sandbox rebuild: the python packages, the credentials (from the
+  encrypted secret store, as environment variables), and the workers.
+* **`tools/bootstrap.sh`** does the whole rebuild from nothing: it clones
+  the repository, restores the packages and the credentials, and recovers
+  the model data from the tracked job ids.
+* **A scheduled task keeps it alive.**  `seasonal-pipeline-keepalive`
+  runs every 20 minutes: it puts the workers back after each rebuild and
+  recovers the model data.  The scheduler lives in the daemon, so it
+  survives the sandbox rebuilds that kill the workers.
+* **The verifier works again**: it uses the full Chromium (the installed
+  Playwright wants a headless shell that is not here), it checks the maps
+  page on the dev copy, and it sets the gate hash so it sees the real
+  pages instead of the login form.
+
+### The world map's data, so far
+
+* **NOAA SFSv1** - the WHOLE WORLD on the model's own **0.5 degree**
+  grid (361 x 720), with the anomaly against the model's own 35-year
+  reforecast climate.  `fetch_sfs.py` now writes
+  `snowfall_monthly_global.npz` and `snowfall_hindcast_global.npz`
+  beside the eastern-US files, and the exporter prefers them.  This is
+  the highest resolution field on the site.
+* **The C3S systems** (ECMWF, UKMO, METFR, ECCC, CMCC, DWD) are ready
+  and waiting: the exporter and the renderer take their global fields as
+  they land, but the fields themselves need the CDS key.
+* **The JMA and the BoM** have no snowfall in the C3S product at all.
+* The stale CONUS map files for the six C3S centres were removed - the
+  new page cannot read the old format, and the exporter rewrites them
+  when the data comes back.
 
 ## In flight
 
