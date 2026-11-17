@@ -88,6 +88,101 @@ def months_from_cpc(t):
     return out
 
 
+def fetch_global(tag="cfsv2"):
+    """The same model over the WHOLE WORLD, for the interactive map.
+
+    The panels are drawn over the eastern United States, so the monthly
+    files above are cut to that box.  The map needs the whole globe, so
+    the same calculation is done on the global ERA5 climatology
+    (data/era5_snow_clim_arco_global.npz) and written beside the others
+    as snowfall_monthly_global.npz / snowfall_hindcast_global.npz - the
+    names the map exporter looks for.
+
+    The anomaly is still the model's OWN: the CPC file already holds the
+    CFSv2 ensemble-mean anomaly against the model's own hindcast
+    climatology, so subtracting the ERA5 climatology back out leaves
+    exactly the anomaly the model published.
+    """
+    d = os.path.join(DATA, "models", tag)
+    clim_path = os.path.join(DATA, "era5_snow_clim_arco_global.npz")
+    if not os.path.exists(clim_path):
+        print("no global ERA5 climatology yet - the map keeps the box field")
+        return
+    pp = download("glbPrecMon.nc", os.path.join(DATA, "cpc"))
+    tp = download("glbT2mMon.nc", os.path.join(DATA, "cpc"))
+    prec, plat, plon, t, punit = read_cpc(pp)
+    mons = months_from_cpc(t)
+    init = "%04d-%02d" % mons[0]
+
+    cz = np.load(clim_path, allow_pickle=True)
+    glat = np.asarray(cz["lat"], float)              # ascending
+    glon = np.asarray(cz["lon"], float)              # 0..360
+    gmon = [int(x) for x in cz["months"]]
+    gclim = np.asarray(cz["clim"], float)            # (month, lat, lon) mm
+    gclim_p = (np.asarray(cz["clim_precip"], float)
+               if "clim_precip" in cz.files else None)
+    print("global climatology:", glat.shape, glon.shape, gmon,
+          "| with precip:", gclim_p is not None)
+
+    fcst = []
+    anom = []
+    for k, (y, m) in enumerate(mons):
+        days = calendar.monthrange(y, m)[1]
+        pr_anom = _bilinear(prec[k], plat, plon, glat, glon) * days   # mm/month
+        if m in gmon:
+            i = gmon.index(m)
+            base = gclim[i]
+            if gclim_p is not None:
+                frac = np.clip(base / np.maximum(gclim_p[i], 1e-6), 0.0, 1.0)
+            else:
+                frac = (base > 0.5).astype(float)
+        else:
+            base = np.zeros_like(pr_anom)
+            frac = np.zeros_like(pr_anom)
+        snow_anom = pr_anom * frac
+        fcst.append(base + snow_anom)
+        anom.append(snow_anom)
+
+    # the renderer's convention: a rate in m w.e. s-1, the latitudes
+    # descending, the longitudes ascending
+    lat = glat[::-1].copy()
+    lon = glon.copy()
+    order = np.argsort(lon)
+    lon = lon[order]
+    months = ["%04d-%02d" % m for m in mons]
+    sec = np.array([calendar.monthrange(*m)[1] * 86400.0 for m in mons])
+
+    def pack(arrs):
+        a = np.stack(arrs)
+        a = np.clip(a, 0.0, None)
+        a = a[:, :, order][:, ::-1, :]
+        return (a[None, :, :, :] / 1000.0 /
+                sec[None, :, None, None]).astype(np.float32)
+
+    os.makedirs(d, exist_ok=True)
+    np.savez_compressed(os.path.join(d, "snowfall_monthly_global.npz"),
+                        months=np.array(months),
+                        member_numbers=np.array([0]),
+                        values=pack(fcst),
+                        lat=lat, lon=lon,
+                        meta=np.array(json.dumps(
+                            dict(tag=tag, name="NOAA CFSv2", init=init,
+                                 members=40, source="NCEP CPC monthly means",
+                                 note="the whole world; absolute snowfall = the "
+                                      "ERA5 1991-2020 climatology plus the "
+                                      "CFSv2 hindcast anomaly"))))
+    base = []
+    for (y, m) in mons:
+        base.append(gclim[gmon.index(m)] if m in gmon else np.zeros_like(anom[0]))
+    np.savez_compressed(os.path.join(d, "snowfall_hindcast_global.npz"),
+                        months=np.array(months),
+                        values=pack(base),
+                        lat=lat, lon=lon,
+                        meta=np.array(json.dumps(dict(init=init))))
+    print("wrote the global fields for %s: %d months on a %dx%d grid"
+          % (tag, len(months), len(lat), len(lon)))
+
+
 def fetch(tag="cfsv2"):
     d = os.path.join(DATA, "cpc")
     pp = download("glbPrecMon.nc", d)
@@ -189,3 +284,4 @@ def fetch(tag="cfsv2"):
 
 if __name__ == "__main__":
     fetch()
+    fetch_global()

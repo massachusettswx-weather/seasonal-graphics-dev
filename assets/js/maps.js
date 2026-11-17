@@ -45,27 +45,15 @@
     land: NE + "ne_50m_land.geojson"
   };
 
-  /* The two sectors the polar section is drawn for: the North Pacific
-     (120E-240E) and the North Atlantic (300E-60E), both 60N-90N. */
-  var SECTORS = [
-    {id: "npac", name: "North Pacific", lon0: 120, lon1: 240,
-     colour: "#f4b740", ink: "#3a2600", flatLabelLon: 150},
-    {id: "natl", name: "North Atlantic", lon0: 300, lon1: 60,
-     colour: "#3d7fd1", ink: "#0d2f5e"}
-  ];
-
-  /* the polar view keeps the arrangement of the static charts: the pole
-     at the centre, Greenwich at the BOTTOM, the Pacific at the top and
-     the Atlantic at the bottom.  d3's azimuthal projections put the
-     projection's own longitude at the bottom, so the rotation is 0. */
-  var POLAR_ROT = [0, -90];
-
   /* the globe opens over North America, where the snowfall field is:
      d3's rotate() puts (-lambda, -phi) at the centre */
-  var state = {view: "globe", rot: [95, -35], drag: null, zoom: 1,
-               field: "total", month: -1, tag: null, manifest: null,
-               raster: null, plan: null, index: null, timer: null,
-               data: {}};
+  var GLOBE_ROT = [95, -35];
+
+  var state = {view: "globe", rot: GLOBE_ROT.slice(), prot: [0, -90],
+               drag: null, zoom: 1,
+               pan: [0, 0], field: "total", month: -1, tag: null,
+               manifest: null, raster: null, plan: null, index: null,
+               timer: null, data: {}};
 
   function el(id) { return document.getElementById(id); }
 
@@ -122,6 +110,15 @@
                 fx: new Float32Array(W * H), fy: new Float32Array(W * H),
                 ok: new Uint8Array(W * H)};
     var lat0 = g.lat0, dlat = g.dlat, lon0 = g.lon0, dlon = g.dlon;
+    /* A field that does not cover the whole world must not be painted
+       outside its own domain.  The longitude is checked against the
+       model's own grid - in the model's own convention - and a pixel
+       outside that box is left alone.  (A global field covers every
+       longitude, so there the longitude wraps, which is what it must
+       do.)  Without this the box of a regional field is smeared around
+       the whole world, once round for every degree of longitude. */
+    var span = nlon * dlon;
+    var isGlobal = span >= 359.5;
     /* On the globe, d3's invert() answers for the WHOLE sphere - it does
        not clip to the visible hemisphere - so without this the field would
        be painted on the dark sky outside the limb, showing the far side of
@@ -149,8 +146,24 @@
         var lon = ll[0], lat = ll[1];
         if (lat > lat0 || lat < lat0 - (nlat - 1) * dlat) { continue; }
         var fi = (lat0 - lat) / dlat;
-        var fj = ((lon - lon0) / dlon) % nlon;
-        if (fj < 0) { fj += nlon; }
+        var fj;
+        if (isGlobal) {
+          fj = ((lon - lon0) / dlon) % nlon;
+          if (fj < 0) { fj += nlon; }
+        } else {
+          var la = lon;
+          if (lon0 >= 0) {
+            while (la < 0) { la += 360; }
+            while (la >= 360) { la -= 360; }
+          } else {
+            while (la > 180) { la -= 360; }
+            while (la < -180) { la += 360; }
+          }
+          if (la < lon0 - 1e-9 || la > lon0 + span - 1e-9) { continue; }
+          fj = (la - lon0) / dlon;
+          if (fj < 0) { fj += nlon; }
+          if (fj >= nlon) { fj -= nlon; }
+        }
         var i0 = Math.floor(fi);
         var j0 = Math.floor(fj);
         if (i0 < 0) { i0 = 0; }
@@ -262,10 +275,25 @@
       .join("path").attr("class", "country").attr("d", path);
     g.selectAll("path.lake").data(state.data.lakes.features)
       .join("path").attr("class", "lake").attr("d", path);
-    svg.append("path").datum(capLine()).attr("class", "capedge").attr("d", path);
-    drawSectors(g, path, proj, true, true);
-    note("The whole world on an equirectangular grid, with the two polar " +
-         "sectors of the polar cap section marked. The equirectangular " +
+
+    /* the flat map is dragged to pan and scrolled to zoom */
+    svg.call(d3.drag()
+      .on("start", function (ev) { state.drag = d3.pointer(ev, this); })
+      .on("drag", function (ev) {
+        var p = d3.pointer(ev, this);
+        var dx = p[0] - state.drag[0], dy = p[1] - state.drag[1];
+        state.pan[0] += dx;
+        state.pan[1] += dy;
+        state.drag = p;
+        state.plan = null;
+        draw();
+      }));
+    svg.on("wheel", function (ev) {
+      ev.preventDefault();
+      zoomAt(ev, ev.deltaY < 0 ? 1.15 : 1 / 1.15);
+    });
+    note("The whole world on an equirectangular grid. Drag it to pan, " +
+         "scroll or use the buttons to zoom. The equirectangular " +
          "projection squeezes the polar regions, which is why the polar " +
          "view exists.");
   }
@@ -295,14 +323,15 @@
       .join("path").attr("class", "country").attr("d", path);
     g.selectAll("path.lake").data(state.data.lakes.features)
       .join("path").attr("class", "lake").attr("d", path);
-    svg.append("path").datum(capLine()).attr("class", "capedge").attr("d", path);
-    drawSectors(g, path, proj, true);
 
+    /* the pole, when it is on the near side of the globe */
     var pole = proj([0, 90]);
     if (pole) {
       svg.append("circle").attr("class", "pole")
         .attr("cx", pole[0]).attr("cy", pole[1]).attr("r", 3);
     }
+
+    /* the globe is dragged to spin */
     svg.call(d3.drag()
       .on("start", function (ev) { state.drag = d3.pointer(ev, this); })
       .on("drag", function (ev) {
@@ -317,14 +346,11 @@
 
     svg.on("wheel", function (ev) {
       ev.preventDefault();
-      state.zoom = Math.max(1, Math.min(6, state.zoom * (ev.deltaY < 0 ? 1.12 : 1 / 1.12)));
-      state.plan = null;
-      draw();
+      zoomAt(ev, ev.deltaY < 0 ? 1.15 : 1 / 1.15);
     });
 
     note("The same world on an orthographic globe - drag it to spin, scroll " +
-         "to zoom. The polar cap is the ring north of 60N; the two sectors " +
-         "are marked in the colours the polar charts use.");
+         "or use the buttons to zoom.");
   }
 
   function drawPolar(svg, proj, W, H) {
@@ -344,54 +370,105 @@
       grat.coordinates.push([[lon, 60], [lon, 90]]);
     }
     svg.append("path").datum(grat).attr("class", "grat").attr("d", path);
-    drawSectors(g, path, proj, true);
-    svg.append("path").datum(capLine()).attr("class", "capedge").attr("d", path);
-    note("The whole world on a north polar projection: the pole at the " +
-         "centre, every continent radiating from it, the 60N edge of the " +
-         "polar cap solid. The North Pacific sector is at the top and the " +
-         "North Atlantic at the bottom, exactly as on the stratosphere " +
-         "page.");
-  }
 
-  /* the 60N edge of the polar cap */
-  function capLine() {
-    var c = [];
-    for (var i = 0; i <= 360; i++) { c.push([i % 360, 60]); }
-    return {type: "LineString", coordinates: c};
-  }
-
-  /* the two sectors, in the colours the polar charts use */
-  function drawSectors(g, path, proj, showLabels, flatLabels) {
-    SECTORS.forEach(function (s) {
-      /* the longitudes are kept UNWRAPPED (120 to 240, not 120 to -120):
-         a ring that jumps across the antimeridian is drawn as a line
-         straight across the map, and d3 cuts the antimeridian for us when
-         the ring is continuous */
-      var ring = [];
-      for (var lat = 60; lat <= 90; lat += 2) {
-        ring.push([s.lon0, lat]);
-      }
-      for (var lon = s.lon0; lon <= s.lon1; lon += 2) {
-        ring.push([lon, 90]);
-      }
-      for (var lat2 = 90; lat2 >= 60; lat2 -= 2) {
-        ring.push([s.lon1, lat2]);
-      }
-      ring.push([s.lon0, 60]);
-      g.append("path").attr("class", "sector")
-        .attr("fill", s.colour).attr("fill-opacity", 0.35)
-        .attr("stroke", s.ink)
-        .attr("d", path({type: "Polygon", coordinates: [ring]}));
-      if (showLabels) {
-        var mid = (s.lon0 + s.lon1) / 2;
-        var p = proj([mid, 75]);
-        if (p) {
-          g.append("text").attr("class", "sectorlabel")
-            .attr("x", p[0]).attr("y", p[1]).attr("fill", s.ink)
-            .text(s.name);
-        }
-      }
+    /* the polar view is dragged to spin around the pole */
+    svg.call(d3.drag()
+      .on("start", function (ev) { state.drag = d3.pointer(ev, this); })
+      .on("drag", function (ev) {
+        var p = d3.pointer(ev, this);
+        var dx = p[0] - state.drag[0];
+        state.prot[0] = (state.prot[0] + dx * 0.5) % 360;
+        state.drag = p;
+        state.plan = null;
+        draw();
+      }));
+    svg.on("wheel", function (ev) {
+      ev.preventDefault();
+      zoomAt(ev, ev.deltaY < 0 ? 1.15 : 1 / 1.15);
     });
+
+    note("The whole world on a north polar projection: the pole at the " +
+         "centre, every continent radiating from it. Drag it to spin around " +
+         "the pole, scroll or use the buttons to zoom.");
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* the zoom                                                          */
+
+  /* The zoom is the one thing a world map cannot do without: the field
+     is the model's own grid, so a 1 degree model has to be looked at
+     from close up to be worth looking at.  Every view can be zoomed
+     (the buttons, the scroll wheel, or the keyboard) and the flat map
+     can be panned. */
+
+  var ZOOM_MIN = 1, ZOOM_MAX = 12;
+
+  function setZoom(z) {
+    state.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+    state.plan = null;
+    draw();
+  }
+
+  /* Zoom about the pointer, so the place under the cursor stays under
+     the cursor.  On the globe the zoom is about the centre of the
+     sphere - that is where the point being looked at is. */
+  function zoomAt(ev, factor) {
+    var z = state.zoom * factor;
+    if (z < ZOOM_MIN) { z = ZOOM_MIN; }
+    if (z > ZOOM_MAX) { z = ZOOM_MAX; }
+    if (z === state.zoom) { return; }
+    if (state.view === "flat" && ev && ev.clientX !== undefined) {
+      var box = el("mapbox");
+      var W = box ? box.clientWidth : 0;
+      var H = box ? box.clientHeight : 0;
+      var cx = W / 2, cy = H / 2;
+      var px = ev.clientX - (box ? box.getBoundingClientRect().left : 0);
+      var py = ev.clientY - (box ? box.getBoundingClientRect().top : 0);
+      state.pan[0] += (px - cx) * (1 - z / state.zoom);
+      state.pan[1] += (py - cy) * (1 - z / state.zoom);
+    }
+    state.zoom = z;
+    state.plan = null;
+    draw();
+  }
+
+  function resetView() {
+    state.zoom = 1;
+    state.pan = [0, 0];
+    state.rot = GLOBE_ROT.slice();
+    state.prot = [0, -90];
+    state.plan = null;
+    draw();
+  }
+
+  function buildControls() {
+    var box = el("mapbox");
+    if (!box || box.querySelector(".mapctl")) { return; }
+    var c = document.createElement("div");
+    c.className = "mapctl";
+    c.innerHTML =
+      '<button type="button" data-z="out" title="zoom out">−</button>' +
+      '<span class="zlabel">100%</span>' +
+      '<button type="button" data-z="in" title="zoom in">+</button>' +
+      '<button type="button" data-z="reset" title="reset the view">⟲</button>';
+    box.appendChild(c);
+    c.addEventListener("click", function (ev) {
+      var b = ev.target.closest ? ev.target.closest("button") : null;
+      if (!b) { return; }
+      ev.preventDefault();
+      ev.stopPropagation();
+      var z = b.getAttribute("data-z");
+      if (z === "in") { setZoom(state.zoom * 1.35); }
+      else if (z === "out") { setZoom(state.zoom / 1.35); }
+      else { resetView(); }
+    });
+    c.addEventListener("wheel", function (ev) { ev.stopPropagation(); },
+                      {passive: true});
+  }
+
+  function updateZoomLabel() {
+    var l = document.querySelector(".mapctl .zlabel");
+    if (l) { l.textContent = Math.round(state.zoom * 100) + "%"; }
   }
 
   /* ---------------------------------------------------------------- */
@@ -645,11 +722,17 @@
         .rotate(state.rot);
     } else {
       proj = d3.geoAzimuthalEquidistant()
-        .rotate(POLAR_ROT)
+        .rotate(state.prot)
         .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"});
     }
+    /* the zoom: the scale goes up about the centre of the projection, and
+       the flat map can then be panned away from that centre */
     if (state.zoom !== 1) {
       proj.scale(proj.scale() * state.zoom);
+    }
+    if (state.pan[0] || state.pan[1]) {
+      var t = proj.translate();
+      proj.translate([t[0] + state.pan[0], t[1] + state.pan[1]]);
     }
     return proj;
   }
@@ -692,6 +775,7 @@
     if (state.view === "flat") { drawFlat(svg, proj, W, H); }
     else if (state.view === "globe") { drawGlobe(svg, proj, W, H); }
     else { drawPolar(svg, proj, W, H); }
+    updateZoomLabel();
 
     /* the tooltip reads the field under the pointer */
     svg.on("mousemove", function (ev) {
@@ -751,6 +835,7 @@
   function setView(v) {
     state.view = v;
     state.plan = null;
+    state.pan = [0, 0];
     var btns = document.querySelectorAll("#mapviews button");
     Array.prototype.forEach.call(btns, function (b) {
       b.classList.toggle("active", b.dataset.view === v);
@@ -801,8 +886,21 @@
       state.plan = null;
       draw();
     });
+    /* the keyboard, for the people who scroll with it */
+    window.addEventListener("keydown", function (ev) {
+      if (!ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+        if (ev.key === "+" || ev.key === "=") {
+          setZoom(state.zoom * 1.25); ev.preventDefault();
+        } else if (ev.key === "-" || ev.key === "_") {
+          setZoom(state.zoom / 1.25); ev.preventDefault();
+        } else if (ev.key === "0") {
+          resetView(); ev.preventDefault();
+        }
+      }
+    });
     /* a handle on the state, for the browser console */
     window.__maps = state;
+    buildControls();
     initSnow();
     setView(state.view);
   }

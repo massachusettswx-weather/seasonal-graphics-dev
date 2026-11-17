@@ -17,7 +17,7 @@ Saves clim[6, nlat, nlon] in mm w.e. per month for calendar months
 import os, sys, json, argparse, datetime, calendar
 import numpy as np
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data")
@@ -94,11 +94,19 @@ def main():
         print("already have", out_npz)
         return
 
-    N, W, S, E = [float(x) for x in args.box.split(",")]
     lat = coord("latitude")
     lon = coord("longitude")
-    li = np.where((lat >= S) & (lat <= N))[0]
-    oi = np.where((lon >= (W % 360)) & (lon <= (E % 360)))[0]
+    if args.box.strip().lower() in ("global", "world"):
+        # the WHOLE WORLD: every latitude and every longitude of the store.
+        # The map needs the climate over the whole globe, not over a box.
+        li = np.arange(len(lat))
+        oi = np.arange(len(lon))
+        print("ARCO grid: the WHOLE WORLD, %d lat x %d lon" % (len(li), len(oi)),
+              flush=True)
+    else:
+        N, W, S, E = [float(x) for x in args.box.split(",")]
+        li = np.where((lat >= S) & (lat <= N))[0]
+        oi = np.where((lon >= (W % 360)) & (lon <= (E % 360)))[0]
     print("ARCO grid lon=%d lat=%d -> box %d lat x %d lon (lat %.1f..%.1f, lon %.1f..%.1f)"
           % (len(lon), len(lat), len(li), len(oi), lat[li].max(), lat[li].min(),
              lon[oi].min(), lon[oi].max()), flush=True)
@@ -108,17 +116,38 @@ def main():
     accum_p = {mo: [] for mo in months}
     cache_p = {}
     cache_t = {}
+    # A global pull is thousands of chunks and the sandbox is rebuilt every
+    # hour or two, so every YEAR is checkpointed: a restarted pull picks up
+    # where it stopped instead of starting again from 1991.
+    ckpt_dir = os.path.join(DATA, "era5_clim_ckpt")
+    os.makedirs(ckpt_dir, exist_ok=True)
     for y in range(args.start, args.end + 1):
+        ck = os.path.join(ckpt_dir, "%04d.npz" % y)
+        if os.path.exists(ck):
+            z = np.load(ck)
+            for mo in months:
+                accum[mo].append(z["m%02d_snow" % mo])
+                accum_p[mo].append(z["m%02d_precip" % mo])
+            print("  %d from the checkpoint" % y, flush=True)
+            continue
         for mo in months:
             nd = calendar.monthrange(y, mo)[1]
             ks = sorted({step_index(datetime.date(y, mo, d)) // NCHUNK_STEPS
                          for d in range(1, nd + 1)})
-            for k in ks:
-                if k not in cache_p:
-                    cache_p[k] = fetch_chunk("total_precipitation_24hr", k,
-                                             not args.no_cache)[1]
-                if k not in cache_t:
-                    cache_t[k] = fetch_chunk("2m_temperature", k, not args.no_cache)[1]
+            # fetch the month's chunks in parallel: a global pull is
+            # thousands of chunks and one at a time is the whole night
+            with ThreadPoolExecutor(max_workers=max(1, args.workers)) as ex:
+                futs = {}
+                for k in ks:
+                    for v in VARS:
+                        futs[ex.submit(fetch_chunk, v, k, not args.no_cache)] = (v, k)
+                for f in as_completed(futs):
+                    v, k = futs[f]
+                    arr = f.result()[1]
+                    if v == "total_precipitation_24hr":
+                        cache_p[k] = arr
+                    else:
+                        cache_t[k] = arr
             total = np.zeros((len(oi), len(li)))
             totp = np.zeros((len(oi), len(li)))
             for d in range(1, nd + 1):
@@ -134,6 +163,11 @@ def main():
             accum_p[mo].append(totp * 1000.0)         # m -> mm of total precip
             for k in ks:
                 cache_p.pop(k, None); cache_t.pop(k, None)
+        # the checkpoint for this year
+        np.savez_compressed(ck, **{("m%02d_snow" % mo): np.asarray(a)
+                                   for mo, a in zip(months, [accum[mo][-1] for mo in months])},
+                            **{("m%02d_precip" % mo): np.asarray(a)
+                               for mo, a in zip(months, [accum_p[mo][-1] for mo in months])})
         print("  %d done" % y, flush=True)
 
     clim = np.stack([np.mean(np.array(accum[mo]), axis=0) for mo in months])

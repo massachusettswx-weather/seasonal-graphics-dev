@@ -217,7 +217,6 @@ a{color:#1c4b8a}
 .country:hover{fill:#ffe9b0}
 .lake{fill:#dfe9f2; stroke:#c3ced8; stroke-width:.35}
 .land{fill:#f7f4ec; stroke:#38424f; stroke-width:.4}
-.sector{stroke:#1c2430; stroke-width:.5; opacity:.72}
 .snowband{stroke:none}
 .maplegend{display:flex; align-items:center; gap:8px; flex-wrap:wrap;
   margin:0 0 10px; font-size:12px; color:var(--muted)}
@@ -226,12 +225,19 @@ a{color:#1c4b8a}
 .maplegend .bar i{display:block; width:16px; height:100%}
 .maplegend .ends{display:flex; justify-content:space-between; width:100%;
   margin-top:-2px; font-size:11px}
-.sectorlabel{font-size:12px; font-weight:700; text-anchor:middle;
-  paint-order:stroke; stroke:#fff; stroke-width:2.6px; stroke-linejoin:round}
-.capedge{fill:none; stroke:#38424f; stroke-width:1.2}
 .outerring{fill:none; stroke:#8b97a3; stroke-width:.9}
 .equator{fill:none; stroke:#8b9199; stroke-width:.8}
 .pole{fill:#12263f; stroke:none}
+/* the map's own controls: the zoom, on the map, where a map puts them */
+.mapctl{position:absolute; right:12px; top:12px; z-index:6; display:flex;
+  align-items:center; gap:4px; background:rgba(8,12,20,.82); padding:4px 6px;
+  border-radius:8px; border:1px solid rgba(255,255,255,.18)}
+.mapctl button{font:inherit; font-size:16px; line-height:1; width:28px; height:28px;
+  cursor:pointer; color:#fff; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.22);
+  border-radius:6px}
+.mapctl button:hover{background:rgba(255,255,255,.22)}
+.mapctl .zlabel{font-size:11.5px; color:#e8eef5; min-width:44px; text-align:center;
+  font-variant-numeric:tabular-nums}
 /* the maps page: the earth and the snowfall field are painted on a canvas
    UNDER the vectors, so the SVG's fills must not cover them */
 .mapbox canvas{position:absolute; left:0; top:0; display:block; z-index:1}
@@ -1021,7 +1027,7 @@ def build_maps_page(reg):
     the model came on, nothing resampled - and it can be read as the
     accumulated snowfall or as the anomaly against that model's own
     hindcast climate.  Three views of the same geography - the flat world,
-    the globe and the polar region with the two sectors - drawn in the
+    the globe and the polar region - drawn in the
     browser from the Natural Earth 1:50m files that are committed to the
     repository.  The script and the map data are copied into the site by
     copy_map_assets().
@@ -1036,10 +1042,9 @@ def build_maps_page(reg):
   nothing resampled - and it can be read as the accumulated snowfall or as
   the anomaly against that model's own hindcast climate. The map can be
   the flat world on an equirectangular grid, the globe you can spin, or
-  the polar projection with the pole at the centre; the two sectors of the
-  polar cap section - the North Pacific and the North Atlantic,
-  60N&ndash;90N - are marked on all three, in the colours the charts on
-  the stratosphere page use.</p>
+  the polar projection with the pole at the centre. Zoom in and out with
+  the buttons on the map, with the scroll wheel or with the keyboard, and
+  drag the flat map to pan it.</p>
   <div class="mapviews" id="mapviews">
     <button data-view="flat">2D Map</button>
     <button data-view="globe" class="active">3D Globe</button>

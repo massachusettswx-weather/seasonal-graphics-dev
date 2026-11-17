@@ -106,7 +106,12 @@ def make_model():
     }
     with open(os.path.join(DATA, "snowmap_%s.json" % TAG), "w") as fh:
         json.dump(man, fh)
-    with open(os.path.join(DATA, "snowmap_tags.json"), "w") as fh:
+    # the index the page reads: the REAL one is kept, so the page is not
+    # left pointing at a model that is not there
+    tags = os.path.join(DATA, "snowmap_tags.json")
+    if os.path.exists(tags):
+        shutil.copyfile(tags, os.path.join(DATA, "snowmap_tags.json.bak"))
+    with open(tags, "w") as fh:
         json.dump([{"tag": TAG, "name": "TEST MODEL", "init": "2026-11"}], fh)
     return man
 
@@ -175,6 +180,25 @@ def main():
                 pg.wait_for_timeout(2500)
                 pg.screenshot(path="/tmp/maps_polar.png")
 
+            # the polar section's sectors must NOT be painted on the
+            # snowfall map - they belong to the stratosphere page
+            furniture = pg.evaluate(
+                "() => document.querySelectorAll("
+                "'#mapsvg .sector, #mapsvg .sectorlabel, #mapsvg .capedge').length")
+            print("polar-section furniture on the map:", furniture)
+
+            # the zoom: the buttons, the label, and the picture changing
+            before = pg.evaluate("() => document.querySelector('.mapctl .zlabel').textContent")
+            pg.query_selector('.mapctl button[data-z="in"]').click()
+            pg.wait_for_timeout(1500)
+            after = pg.evaluate("() => document.querySelector('.mapctl .zlabel').textContent")
+            print("zoom:", before, "->", after)
+            pg.screenshot(path="/tmp/maps_zoom.png")
+            pg.query_selector('.mapctl button[data-z="reset"]').click()
+            pg.wait_for_timeout(1200)
+            reset = pg.evaluate("() => document.querySelector('.mapctl .zlabel').textContent")
+            print("after reset:", reset)
+
             # is anything actually painted on the canvas?
             painted = pg.evaluate("""() => {
               var c = document.getElementById('mapcanvas');
@@ -197,6 +221,11 @@ def main():
             for f in os.listdir(DATA):
                 if f.startswith("snowmap_%s" % TAG):
                     os.remove(os.path.join(DATA, f))
+            # put the real model index back
+            bak = os.path.join(DATA, "snowmap_tags.json.bak")
+            if os.path.exists(bak):
+                shutil.copyfile(bak, os.path.join(DATA, "snowmap_tags.json"))
+                os.remove(bak)
             print("cleaned up the test files")
     return 0
 

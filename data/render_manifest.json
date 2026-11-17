@@ -384,27 +384,27 @@
   "lead": 12
  },
  "snow_cfsv2_month01_in.png": {
-  "label": "November 2026",
+  "label": "December 2026",
   "lead": 1
  },
  "snow_cfsv2_month02_in.png": {
-  "label": "December 2026",
+  "label": "January 2027",
   "lead": 2
  },
  "snow_cfsv2_month03_in.png": {
-  "label": "January 2027",
+  "label": "February 2027",
   "lead": 3
  },
  "snow_cfsv2_month04_in.png": {
-  "label": "February 2027",
+  "label": "March 2027",
   "lead": 4
  },
  "snow_cfsv2_month05_in.png": {
-  "label": "March 2027",
+  "label": "April 2027",
   "lead": 5
  },
  "snow_cfsv2_month06_in.png": {
-  "label": "April 2027",
+  "label": "May 2027",
   "lead": 6
  },
  "SNOW_CFSV2_November2026_anom_in.png": {
@@ -413,23 +413,23 @@
  },
  "SNOW_CFSV2_December2026_anom_in.png": {
   "label": "December 2026",
-  "lead": 2
+  "lead": 1
  },
  "SNOW_CFSV2_January2027_anom_in.png": {
   "label": "January 2027",
-  "lead": 3
+  "lead": 2
  },
  "SNOW_CFSV2_February2027_anom_in.png": {
   "label": "February 2027",
-  "lead": 4
+  "lead": 3
  },
  "SNOW_CFSV2_March2027_anom_in.png": {
   "label": "March 2027",
-  "lead": 5
+  "lead": 4
  },
  "SNOW_CFSV2_April2027_anom_in.png": {
   "label": "April 2027",
-  "lead": 6
+  "lead": 5
  },
  "snow_c3s-multi_total_run_in.png": {
   "label": "",
@@ -654,5 +654,9 @@
  "snow_c3s-multi_month07_in.png": {
   "label": "May 2027",
   "lead": 7
+ },
+ "SNOW_CFSV2_May2027_anom_in.png": {
+  "label": "May 2027",
+  "lead": 6
  }
 }

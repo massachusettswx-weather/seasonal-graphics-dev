@@ -8,6 +8,9 @@ data/.publish_fingerprint
 data/*.grib
 data/*.nc
 data/arco_chunks/
+# the per-year checkpoints of the global ERA5 climatology pull - working
+# data, re-fetchable with fetch_era5_snow_arco.py
+data/era5_clim_ckpt/
 data/seas5_*_snow.npz
 *.grib
 
