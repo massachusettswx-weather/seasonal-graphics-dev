@@ -183,8 +183,14 @@
   /* ---------------------------------------------------------------- */
   /* the field                                                         */
 
-  /* the colour of a byte on the published ladder: the byte IS the
-     position on the ladder, so the ramp is read straight off it */
+  /* the colour of a byte on the published ladder.
+
+     The exporter ships the ladder's own table: byte -> colour, bucket for
+     bucket, made with the same BoundaryNorm(clip=True) the static panels
+     use.  So the map and the static panels are the same map - over the
+     top of the ladder is the top colour, not a white hole, and a trace of
+     snow is the bottom colour.  The old interpolated ramp of its own is
+     only a fallback for a manifest that carries no table. */
   function rampIndex(byte, ramp) {
     if (byte >= 255) { return ramp.length - 1; }
     return Math.round(byte / 254 * (ramp.length - 1));
@@ -208,8 +214,13 @@
     var base = ctx.getImageData(0, 0, W, H);
     var bp = base.data;
     var isAnom = state.field === "anom";
-    var ramp = man.ramp || man.colors;
-    var rampRGB = ramp.map(hexToRgb);
+    /* the ladder table: byte -> the colour the static panels give it */
+    var lutRGB = null;
+    if (man.lut && man.lut.length === 256) {
+      lutRGB = man.lut.map(hexToRgb);
+    }
+    var ramp = man.colors || man.ramp;
+    var rampRGB = lutRGB || (ramp || []).map(hexToRgb);
     var anomRGB = (man.anom_colors || []).map(hexToRgb);
     var bytes = r.bytes;
     var alpha = isAnom ? 0.82 : 1.0;
@@ -234,7 +245,8 @@
           var col = anomRGB[ai];
         } else {
           if (v < 0.5) { continue; }          /* no snow */
-          var col = rampRGB[rampIndex(v, ramp)];
+          var col = lutRGB ? lutRGB[Math.min(255, Math.round(v))]
+                           : rampRGB[rampIndex(v, ramp)];
         }
         var o = k * 4;
         bp[o] = col[0] * alpha + bp[o] * (1 - alpha);
@@ -659,7 +671,7 @@
         "climate (" + man.name + "), inches of snow depth - brown is less " +
         "snow than the model expects, teal is more";
     } else {
-      (man.ramp || man.colors).forEach(function (c) {
+      (man.colors || man.ramp || []).forEach(function (c) {
         var i = document.createElement("i");
         i.style.background = c;
         bar.appendChild(i);

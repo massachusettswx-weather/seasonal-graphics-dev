@@ -112,10 +112,43 @@ def nice_scale(v, floor=4.0):
     return max(10.0 ** (np.floor(np.log10(v)) + 1), floor)
 
 
+def ladder_lut(levels, colors):
+    """The 256-entry table: the quantised byte -> the colour the STATIC
+    panels give it.
+
+    The byte is the position on the published ladder (0.01 in at the
+    bottom, 300 in at the top).  The static panels turn a value into a
+    bucket with BoundaryNorm(clip=True), so over the top of the ladder is
+    the TOP COLOUR and not a hole, and a trace of snow is the bottom
+    colour.  This table makes exactly the same decision for every cell,
+    which is what makes the interactive map the same map as the static
+    panels and not merely a map of the same data.
+    """
+    from matplotlib.colors import ListedColormap, BoundaryNorm, to_hex
+    cmap = ListedColormap(colors, name="snow_depth")
+    norm = BoundaryNorm(levels, cmap.N, clip=True)
+    lo, hi = float(levels[0]), float(levels[-1])
+    lut = []
+    for b in range(256):
+        if b >= OVER:
+            lut.append(colors[-1])          # over the top of the ladder
+            continue
+        t = b / 254.0
+        v = 10 ** (np.log10(lo) + t * (np.log10(hi) - np.log10(lo)))
+        lut.append(to_hex(cmap(norm(v))))
+    return lut
+
+
 def house_palette():
     """The house colours the browser needs: the published snow-depth ladder
     for the totals, and the house brown-white-teal palette for the
-    anomalies."""
+    anomalies.
+
+    The browser is given the ladder's own table, bucket for bucket.  An
+    interpolated ramp of its own was what made the first version of the
+    map read as a different product from the static panels - softer greys,
+    muddied blues, and a magenta that was not the published one.
+    """
     import plot_snow_models as PSM
     from plot_snow_totals import boost_saturation
 
@@ -124,25 +157,8 @@ def house_palette():
     colors = list(reversed(list(boost_saturation(list(d["colors"])))))
     colors[0] = "#ffffff"          # zero snowfall is white
 
-    # a finer ramp for the map: the same ladder, interpolated, so the field
-    # reads as a smooth field at world scale.  The legend keeps the ladder.
-    RAMP = 48
-    ramp = []
-    for k in range(RAMP):
-        u = k * (len(colors) - 1) / float(RAMP - 1)
-        i0 = int(u)
-        i1 = min(i0 + 1, len(colors) - 1)
-        f = u - i0
-        a = colors[i0].lstrip("#")
-        b = colors[i1].lstrip("#")
-        ca = [int(a[0:2], 16), int(a[2:4], 16), int(a[4:6], 16)]
-        cb = [int(b[0:2], 16), int(b[2:4], 16), int(b[4:6], 16)]
-        mix = "".join("%02x" % int(round(ca[t] + (cb[t] - ca[t]) * f))
-                      for t in range(3))
-        ramp.append("#" + mix)
-
     anom_colors = [c for c in PSM.anom_cmap().colors]
-    return levels, colors, ramp, anom_colors
+    return levels, colors, ladder_lut(levels, colors), anom_colors
 
 
 def main():
@@ -153,7 +169,7 @@ def main():
     state_p = os.path.join(DATA, "models_fetched.json")
     state = json.load(open(state_p)) if os.path.exists(state_p) else {}
 
-    levels, colors, ramp, anom_colors = house_palette()
+    levels, colors, lut, anom_colors = house_palette()
 
     # the models we can export, and the global fields they produced
     exported = {}
@@ -299,7 +315,8 @@ def main():
                      "nlon": int(len(lons0))},
             "levels": levels,
             "colors": colors,
-            "ramp": ramp,
+            "ramp": colors,          # the legend bar: the published ladder
+            "lut": lut,
             "anom_colors": anom_colors,
             "anom_scale": float(scale),
             "anom_available": bool(has_clim),
@@ -369,7 +386,8 @@ def main():
             "init": "",
             "members": 6,
             "grid": ref["grid"],
-            "levels": levels, "colors": colors, "ramp": ramp,
+            "levels": levels, "colors": colors, "ramp": colors,
+            "lut": lut,
             "anom_colors": anom_colors,
             "anom_scale": float(scale),
             "anom_available": all(exported[t].get("anom_available", False)
