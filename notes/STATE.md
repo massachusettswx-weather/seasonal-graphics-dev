@@ -289,3 +289,26 @@ Two things that had to be fixed to get the first push through:
   every rebuild.
 - `push_to_github.sh` now derives the development URL from
   `GITHUB_DEV_OWNER` instead of hard-coding the old owner.
+
+### The map now IS the static map (17 Nov, 20:30)
+
+The owner: "these maps are terrible - they have to use the same maps as
+the static one, but with this interactive configuration and worldwide
+outputs."  Two things were wrong, and both are fixed:
+
+- **The browser had a ramp of its own.**  The exporter wrote a 48-step
+  interpolation of the ladder, so the map's greys were muddy, its blues
+  soft and its magenta not the published one.  The exporter now writes
+  the ladder's own table - a 256-entry byte -> colour list built with the
+  same `BoundaryNorm(levels, cmap.N, clip=True)` the static panels use -
+  and the browser reads that.  **Over the top of the ladder is now the
+  top colour, not a white hole**, which is what the white streaks in the
+  northern United States were.  Checked against the published panel:
+  45N 100W is `#b1dbe7` in both, 33N 100W is `#882b9a` in both - the map
+  is the same map, worldwide and interactive.
+- **The global CFSv2 field was ten times too big.**  `fetch_cfsv2.py`'s
+  global path resampled the CPC anomaly onto the climatology's 0..360
+  grid while the CPC grid runs -179..180, so the interpolation ran off
+  the end of the source array and extrapolated.  The longitudes are now
+  put in the same convention first.  The global and the CONUS fields now
+  agree (35.9 in vs 35.6 in at 45N 100W).

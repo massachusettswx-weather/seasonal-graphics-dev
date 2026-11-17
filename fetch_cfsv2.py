@@ -126,9 +126,18 @@ def fetch_global(tag="cfsv2"):
 
     fcst = []
     anom = []
+    # The CPC grid runs -179..180 and the global climatology grid runs
+    # 0..360, so the longitudes have to be in the SAME convention before
+    # the model's anomaly is resampled onto it.  Without this the
+    # interpolation runs off the end of the source grid and extrapolates:
+    # the field comes out about ten times too big and the world map shows
+    # snow in places that never get any.
+    plon360 = np.where(np.asarray(plon, float) < 0,
+                       np.asarray(plon, float) + 360.0,
+                       np.asarray(plon, float))
     for k, (y, m) in enumerate(mons):
         days = calendar.monthrange(y, m)[1]
-        pr_anom = _bilinear(prec[k], plat, plon, glat, glon) * days   # mm/month
+        pr_anom = _bilinear(prec[k], plat, plon360, glat, glon) * days   # mm/month
         if m in gmon:
             i = gmon.index(m)
             base = gclim[i]
