@@ -1,0 +1,981 @@
+{
+ "note": "what the site needs, and how to get it back. regenerate with tools/write_fetch_manifest.py",
+ "jobs": [
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/snowfall_monthly.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "bom",
+    "system": "2",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6"
+    ],
+    "data_format": "grib",
+    "product_type": "monthly_mean"
+   },
+   "note": "the model's own forecast"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/snowfall_hindcast.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "bom",
+    "system": "2",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6"
+    ],
+    "data_format": "grib",
+    "product_type": "hindcast_climate_mean"
+   },
+   "note": "the model's own hindcast climate (the anomaly baseline)"
+  },
+  {
+   "model": "cmcc-sps4",
+   "target": "data/models/cmcc-sps4/snowfall_monthly.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "cmcc",
+    "system": "4",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7"
+    ],
+    "data_format": "grib",
+    "product_type": "monthly_mean"
+   },
+   "note": "the model's own forecast"
+  },
+  {
+   "model": "cmcc-sps4",
+   "target": "data/models/cmcc-sps4/snowfall_hindcast.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "cmcc",
+    "system": "4",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7"
+    ],
+    "data_format": "grib",
+    "product_type": "hindcast_climate_mean"
+   },
+   "note": "the model's own hindcast climate (the anomaly baseline)"
+  },
+  {
+   "model": "dwd-gcfs2",
+   "target": "data/models/dwd-gcfs2/snowfall_monthly.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "dwd",
+    "system": "22",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7"
+    ],
+    "data_format": "grib",
+    "product_type": "monthly_mean"
+   },
+   "note": "the model's own forecast"
+  },
+  {
+   "model": "dwd-gcfs2",
+   "target": "data/models/dwd-gcfs2/snowfall_hindcast.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "dwd",
+    "system": "22",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7"
+    ],
+    "data_format": "grib",
+    "product_type": "hindcast_climate_mean"
+   },
+   "note": "the model's own hindcast climate (the anomaly baseline)"
+  },
+  {
+   "model": "eccc-canesm5",
+   "target": "data/models/eccc-canesm5/snowfall_monthly.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "eccc",
+    "system": "4",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7"
+    ],
+    "data_format": "grib",
+    "product_type": "monthly_mean"
+   },
+   "note": "the model's own forecast"
+  },
+  {
+   "model": "eccc-canesm5",
+   "target": "data/models/eccc-canesm5/snowfall_hindcast.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "eccc",
+    "system": "4",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7"
+    ],
+    "data_format": "grib",
+    "product_type": "hindcast_climate_mean"
+   },
+   "note": "the model's own hindcast climate (the anomaly baseline)"
+  },
+  {
+   "model": "eccc-gem5",
+   "target": "data/models/eccc-gem5/snowfall_monthly.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "eccc",
+    "system": "5",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7"
+    ],
+    "data_format": "grib",
+    "product_type": "monthly_mean"
+   },
+   "note": "the model's own forecast"
+  },
+  {
+   "model": "eccc-gem5",
+   "target": "data/models/eccc-gem5/snowfall_hindcast.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "eccc",
+    "system": "5",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7"
+    ],
+    "data_format": "grib",
+    "product_type": "hindcast_climate_mean"
+   },
+   "note": "the model's own hindcast climate (the anomaly baseline)"
+  },
+  {
+   "model": "ecmwf-seas5",
+   "target": "data/models/ecmwf-seas5/snowfall_hindcast.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "ecmwf",
+    "system": "51",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7"
+    ],
+    "data_format": "grib",
+    "product_type": "hindcast_climate_mean"
+   },
+   "note": "the model's own hindcast climate (the anomaly baseline)"
+  },
+  {
+   "model": "jma-jra3",
+   "target": "data/models/jma-jra3/snowfall_monthly.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "jma",
+    "system": "4",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6"
+    ],
+    "data_format": "grib",
+    "product_type": "monthly_mean"
+   },
+   "note": "the model's own forecast"
+  },
+  {
+   "model": "jma-jra3",
+   "target": "data/models/jma-jra3/snowfall_hindcast.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "jma",
+    "system": "4",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6"
+    ],
+    "data_format": "grib",
+    "product_type": "hindcast_climate_mean"
+   },
+   "note": "the model's own hindcast climate (the anomaly baseline)"
+  },
+  {
+   "model": "meteo-france-s9",
+   "target": "data/models/meteo-france-s9/snowfall_monthly.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "meteo_france",
+    "system": "9",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6"
+    ],
+    "data_format": "grib",
+    "product_type": "monthly_mean"
+   },
+   "note": "the model's own forecast"
+  },
+  {
+   "model": "meteo-france-s9",
+   "target": "data/models/meteo-france-s9/snowfall_hindcast.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "meteo_france",
+    "system": "9",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6"
+    ],
+    "data_format": "grib",
+    "product_type": "hindcast_climate_mean"
+   },
+   "note": "the model's own hindcast climate (the anomaly baseline)"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/snowfall_monthly.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "ukmo",
+    "system": "610",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6"
+    ],
+    "data_format": "grib",
+    "product_type": "monthly_mean"
+   },
+   "note": "the model's own forecast"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/snowfall_hindcast.grib",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "ukmo",
+    "system": "610",
+    "variable": "snowfall",
+    "year": "2026",
+    "month": "11",
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6"
+    ],
+    "data_format": "grib",
+    "product_type": "hindcast_climate_mean"
+   },
+   "note": "the model's own hindcast climate (the anomaly baseline)"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "0fb9efb6-45e0-43fb-b762-a91bee8b6880",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "8ae62c42-1fc4-44db-96ff-242c5a82c282",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "7328c858-e7b1-4cab-83a0-29ccc96a1323",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "de55ec38-ca9e-4c6a-8985-f179b0a91bf3",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "8fb73169-e071-482f-a8d1-8aa204c913ca",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "2e3938b2-6d28-40fa-91af-f49d766cad5c",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "5fa25c29-3cbd-4b31-85c9-163bd683d4c9",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "9110ebc9-f61d-4f19-aa4d-defbaa364b5b",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "021b87b9-9dea-4497-8ea0-a609af625045",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "458a9052-4839-406a-ade3-484faa289383",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "7395a36f-aac0-418b-88d8-477cc216cbec",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "f6ef11d4-f9e0-4936-a6c8-b87f4baada94",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "9c00ddd3-32ec-4a9b-b90c-9948478132ff",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "40253bef-f698-4311-8b47-ad191bff4154",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "eea3ac1b-9c4f-439e-b957-ccc4c8249fe3",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "ff29e460-79a6-4ca6-8256-0d9190bacd3e",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "26adcc07-7183-40ec-a29b-772f49d82064",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "cmcc-sps4",
+   "target": "data/models/cmcc-sps4/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "3cee6038-25c9-4a4f-8293-164e7b93399c",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "cmcc-sps4",
+   "target": "data/models/cmcc-sps4/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "1bec9103-06c8-4217-8fe2-45a02a9018da",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "cmcc-sps4",
+   "target": "data/models/cmcc-sps4/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "26f92134-71c4-4e88-95b3-3c6db55703eb",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "cmcc-sps4",
+   "target": "data/models/cmcc-sps4/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "17760977-6437-4af8-b86d-0c8b349dfce5",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "cmcc-sps4",
+   "target": "data/models/cmcc-sps4/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "1fe99e9a-4777-4a31-b270-2a43ccfb4066",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "dwd-gcfs2",
+   "target": "data/models/dwd-gcfs2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "5186e7d4-dae0-460b-9b87-a975fca2a59e",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "dwd-gcfs2",
+   "target": "data/models/dwd-gcfs2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "b1b6abe1-8b7e-4ceb-b130-99ec44851078",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "dwd-gcfs2",
+   "target": "data/models/dwd-gcfs2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "56b7b01c-b1db-4beb-8e2b-df6ec90f7498",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "3d1dc8a9-4013-4fe8-8c4c-f3adf8292e3e",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "1ed229e7-e75d-4d64-82ae-0907bb1ae4f9",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "c4172253-c1f8-42c5-b114-10db61299690",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "f672a5ed-b631-4d2c-9315-8485005a476c",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "e5143f7b-42a7-4640-b720-e87b71046324",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "8e14ed14-a85e-470e-92ed-cf0f465678e8",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "33b2f569-13a4-4922-b873-e85e4d6c6f59",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "053633b8-6e96-4e4d-818e-f30d54b0d6a7",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "meteo-france-s9",
+   "target": "data/models/meteo-france-s9/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "dd225bd1-6592-4341-a8eb-0dbc079b2c51",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "meteo-france-s9",
+   "target": "data/models/meteo-france-s9/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "0008f9ad-6d8a-4e7f-b325-b75e014ac000",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "meteo-france-s9",
+   "target": "data/models/meteo-france-s9/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "a8c06f6d-26c0-4afd-b498-ee96c9caeea6",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "eccc-gem5",
+   "target": "data/models/eccc-gem5/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "d6a9219d-3097-487f-9e6f-3cbe5061d6fc",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "eccc-gem5",
+   "target": "data/models/eccc-gem5/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "8574bb46-de49-4f2a-9e25-d32665e35ffa",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "eccc-gem5",
+   "target": "data/models/eccc-gem5/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "ae437ee7-8da3-4ef2-b18d-46c627ab49e1",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "eccc-canesm5",
+   "target": "data/models/eccc-canesm5/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "8907db75-efbf-46bd-b103-1631ce1065cf",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "eccc-canesm5",
+   "target": "data/models/eccc-canesm5/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "d5917711-8c6a-488c-94b5-ee78a7256365",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "eccc-canesm5",
+   "target": "data/models/eccc-canesm5/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "13016249-4f40-42ee-aad3-d855b3ec9f82",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "jma-jra3",
+   "target": "data/models/jma-jra3/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "4f2aff72-e2ea-4d72-ac7a-c50aaf3d8ac3",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "jma-jra3",
+   "target": "data/models/jma-jra3/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "b627ca24-9c2a-40d5-8e4a-e2bfc1728813",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "jma-jra3",
+   "target": "data/models/jma-jra3/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "e8dde55d-ee37-4676-86d1-1d39b3abf93d",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "cb851e0b-7b65-4b4f-bbb3-bf45833ec924",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "9551c421-6e14-4a8b-b043-f83d01c159f5",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "f858c566-3d26-40ac-8f02-6770b91a81f3",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "9eccf4eb-89d8-4391-b017-df5feaf1b6cc",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "490d57ab-3670-4841-9c4a-6030e552e6ac",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom-access-s2",
+   "target": "data/models/bom-access-s2/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "4497fba2-b549-48cf-a115-d82185084eeb",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "29b7e338-d7f2-4f74-ae3d-90f94fea15d7",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "04a59885-f851-4564-b62f-7e1bc62a1728",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "ef0e9daa-13b4-4189-aad6-bc0f7242883f",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "3af13cc3-3bdd-4bcf-ad56-c93c607c0a5b",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "86cf0f8b-8912-4b7a-9205-89ba9a34231f",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "4ba6fc65-876a-469a-8e08-068697369f93",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "f6bf4b39-1ae1-49b4-b6d2-9f9a0b058e29",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "58d05d80-be46-4083-a059-e32b002c226b",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "ukmo-gloseas6",
+   "target": "data/models/ukmo-gloseas6/u10_daily.grib",
+   "dataset": "seasonal-monthly-pressure-levels",
+   "request": null,
+   "job": "b4bcb55a-efe5-40a7-8c28-5a03a8630678",
+   "note": "the daily 10 hPa wind chunk"
+  },
+  {
+   "model": "bom",
+   "target": "data/bom_job.txt",
+   "job": "dea9bbd7-6f86-488d-8010-fee0a8d81688",
+   "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "bom_snow",
+   "target": "data/bom_snow_job.txt",
+   "job": "ce76d91c-9a62-4aa7-bc47-b2f52e24b069",
+   "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "control",
+   "target": "data/control_job.txt",
+   "job": "f36f246f-44b4-42e6-92fb-acfa2eede432",
+   "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "diag",
+   "target": "data/diag_job.txt",
+   "job": "e693172e-780f-4758-b6e3-caa27a54b164",
+   "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "ext",
+   "target": "data/ext_job.txt",
+   "job": "26895b55-5c76-40e7-8c0e-6352df86db93",
+   "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "jma",
+   "target": "data/jma_job.txt",
+   "job": "0b73615c-a3d2-4380-b71d-80aafc860676",
+   "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "jma_live",
+   "target": "data/jma_live_job.txt",
+   "job": "4d547285-8cbe-46db-8f4b-e92f4070f723",
+   "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "job_bom-access-s2",
+   "target": "data/job_bom-access-s2.txt",
+   "job": "06c95bcd-4ef7-411a-bb48-fec63a9e60b9",
+   "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "job_eccc-canesm5",
+   "target": "data/job_eccc-canesm5.txt",
+   "job": "afd0294c-b3a1-4e8a-ac86-6d64790d69e1",
+   "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "job_jma-jra3",
+   "target": "data/job_jma-jra3.txt",
+   "job": "acfbd4e6-d098-456c-af86-918d27057961",
+   "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "metfr_sst",
+   "target": "data/metfr_sst_job.txt",
+   "job": "b4b90869-5e31-412a-9375-67f7ea79e2d3",
+   "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "nov_fetch",
+   "target": "data/nov_fetch_job.txt",
+   "job": "8fd9ea17-386a-4c45-aa04-ea863b2bdd40",
+   "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "probe",
+   "target": "data/probe_job.txt",
+   "job": "838b34c2-f5d7-4946-b0e2-78fba39b3c3e",
+   "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "probes",
+   "target": "data/probe_jobs.txt",
+   "job": "838b34c2-f5d7-4946-b0e2-78fba39b3c3e",
+   "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "quiet",
+   "target": "data/quiet_job.txt",
+   "job": "f0463634-cb67-4956-88f3-ca51b1a426b0",
+   "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "small",
+   "target": "data/small_job.txt",
+   "job": "cacaddd8-022a-40dd-a7f0-14e6df65a0f5",
+   "note": "a job id kept from an earlier fetch"
+  }
+ ]
+}

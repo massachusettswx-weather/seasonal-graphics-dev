@@ -36,6 +36,7 @@ class CDSDirect:
                        if l.strip().startswith("key:")][0]
         self.key = key
         self.url = url.rstrip("/")
+        self.last_job = None
         self.s = requests.Session()
         self.s.headers.update({"PRIVATE-TOKEN": key})
 
@@ -71,6 +72,7 @@ class CDSDirect:
         r.raise_for_status()
         job = r.json()
         jid = job.get("jobID") or job.get("processID")
+        self.last_job = jid          # so a caller can record the job id
         t0 = time.time()
         status = None
         while time.time() - t0 < max_wait_s:
@@ -133,6 +135,8 @@ class CDSDirect:
             raise NoData("HTTP %d: %s" % (r.status_code, txt[:400]))
         r.raise_for_status()
         job = r.json()
+        jid = job.get("jobID") or job.get("processID")
+        self.last_job = jid
         return job.get("jobID") or job.get("processID")
 
     # ------------------------------------------------------------------

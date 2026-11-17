@@ -121,6 +121,13 @@ def retrieve(ds, req, out, tries=4):
                     continue
                 with open(out, "wb") as f:
                     f.write(dr.content)
+                # write the job id down: after a sandbox wipe the RESULT can
+                # be downloaded again from the store without queueing for it
+                try:
+                    from tools.record_job import record
+                    record(out, jid, dataset=ds, request=req)
+                except Exception as e:
+                    print("      (job id not recorded: %s)" % str(e)[:80], flush=True)
                 return True
             if st in ("rejected", "failed"):
                 t = tb(jid)
