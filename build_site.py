@@ -13,7 +13,7 @@ Data
 
 Run after any re-render:  python3 build_site.py
 """
-import os, json, sys
+import os, json, sys, shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SITE = os.path.join(HERE, "docs")
@@ -614,6 +614,10 @@ def page(title, active, body, version=""):
     # the crumb back to the home page is an absolute link
     body = body.replace("__SITE__", SITE_URL)
     canonical = SITE_URL if active == "index.html" else SITE_URL + active
+    # the icon link only when the icon is really there, so the browser does
+    # not ask for one and get a 404
+    icon = ('<link rel="icon" href="favicon.ico">'
+            if os.path.exists(os.path.join(SITE, "favicon.ico")) else "")
     return """<!doctype html>
 <html lang="en">
 <head>
@@ -621,7 +625,7 @@ def page(title, active, body, version=""):
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>%s &middot; Seasonal Forecast Graphics%s</title>
 <link rel="canonical" href="%s">
-<link rel="stylesheet" href="assets/css/style.css%s">
+<link rel="stylesheet" href="assets/css/style.css%s">%s
 %s
 <script>
 /* the theme is read back before anything is drawn, so a dark screen never
@@ -656,7 +660,7 @@ def page(title, active, body, version=""):
 })();
 </script>
 </body>
-</html>""" % (title, DEV_TAG, canonical, v, gate_script(), header(active),
+</html>""" % (title, DEV_TAG, canonical, v, icon, gate_script(), header(active),
               body, footer())
 
 
@@ -1165,6 +1169,20 @@ render();
     open(os.path.join(SITE, "spv.html"), "w").write(page("Stratosphere", "spv.html", body, VER))
 
 
+def copy_favicon():
+    """The site icon, if the tree carries one.
+
+    Without it the browser asks the domain root for /favicon.ico and gets a
+    404 in the console - a small thing, but it is the only console error a
+    clean page produces, and it is easier to remove than to explain.
+    """
+    src = os.path.join(HERE, "assets", "favicon.ico")
+    if not os.path.exists(src):
+        return
+    dst = os.path.join(SITE, "favicon.ico")
+    shutil.copyfile(src, dst)
+
+
 def build_maps_page(reg):
     """The interactive Natural Earth maps page.
 
@@ -1274,6 +1292,7 @@ def main():
     global VER
     VER = reg.get("version", "")
     set_init_sub(reg)
+    copy_favicon()
     build_home(reg)
     build_model_page(reg)
     build_snow(reg)
