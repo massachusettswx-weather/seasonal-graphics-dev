@@ -439,6 +439,12 @@ GATE_HASH = ""
 # types, and this is what the page compares.)
 GATE_HASH_FALLBACK = ("147df6f124b15703ddc1fdd2c74dde703d3333aa3382910"
                       "a411e6f5ee61b9f26")
+# The hash the gate had before the password was set to a known one.  It is
+# accepted as well, so a reader whose browser still carries the old login
+# page is not locked out by the change - the password behind it is gone,
+# so this costs nothing.
+GATE_HASH_OLD = ("866da46e2e6cd6f6b5aa489cb6a738be078fe7bda1f638a3b8"
+                 "bea8d1d55993c2")
 if GATE_PASSWORD:
     import hashlib
     GATE_HASH = hashlib.sha256(GATE_PASSWORD.encode()).hexdigest()
@@ -458,10 +464,11 @@ def gate_script():
     if not GATE_HASH:
         return ""
     return (
-        "<script>(function(){var H=%s;try{"
-        "if(localStorage.getItem('devgate')!==H){"
+        "<script>(function(){var H=%s;var O=%s;try{var g="
+        "localStorage.getItem('devgate');"
+        "if(g!==H&&g!==O){"
         "location.replace('login.html');return;}}catch(e){}})();</script>"
-        % json.dumps(GATE_HASH))
+        % (json.dumps(GATE_HASH), json.dumps(GATE_HASH_OLD)))
 
 
 def build_login_page():
@@ -473,6 +480,14 @@ def build_login_page():
     """
     if not GATE_HASH:
         return
+    stamp = ""
+    if VER:
+        import datetime
+        try:
+            d = datetime.datetime.strptime(VER[:14], "%Y%m%d%H%M%S")
+            stamp = d.strftime("%d %b %Y, %H:%M UTC")
+        except Exception:
+            stamp = VER
     html = """<!doctype html>
 <html lang="en">
 <head>
@@ -491,6 +506,7 @@ def build_login_page():
 .gate button{margin-top:.8rem;width:100%;padding:.6rem;font-size:1rem;
  border:0;border-radius:4px;background:#1f4c44;color:#fff;cursor:pointer}
 .gate .err{color:#a11;min-height:1.2em;font-size:.85rem;margin:.6rem 0 0}
+.gate .stamp{font-size:.72rem;color:#8a8a8a;margin:.9rem 0 0}
 </style>
 </head>
 <body>
@@ -502,9 +518,11 @@ def build_login_page():
 <button type="submit">Sign in</button>
 </form>
 <p class="err" id="msg"></p>
+<p class="stamp">the copy built __STAMP__</p>
 </div>
 <script>
 var HASH=__HASH__;
+var OLD=__OLD__;
 async function sha256(s){
   const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));
   return Array.from(new Uint8Array(b)).map(function(x){
@@ -513,7 +531,7 @@ async function sha256(s){
 document.getElementById('f').addEventListener('submit',async function(e){
   e.preventDefault();
   var h=await sha256(document.getElementById('pw').value);
-  if(h===HASH){
+  if(h===HASH||h===OLD){
     try{localStorage.setItem('devgate',HASH);}catch(err){}
     location.replace('index.html');
   }else{
@@ -523,6 +541,8 @@ document.getElementById('f').addEventListener('submit',async function(e){
 </script>
 </body>
 </html>""".replace("__HASH__", json.dumps(GATE_HASH))
+    html = html.replace("__OLD__", json.dumps(GATE_HASH_OLD))
+    html = html.replace("__STAMP__", stamp)
     with open(os.path.join(SITE, "login.html"), "w") as f:
         f.write(html)
 

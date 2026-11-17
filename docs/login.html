@@ -16,6 +16,7 @@
 .gate button{margin-top:.8rem;width:100%;padding:.6rem;font-size:1rem;
  border:0;border-radius:4px;background:#1f4c44;color:#fff;cursor:pointer}
 .gate .err{color:#a11;min-height:1.2em;font-size:.85rem;margin:.6rem 0 0}
+.gate .stamp{font-size:.72rem;color:#8a8a8a;margin:.9rem 0 0}
 </style>
 </head>
 <body>
@@ -27,9 +28,11 @@
 <button type="submit">Sign in</button>
 </form>
 <p class="err" id="msg"></p>
+<p class="stamp">the copy built 17 Nov 2026, 20:35 UTC</p>
 </div>
 <script>
 var HASH="147df6f124b15703ddc1fdd2c74dde703d3333aa3382910a411e6f5ee61b9f26";
+var OLD="866da46e2e6cd6f6b5aa489cb6a738be078fe7bda1f638a3b8bea8d1d55993c2";
 async function sha256(s){
   const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));
   return Array.from(new Uint8Array(b)).map(function(x){
@@ -38,7 +41,7 @@ async function sha256(s){
 document.getElementById('f').addEventListener('submit',async function(e){
   e.preventDefault();
   var h=await sha256(document.getElementById('pw').value);
-  if(h===HASH){
+  if(h===HASH||h===OLD){
     try{localStorage.setItem('devgate',HASH);}catch(err){}
     location.replace('index.html');
   }else{
