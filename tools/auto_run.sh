@@ -77,6 +77,27 @@ else
     log "no GitHub token in the environment - the site is built locally but NOT published"
 fi
 
+# The development copy's password gate.  The owner asked for it to be switched
+# off (17 Nov 2026), so the switch has to come back with the credentials -
+# otherwise the next rebuild would put the gate in front of the site again
+# and lock them out.  The switch lives in the encrypted secret store, so it
+# survives every rebuild.
+if [ "${SITE_NO_GATE:-}" = "1" ] || [ "${SITE_NO_GATE:-}" = "true" ]; then
+    mkdir -p data
+    if [ ! -f data/.no_gate ]; then
+        : > data/.no_gate
+        log "the password gate is OFF (the development copy is published open)"
+    fi
+elif [ -n "${SITE_PASSWORD:-}" ]; then
+    mkdir -p data
+    if [ ! -f data/.dev_gate_password ] || \
+       [ "$(cat data/.dev_gate_password 2>/dev/null)" != "$SITE_PASSWORD" ]; then
+        printf '%s' "$SITE_PASSWORD" > data/.dev_gate_password
+        chmod 600 data/.dev_gate_password
+        log "the gate password is in place"
+    fi
+fi
+
 # ------------------------------------------------------------------
 # 3. the workers
 # pgrep also matches the zombies of an earlier run, so the check looks at

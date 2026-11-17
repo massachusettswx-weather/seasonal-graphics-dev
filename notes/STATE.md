@@ -381,3 +381,18 @@ outputs."  Two things were wrong, and both are fixed:
 - To get the corrected build back on the OLD address: add `massachusettswx-weather`
   as a write collaborator on `Matthew22-cmd/seasonal-graphics-dev`, then set
   `GITHUB_DEV_OWNER=Matthew22-cmd` and re-publish.
+
+## The gate is off on the development copy (17 Nov 2026, the owner's call)
+- The owner asked to bypass the password.  The development copy is now published
+  OPEN: `https://massachusettswx-weather.github.io/seasonal-graphics-dev/` - no
+  login, no password, no gate script in the pages.
+- The switch is `DEV_NO_GATE=1` (or a file `data/.no_gate`).  It is stored in the
+  encrypted secret store as `SITE_NO_GATE=1`, and `tools/restore_secrets.sh` and
+  `tools/auto_run.sh` both put it back after a wipe - otherwise the next rebuild
+  would put the gate in front of the site again and lock the owner out.
+- The publisher's "the build must carry a gate" check follows the switch: with
+  the gate off it prints a NOTE instead of refusing to publish.
+- The old address `matthew22-cmd.github.io/seasonal-graphics-dev/` is still
+  serving the old gated build and cannot be updated from here (pull-only).
+- The OPERATIONAL site is untouched: `https://massachusettswx-weather.github.io/
+  seasonal-graphics/` (the repo was renamed, so the old `seasonal-snow` path 404s).
