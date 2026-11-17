@@ -226,3 +226,39 @@ secret store, which survives the reset.
    normalises. The anomalies use **each model's own hindcast climate** -
    the ECCC is genuinely about 3x drier than the others, and that is a
    model property, not a bug.
+
+## 17 Nov, evening: the credentials are in, and one blocker left
+
+The **CDS key** and the **GitHub PAT** are in the encrypted secret store
+(`CDS_API_KEY`, `GITHUB_TOKEN`).  `tools/restore_secrets.sh` writes them
+into `.cdsapirc` and `data/.github_token` (both gitignored) and the
+keepalive does it on every rebuild, so neither has to be pasted again.
+
+**The C3S pull is running.**  The queue worker is back through the
+centres - the ECCC's two systems landed first (23.3 MB of monthly
+snowfall each) - and the map gets every centre on its own 1 degree
+global grid as its GRIB arrives.
+
+**The one blocker: the PAT cannot push the dev repo.**  The token
+belongs to `massachusettswx-weather`, which has **pull-only** on
+`Matthew22-cmd/seasonal-graphics-dev` (GitHub says `permissions: {push:
+false}`) and owns the **operational** repo, which is not to be touched
+without approval.  Two ways out, both the owner's call:
+  - add `massachusettswx-weather` as a collaborator with write access on
+    `Matthew22-cmd/seasonal-graphics-dev` (keeps the dev URL); or
+  - let the dev copy live in a repo the token owns
+    (`massachusettswx-weather/seasonal-graphics-dev`), which changes the
+    dev URL but lets the pipeline run unattended from then on.
+
+### Two things fixed while the credentials were going in
+
+- `run_nov_queue.py:target_for()` now makes the model's own folder.  A
+  wiped tree takes `data/models/*` with it, and every download was
+  landing on a missing directory and being thrown away - the ECCC
+  request came back three times and was lost each time.
+- `push_to_github.sh` no longer refuses to publish a dev copy when the
+  plaintext gate password is missing (it was lost with the tree too).
+  The builder keeps the **published gate hash**, so the owner keeps the
+  password they already have, and the publisher now **verifies the gate
+  is in the built pages** before anything is pushed - a development copy
+  without a gate is never published.
