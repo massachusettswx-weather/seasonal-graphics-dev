@@ -745,7 +745,10 @@
     var W = Math.max(320, Math.round(box.clientWidth));
     var H;
     if (state.view === "flat") {
-      H = Math.round(Math.min(620, Math.max(280, W * 0.50)));
+      /* the whole world is twice as wide as it is tall, so the flat map
+         is given a 2:1 box: it fills the width of the page instead of
+         sitting in a letterbox with empty ocean at the sides */
+      H = Math.round(Math.min(900, Math.max(320, W * 0.52)));
     } else if (state.view === "polar") {
       H = Math.round(Math.min(720, Math.max(380, W * 0.64)));
     } else {

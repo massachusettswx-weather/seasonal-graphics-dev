@@ -46,8 +46,14 @@ def main():
             # the model that is on the map
             models = pg.evaluate(
                 "() => Array.from(document.querySelectorAll('#snowModel option'))"
-                ".map(o => o.textContent)")
+                ".map(o => o.value)")
             print("models on the map:", models)
+            # the model to photograph: the last argument, else the first
+            want = sys.argv[2] if len(sys.argv) > 2 else None
+            if want and want in models:
+                pg.select_option("#snowModel", want)
+                pg.wait_for_timeout(3000)
+                print("showing", want)
 
             # zoom in on the globe
             for _ in range(3):
