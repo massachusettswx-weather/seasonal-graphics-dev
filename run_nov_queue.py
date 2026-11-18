@@ -391,6 +391,29 @@ def centre_init(tag):
     return st.get(tag, {}).get("init") or newest_init(tag)
 
 
+def ext_init_on_disk(path):
+    """The init an extended-months file belongs to.
+
+    The extension is the sub-daily product from the 181st day onwards, so
+    the file's own dates do not say which init it came from - they are
+    months past it.  The DECODED file beside it does: decode_ext() writes
+    the init into the npz's meta, so that is what is read.  A GRIB with
+    no npz beside it answers None, and None never matches, so a file
+    that was downloaded but not decoded is asked for again.
+    """
+    npz = path.replace(".grib", ".npz")
+    if not os.path.exists(npz):
+        return None
+    try:
+        import numpy as _np
+        import json as _json
+        # save_npz() stores the meta as a JSON STRING, not a dict
+        meta = _json.loads(str(_np.load(npz, allow_pickle=True)["meta"]))
+        return meta.get("init")
+    except Exception:
+        return None
+
+
 def u10_init_on_disk(path):
     """The init a monthly 10 hPa wind file belongs to.
 
@@ -1070,6 +1093,18 @@ def run(c, steps, only=None, dry=False):
                     p = target_for(tag, "u10m")
                     if (os.path.exists(p) and os.path.getsize(p) > 10000
                             and u10_init_on_disk(p) == newest_init(tag)):
+                        continue
+                elif kind == "ext":
+                    # The extension is only asked for when it is not on
+                    # disk yet.  Without this the pool re-submits the
+                    # SAME request for ever: the file is written, the
+                    # step is not marked as done, and the next pass asks
+                    # for it again - 46 submissions of a 231 MB request
+                    # before this was found.  The extension follows the
+                    # monthly, so it belongs to the centre's own init.
+                    p = target_for(tag, "ext")
+                    if (os.path.exists(p) and os.path.getsize(p) > 10000
+                            and ext_init_on_disk(p) == centre_init(tag)):
                         continue
                 elif kind == "clim":
                     # the hindcast climate does not change between inits, so
