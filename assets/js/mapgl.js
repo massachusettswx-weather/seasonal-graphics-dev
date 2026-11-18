@@ -185,10 +185,15 @@ void main() {
          arithmetic the CPU version used - the same four cells, the
          same weights, the same published table - so the map IS the
          static map and not merely a map of the same data. */
-      /* THE FIELD IS PAINTED EVERYWHERE THE EARTH IS: the land, the
-         coastlines and the snow are the same picture, and none of them
-         is left bare. */
-      {
+      /* THE FIELD IS PAINTED ON THE LAND, NOT ON THE SEA.  The models'
+         "snowfall" over the water is the precipitation they classified
+         as snow over the water, and the house's 10:1 depth ratio turns
+         it into nonsense - the SEAS5 puts 48 inches of "snow" on the
+         North Atlantic for the run.  The static panels never showed it
+         because they are cut to the eastern United States; a map of the
+         whole world does.  So the field is painted where the land is,
+         and the sea is left as sea. */
+      if (mk.r > 0.5 && mk.g < 0.5) {
         float glat0 = u_grid.x;
         float gdlat = u_grid.y;
         float glon0 = u_grid.z;
@@ -726,6 +731,11 @@ void main() {
      equirectangular texture */
   Renderer.prototype.setMask = function (canvas) {
     var gl = this.gl;
+    /* the canvas is kept: the field is only painted on the land, and
+       "is this point land?" has to be answerable from the same mask
+       the shader reads */
+    this.maskCanvas = canvas;
+    this.maskCtx = canvas.getContext("2d");
     gl.bindTexture(gl.TEXTURE_2D, this.texMask);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE,
@@ -734,6 +744,23 @@ void main() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  };
+
+  /* Is this point on the land?  The same mask the shader reads: the
+     red channel is the land, the green channel the lakes.  The field is
+     painted on the land only, so anything that asks "what does the map
+     show here?" has to ask the mask the same way. */
+  Renderer.prototype.landAt = function (lon, lat) {
+    if (!this.maskCtx) { return {land: true, lake: false}; }
+    var W = this.maskCanvas.width, H = this.maskCanvas.height;
+    var x = Math.floor((lon + 180.0) / 360.0 * W);
+    var y = Math.floor((90.0 - lat) / 180.0 * H);
+    if (x < 0) { x = 0; }
+    if (x >= W) { x = W - 1; }
+    if (y < 0) { y = 0; }
+    if (y >= H) { y = H - 1; }
+    var d = this.maskCtx.getImageData(x, y, 1, 1).data;
+    return {land: d[0] > 127, lake: d[1] > 127};
   };
 
   /* the field: the model's own grid, one byte a cell, exactly as it

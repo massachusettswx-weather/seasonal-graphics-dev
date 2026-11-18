@@ -101,6 +101,62 @@ def quantise_anom(field_in, scale):
     return out
 
 
+# --------------------------------------------------------------------------
+# the land mask
+# --------------------------------------------------------------------------
+# The models' "snowfall" over the sea is not a snowfall: it is the
+# precipitation the model classified as snow over the water, and the
+# house's 10:1 water-equivalent-to-depth ratio turns it into nonsense -
+# the SEAS5 puts 48 inches of "snow" on the North Atlantic for the run.
+# The static panels never showed it: they are cut to the eastern United
+# States, and their own mask (the model's climate expects no snow) covers
+# the water inside that box.  A map of the whole world does show it.
+#
+# So the map paints the field on the land and leaves the sea as sea, and
+# the anomaly's colour scale is worked out over the land as well - over
+# the sea the anomaly is a large number about a quantity that means
+# nothing, and it would swallow the whole scale.
+LAND_GEO = os.path.join(DATA, "ne_50m_land.geojson")
+_LAND_CACHE = {}
+
+
+def land_mask(grid):
+    """A boolean mask of the land on the model's own grid.
+
+    The same Natural Earth 1:50m land the map page draws its earth from,
+    read once per grid and then kept."""
+    key = (grid["nlat"], grid["nlon"], grid["lat0"], grid["dlat"],
+           grid["lon0"], grid["dlon"])
+    if key in _LAND_CACHE:
+        return _LAND_CACHE[key]
+    from matplotlib.path import Path
+    gj = json.load(open(LAND_GEO))
+    polys, verts = [], []
+    for feat in gj.get("features", []):
+        geom = feat.get("geometry") or {}
+        coords = geom.get("coordinates")
+        if not coords:
+            continue
+        parts = coords if geom.get("type") == "MultiPolygon" else [coords]
+        for poly in parts:
+            for ring in poly:
+                pts = np.asarray(ring, dtype=float)
+                if len(pts) < 3:
+                    continue
+                verts.append(pts)
+                polys.append(Path(pts))
+    la = grid["lat0"] - np.arange(grid["nlat"]) * grid["dlat"]
+    lo = grid["lon0"] + np.arange(grid["nlon"]) * grid["dlon"]
+    LON, LAT = np.meshgrid(lo, la)
+    pts = np.column_stack([LON.ravel(), LAT.ravel()])
+    inside = np.zeros(len(pts), bool)
+    for path in polys:
+        inside |= path.contains_points(pts)
+    m = inside.reshape(LAT.shape)
+    _LAND_CACHE[key] = m
+    return m
+
+
 def nice_scale(v, floor=4.0):
     """A round number for the anomaly scale, so the legend reads well."""
     if not np.isfinite(v) or v <= 0:
@@ -395,9 +451,24 @@ def main():
 
         # the anomaly scale: a round number that covers the field, so the
         # legend is readable and the timeline does not rescale as it moves
+        #
+        # THE SCALE IS WORKED OUT OVER THE LAND.  Over the sea the
+        # anomaly is a large number about a quantity that means nothing
+        # (the model's ocean "snowfall" is precipitation classified as
+        # snow, and the 10:1 depth ratio makes it enormous), and the sea
+        # is most of the world: left in, it swallows the whole scale and
+        # the continents come out washed out.
+        mgrid = {"lat0": float(lats0[0]),
+                 "dlat": float(abs(lats0[1] - lats0[0])) if len(lats0) > 1 else 1.0,
+                 "nlat": int(len(lats0)),
+                 "lon0": float(lons0[0]),
+                 "dlon": float(abs(lons0[1] - lons0[0])) if len(lons0) > 1 else 1.0,
+                 "nlon": int(len(lons0))}
+        land = land_mask(mgrid)
         finite = np.abs(np.concatenate([a[np.isfinite(a)] for a in anom_in]
                                        + [total_anom[np.isfinite(total_anom)]]))
-        scale = nice_scale(np.percentile(finite, 99.5) if finite.size else 4.0)
+        on_land = finite[land.ravel()] if land.size == finite.size else finite
+        scale = nice_scale(np.percentile(on_land, 99.5) if on_land.size else 4.0)
         # the mask is the model's OWN climate for the month the anomaly is
         # about: a place where the model expects no snow in December is not
         # "drier than normal in December", whatever it does in January
@@ -530,7 +601,11 @@ def main():
                 total_clim = np.zeros_like(exported[ref]["total_clim"])
             finite = np.abs(np.concatenate([a[np.isfinite(a)] for a in anoms]
                                            + [total_anom[np.isfinite(total_anom)]]))
-            scale = nice_scale(np.percentile(finite, 99.5) if finite.size else 4.0)
+            # over the land only: the sea's numbers are about nothing
+            # (see the per-model scale above)
+            land = land_mask(ref["grid"])
+            on_land = finite[land.ravel()] if land.size == finite.size else finite
+            scale = nice_scale(np.percentile(on_land, 99.5) if on_land.size else 4.0)
             # the mask is the model's OWN climate for the month the anomaly
             # is about: a place where the model expects no snow in December
             # is not "drier than normal in December", whatever it does in

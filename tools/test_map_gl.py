@@ -145,6 +145,13 @@ COLOUR_JS = r"""
     if (isNaN(ll.lon) || isNaN(ll.lat)) { continue; }
     var lat = ll.lat, lon = ll.lon;
     if (lat > g.lat0 || lat < g.lat0 - (nlat - 1) * g.dlat) { continue; }
+    /* THE FIELD IS PAINTED ON THE LAND ONLY: the models' ocean
+       "snowfall" is precipitation classified as snow over the water, and
+       the house's 10:1 depth ratio makes it enormous.  So the sea is
+       left as sea, and this check asks the same mask the shader reads
+       before it compares a colour. */
+    var land = st.gl.landAt(lon, lat);
+    if (!land.land || land.lake) { continue; }
     var fi = (g.lat0 - lat) / g.dlat, fj;
     if (isGlobal) {
       fj = ((lon - g.lon0) / g.dlon) % nlon;
