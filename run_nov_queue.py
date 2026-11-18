@@ -413,6 +413,45 @@ def centre_init(tag):
     return st.get(tag, {}).get("init") or newest_init(tag)
 
 
+def snow_carried_over(tag):
+    """Is this centre's forecast already in the repository, carried over?
+
+    The SEAS5 fetch wrote the ECMWF's global field and its hindcast
+    climate into the repository, so the archive has nothing to add that
+    the repository does not already hold.  The queue must not spend a
+    slot on it.
+
+    The file counts only when it belongs to the centre's OWN init: the
+    init is in the npz's meta, and a file for an older init is not the
+    forecast the site should publish.
+    """
+    p = os.path.join(MDIR, tag, "snowfall_monthly.npz")
+    return _carried_init(p) == centre_init(tag)
+
+
+def clim_carried_over(tag):
+    """Is this centre's hindcast climate already in the repository?"""
+    p = os.path.join(MDIR, tag, "snowfall_hindcast.npz")
+    return _carried_init(p) == centre_init(tag)
+
+
+def _carried_init(path):
+    """The init a carried-over npz belongs to, or None.
+
+    The meta is stored as a JSON STRING, not a dict, so it has to be
+    parsed: save_npz() writes it with np.array(json.dumps(meta)).
+    """
+    if not os.path.exists(path):
+        return None
+    try:
+        import numpy as _np
+        import json as _json
+        meta = _json.loads(str(_np.load(path, allow_pickle=True)["meta"]))
+        return meta.get("init")
+    except Exception:
+        return None
+
+
 def ext_init_on_disk(path):
     """The init an extended-months file belongs to.
 
@@ -1103,6 +1142,14 @@ def run(c, steps, only=None, dry=False):
                     if (os.path.exists(p) and os.path.getsize(p) > 10000
                             and st.get(tag, {}).get("init") == newest_init(tag)):
                         continue
+                    # A centre whose field has been CARRIED OVER is not
+                    # fetched either.  The carry-over writes the same npz
+                    # the exporter reads, so the archive has nothing to add
+                    # that the repository does not already hold - and the
+                    # queue's slots are better spent on a centre that has
+                    # nothing at all.
+                    if snow_carried_over(tag):
+                        continue
                 elif kind == "sst":
                     # the SST has to be the NEWEST init's, not merely a
                     # fresh file - the ECCC centres had a fresh copy of
@@ -1136,6 +1183,9 @@ def run(c, steps, only=None, dry=False):
                     # once it is on disk it never needs fetching again
                     p = target_for(tag, "clim")
                     if os.path.exists(p) and os.path.getsize(p) > 10000:
+                        continue
+                    # nor when it has been carried over
+                    if clim_carried_over(tag):
                         continue
                 # a daily chunk that is already decoded is not asked for
                 if kind == "u10d":
