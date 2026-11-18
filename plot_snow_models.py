@@ -303,15 +303,29 @@ def to_2d(rec, lats, lons, order):
 
 
 def interp_to(target_lat, target_lon, lats, lons, v):
-    """bilinear from the source grid to the target grid."""
+    """bilinear from the source grid to the target grid.
+
+    The target may be a pair of AXES (the latitude and the longitude of a
+    rectangular grid, of any lengths) or a pair of POINT lists (the same
+    length, one point each).  The two are told apart by their lengths:
+    an axis pair is the only way the lengths can differ.
+    """
     o = np.argsort(lats); lats = lats[o]; v = v[o, :]
     o = np.argsort(lons); lons = lons[o]; v = v[:, o]
     i = np.clip(np.searchsorted(lats, target_lat) - 1, 0, len(lats) - 2)
     dy = (target_lat - lats[i]) / (lats[i + 1] - lats[i])
     j = np.clip(np.searchsorted(lons, target_lon) - 1, 0, len(lons) - 2)
     dx = (target_lon - lons[j]) / (lons[j + 1] - lons[j])
-    return ((1 - dy) * ((1 - dx) * v[i, j] + dx * v[i, j + 1]) +
-            dy * ((1 - dx) * v[i + 1, j] + dx * v[i + 1, j + 1]))
+    if len(target_lat) != len(target_lon):
+        # an axis pair: the answer is the whole rectangle
+        ii = i[:, None]
+        jj = j[None, :]
+        ddy = dy[:, None]
+        ddx = dx[None, :]
+    else:
+        ii, jj, ddy, ddx = i, j, dy, dx
+    return ((1 - ddy) * ((1 - ddx) * v[ii, jj] + ddx * v[ii, jj + 1]) +
+            ddy * ((1 - ddx) * v[ii + 1, jj] + ddx * v[ii + 1, jj + 1]))
 
 
 def load_relief_mask(X, Y):

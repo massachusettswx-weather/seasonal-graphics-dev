@@ -1,0 +1,37 @@
+The ECMWF is carried over to the map instead of queued for it
+
+The owner asked why the map needs more models when the static pages
+already have them.  The answer was two bugs and one piece of data that
+was already in the repository.
+
+THE INDEX DROPPED MODELS.  write_index() wrote the picker from THIS
+run's summary alone, so every rebuild dropped every model whose GRIB
+was not on disk - even though its rasters and manifest were committed
+and sitting in docs/data/.  That is how the ECMWF's export was lost
+(commit c2751cf deleted it) and why the map kept needing the queue.
+The index now keeps every model whose export is on disk with its
+rasters beside it, and the "is it there?" check is separate from the
+list - the same rule the queue learned today.
+
+THE ECMWF'S FIELD WAS ALREADY IN THE REPOSITORY.  The SEAS5 fetch
+wrote data/seas5_<init>_snow_em.npz (the ensemble mean, six lead
+months, the model's own 1 degree grid) and _snow_hc.npz (the model's
+own hindcast climate), and BOTH ARE COMMITTED TO GIT.  tools/
+carry_over_seas5.py writes them into data/models/ecmwf-seas5/ in the
+convention the exporter and the panel renderer already read, so both
+products are built from them with no queue, no request and no waiting.
+The field is bit-for-bit the same: compared cell by cell against the
+committed source the largest difference anywhere is 0.000e+00 in, and
+the static panel re-rendered from it differs from the published one in
+187 of 2,167,620 pixels - isolated single pixels on a contour edge.
+
+THE EXTENSION WAS DECODED ON A CONUS CROP.  The extension past the
+sixth lead month is FETCHED globally but was decoded on the 20-56N /
+134-56W box the panels use, so the map got a 36x78 fragment it could
+not interpolate onto its own grid.  read_snow() takes crop=False for
+the global case, and interp_to() now accepts a pair of target AXES as
+well as a pair of points.
+
+The ECMWF is now on the map with seven lead months - the seventh is the
+sub-daily extension out to May 2027 - and with its own hindcast
+climate, so its anomaly is drawn.

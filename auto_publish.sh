@@ -107,6 +107,13 @@ while true; do
             # the ECCC's two systems are pooled into the official canSIPS
             # ensemble before anything is rendered
             python3 -u build_cansips.py >> logs_auto_publish.log 2>&1
+            # The ECMWF's field is carried over from the committed SEAS5
+            # files.  The GRIB in data/models/ is gitignored and a sandbox
+            # rebuild takes it away, and the archive's queue is slow - but
+            # the same numbers are already in the repository, so the panels
+            # and the map are built from those instead of waiting for a
+            # request that is not needed.
+            python3 -u tools/carry_over_seas5.py >> logs_auto_publish.log 2>&1
             python3 -u plot_snow_models.py --unit snow >> logs_auto_publish.log 2>&1
             # the interactive map: the same fields, on the model's OWN global
             # grid, with the anomaly against the model's own hindcast

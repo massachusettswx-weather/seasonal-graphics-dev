@@ -99,7 +99,7 @@ def _normlon(lon):
     return np.where(lon > 180.0, lon - 360.0, lon)
 
 
-def read_snow(path):
+def read_snow(path, crop=True):
     """-> (months, members, acc[nmem, nmon, nlat, nlon], lats, lons, ndays)
 
     The daily and sub-daily products carry the total snowfall accumulated
@@ -107,8 +107,19 @@ def read_snow(path):
     a calendar day is the difference between the total at the end of that
     day and the total at the end of the day before.  ``acc`` holds the
     metres of water equivalent that falls in each lead month for each
-    ensemble member, on the CONUS crop, and the last item says how many
-    days of that month the file actually covers.
+    ensemble member, and the last item says how many days of that month
+    the file actually covers.
+
+    WITH crop=True (the default) the field is cut to the CONUS box, which
+    is what the PANELS want - they are drawn over North America, and the
+    crop makes the decoder's output a fraction of the file's size.
+
+    WITH crop=False the WHOLE WORLD is kept.  The interactive map needs
+    that: it is the whole planet, and a CONUS fragment cannot be painted
+    on it.  The extension past the sixth lead month is fetched globally
+    for exactly that reason, so decoding it on a CONUS crop threw the
+    rest of the world away and left the map with a 36x78 box it could
+    not even interpolate onto its own grid.
     """
     vals = {}           # (member, valid time) -> the cropped values
     members = []
@@ -170,13 +181,19 @@ def read_snow(path):
                 lats = lat2d[:, 0].copy()
 
                 if grid is None:
-                    rlat = np.where((lats >= LAT0) & (lats <= LAT1))[0]
-                    rlon = np.where((lons >= LON0) & (lons <= LON1))[0]
-                    if not len(rlat) or not len(rlon):
-                        continue
-                    grid = (rlat, rlon)
-                    glat = lats[rlat]
-                    glon = lons[rlon]
+                    if crop:
+                        rlat = np.where((lats >= LAT0) & (lats <= LAT1))[0]
+                        rlon = np.where((lons >= LON0) & (lons <= LON1))[0]
+                        if not len(rlat) or not len(rlon):
+                            continue
+                        grid = (rlat, rlon)
+                        glat = lats[rlat]
+                        glon = lons[rlon]
+                    else:
+                        # the whole grid: every latitude, every longitude
+                        grid = (np.arange(len(lats)), np.arange(len(lons)))
+                        glat = lats
+                        glon = lons
                 else:
                     rlat, rlon = grid
                     if not (np.allclose(lats[rlat], glat) and

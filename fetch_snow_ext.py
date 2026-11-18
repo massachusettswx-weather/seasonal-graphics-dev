@@ -102,7 +102,10 @@ def main():
             time.sleep(30)
         if not ok:
             continue
-        months, members, acc, glat, glon, ndays = read_snow(grib)
+        # the WHOLE WORLD, not the CONUS crop: this is the extension the
+        # interactive map paints on the globe, and a crop would leave it
+        # with a fragment it cannot interpolate onto its own grid
+        months, members, acc, glat, glon, ndays = read_snow(grib, crop=False)
         if not months or acc is None:
             print("  %s: no data past the monthly product's 6 months" % tag,
                   flush=True)

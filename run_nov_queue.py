@@ -666,7 +666,10 @@ def split_combined(path, tag, kinds):
 def decode_ext(path, tag):
     """The renderer reads the decoded months, not the GRIB."""
     from fetch_snow_daily import read_snow, save_npz
-    months, members, acc, glat, glon, ndays = read_snow(path)
+    # the WHOLE WORLD, not the CONUS crop: the extension is what the
+    # interactive map paints on the globe, and a crop would leave it with
+    # a 36x78 fragment it cannot interpolate onto its own grid
+    months, members, acc, glat, glon, ndays = read_snow(path, crop=False)
     if months and acc is not None:
         save_npz(path.replace(".grib", ".npz"), months, members, acc, glat, glon,
                  meta=dict(tag=tag, init=centre_init(tag), kind="extended"),

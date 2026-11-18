@@ -58,6 +58,13 @@ else
     echo "   skipped: no .cdsapirc"
 fi
 
+# The ECMWF's field is carried over from the committed SEAS5 files, so
+# the panels and the map can be built without waiting for the archive.
+echo ""
+echo "== the carried-over data"
+python3 tools/carry_over_seas5.py || \
+    echo "   (nothing to carry over)"
+
 echo ""
 echo "== what is here now"
 python3 - <<'PY'

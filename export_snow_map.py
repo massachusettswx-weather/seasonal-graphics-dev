@@ -198,9 +198,48 @@ def write_index(tags, state):
     model that is listed but not there is a broken entry in the picker (and
     a 404 for its rasters) - and that is exactly what a test run that
     leaves its own model behind used to publish.
+
+    A MODEL WHOSE EXPORT IS ALREADY ON DISK IS KEPT, even when this run
+    did not export it.  The working tree is disposable: the model's GRIB
+    can be gone while its rasters and manifest are still committed, and
+    the picker must not lose a model just because the source data is
+    missing for the moment.  The exporter used to write the index from
+    this run's summary alone, so every rebuild dropped every model whose
+    GRIB was not on disk - and that is how the ECMWF's export was lost
+    even though it had been made.  The rule is the same one the queue
+    learned: the list is the WHOLE set, and the "is it there?" check is
+    separate.
     """
+    # everything this run exported, plus everything that is already on
+    # disk with its rasters beside it
+    keep = list(tags)
+    for fn in sorted(os.listdir(OUT)):
+        if not fn.startswith("snowmap_") or not fn.endswith(".json"):
+            continue
+        if fn == "snowmap_tags.json":
+            continue
+        tag = fn[len("snowmap_"):-len(".json")]
+        if tag in keep:
+            continue
+        # it counts only if its rasters are there too - a manifest with no
+        # PNGs is a broken entry in the picker
+        man = os.path.join(OUT, fn)
+        try:
+            m = json.load(open(man))
+        except Exception:
+            continue
+        files = []
+        for lead in m.get("leads", []):
+            for k in ("total", "anom"):
+                if lead.get(k):
+                    files.append(lead[k])
+        files += list((m.get("total") or {}).values())
+        if not files or not all(os.path.exists(os.path.join(OUT, f))
+                                for f in files):
+            continue
+        keep.append(tag)
     index = []
-    for tag in tags:
+    for tag in keep:
         meta = state.get(tag, {})
         index.append({"tag": tag,
                       "name": "C3S Multi-Model Mean" if tag == "c3s-multi"
@@ -209,7 +248,7 @@ def write_index(tags, state):
     with open(os.path.join(OUT, "snowmap_tags.json"), "w") as f:
         json.dump(index, f)
     with open(os.path.join(DATA, "snowmap_tags.json"), "w") as f:
-        json.dump(tags, f)
+        json.dump([t["tag"] for t in index], f)
     return index
 
 
