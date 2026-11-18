@@ -109,7 +109,7 @@ The two traps that are already known and fixed:
   unit arithmetic, the anomaly against the model's own climate, the mask,
   the ladder quantisation and the raster sizes.  All the checks pass.
 * `tools/test_maps_page.py` - the page in a headless browser with a
-  synthetic model: the globe, the flat map, the polar view, the timeline
+  synthetic model: the globe, the flat map, the timeline
   and the anomaly toggle, with the console watched for errors.
 
 **Both tests need no key and no queue - they run in seconds.**  That is
@@ -523,3 +523,66 @@ given_up: True`) and its 60-member monthly wind serves the chart.
 
 **THE WATERMARK** is on the map, bottom right, in the house style
 (`@Massachusettswx`, bold), matching the static panels.
+
+## The polar view is gone, and the map moves less (18 Nov 2026)
+
+**THE OWNER'S DECISION: THE POLAR VIEW IS REMOVED.**  The investigation
+below had shown the projection was exact (0.000000 degrees), the field was
+right, and the bright Antarctic ring was real data squeezed into the outer
+annulus - but the whole-globe polar projection was not useful enough to
+keep.  Two views remain: **2D Map** and **3D Globe**.
+
+What was taken out, in both the CPU path (`assets/js/maps.js`) and the GPU
+path (`assets/js/mapgl.js`):
+- the Polar button in `#mapviews` (built by `build_site.py`);
+- `state.prot`, the azimuthal-equidistant branch of `baseProjection()`,
+  the polar branch of `projParams()` and of `mapHeight()`;
+- `graticulePolar()` and its export;
+- the polar arm of the vector shader's `forward()` and the `u_view == 2`
+  arms of the earth shader's `invert()` and of `Renderer.pick()`.
+The GLSL now knows only `u_view 0 = flat` and `u_view 1 = globe`.
+
+**THE DRAG SENSITIVITY IS NOW A NAMED CONSTANT.**
+
+    var DRAG_GAIN = {flat: 0.75, globe: 0.30};
+
+- the flat map pans at `dx * DRAG_GAIN.flat` (was 1:1);
+- the globe spins at `DRAG_GAIN.globe / state.zoom`, so **the spin is
+  divided by the zoom**: the map moves the same distance ON THE SCREEN at
+  every magnification.  Before, the same drag threw the globe about nine
+  times further at 600% than it did at 100%, which is what made dragging a
+  zoomed-in globe feel wild.
+- the zoom step came down from 1.15 to **1.12**, for the wheel and for the
+  buttons both.
+
+**MEASURED ON THE BUILT PAGE** (200 px of pointer travel):
+
+| | before | after |
+|---|---|---|
+| flat map, the pan | 200 px (1.00 of the pointer) | **150 px (0.75)** |
+| globe at 100%, the turn | 90 deg | **60 deg** |
+| globe at 197%, the turn | 90 deg | **30.4 deg** |
+| globe at 605%, the turn | 90 deg | **9.9 deg** |
+
+The turn at 605% is 0.165 of the turn at 100% - exactly 1/zoom - so the
+movement on the screen is the same at every size.
+
+**THE RENDERER NOW RECORDS A LOST CONTEXT IN AN EVENT.**  `mapgl.js`
+listens for `webglcontextlost` / `webglcontextrestored` and keeps the
+flag on `renderer.contextLost`.  Nothing has to call into the GPU to ask
+whether the context is alive - and that call was what used to hang the
+test suite under SwiftShader (the test now reads the flag, and asks for
+it BEFORE the drag, because the drag leaves the software renderer with a
+lot of queued work).
+
+**THE TESTS, ALL GREEN:** `tools/test_map_gl.py` (projection 1.14e-12 px
+forward / 2.84e-14 deg inverse against d3; 272 colours checked, 2 off;
+the anomaly's own palette; the context alive; the drag 1.02 ms of CPU and
+0.87 ms with the GPU; no console errors - "all good"),
+`tools/test_maps_page.py` (the two view buttons, the timeline, the zoom
+and its reset, no polar-section furniture, no console errors) and
+`tools/test_export_map.py` ("all the checks passed").
+
+**PUBLISHED TO THE DEV SITE ONLY** (commit `3fc5b08`): the live page has
+exactly two views, no gate, the watermark, and the drag numbers above.
+The operational site was NOT touched.
