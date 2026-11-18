@@ -725,3 +725,79 @@ multi-model's month labels came out as null.  Both are fixed.
 **THE MAP NOW CARRIES NINE MODELS**: the C3S Multi-Model Mean, the
 CFSv2, the CMCC, the DWD, the ECCC canSIPS, the ECMWF SEAS5, the
 Météo-France System 9, the SFSv1 and the UKMO GloSeas6.
+
+## The map opens on the multi-model, and the globe stopped lying (18 Nov 2026)
+
+**THE PAGE OPENS ON THE C3S MULTI-MODEL MEAN** (the owner's request).
+The picker is ordered - the mean first, the rest by name - so the list
+does not reshuffle itself between rebuilds, and the page asks for the
+mean BY NAME (`"c3s-multi"`), not by position: a stale index on disk
+cannot make it land on something else.  The first entry is only the
+fallback.  The mean now has its own hindcast climate (the ECCC's arrived
+and `build_cansips.py` was re-run), so its anomaly is real and 43.9 % of
+the run total is masked where the climate expects no snow.
+
+**THE GLOBE'S INVERSE WAS WRONG BY UP TO 0.53 PIXELS.**  The map's GPU
+and its own CPU arithmetic disagreed on a few pixels of the globe - and
+never on the flat map, which uses no transcendentals at all.  The cause
+was measured, not guessed:
+
+| function | worst error (SwiftShader) |
+|---|---|
+| `asin` | 1.6e-8 |
+| `atan2` | 1.1e-7 |
+| **`sin` / `cos`** | **1.9e-4** |
+
+The shader's inverse went through `sin(asin(z))` and `cos(asin(z))` and
+then took the sine and cosine of the two angles it had recovered.  The
+error walked straight into the place the snow is sampled: up to 0.53 px,
+enough to flip a pixel's byte across a colour boundary.
+
+But `sin(asin(z))` IS `z`, and `cos(asin(z))` IS `sqrt(1 - z*z)`, and
+the point on the sphere is the two screen axes and the depth:
+
+    P = px * east + py * north + sqrt(1 - px^2 - py^2) * up
+
+so the inverse now says that outright: three fewer transcendentals, two
+left, and no dependence on how well `sin()` and `cos()` are implemented.
+The two forms agree to **1.9e-13 rad**, and the shader still matches d3
+to **3.7e-13 deg**.  The anomaly palette now reads back **334 pixels
+with 0 of them wrong** (it was 4), and the totals 321 with 0 bad (it was
+1).
+
+**THE MEASUREMENT TRAP**: packing a float into four bytes with the
+usual `fract(v * (1, 255, 65025, 16581375))` trick carries a noise
+floor of about 2.4e-4 - the same size as the error being hunted.  The
+probe now packs the float's **bits** (`floatBitsToUint`), which is
+exact.  (`probes/glsl_test.html`, `probes/glsl_acc.py`.)
+
+## The sea is left as sea (18 Nov 2026)
+
+**THE WORLD MAP SHOWED 48 INCHES OF SNOW ON THE NORTH ATLANTIC.**  The
+models' "snowfall" over the sea is the precipitation they classified as
+snow over the water, and the house's 10:1 water-equivalent-to-depth
+ratio turns it into nonsense: the SEAS5 puts 48 inches on the Atlantic
+for the run and 144 for the six months, against 57 inches over northern
+Canada.  Every model does it.  The anomaly over the sea came out at
+-20 inches - the extreme of the palette - so the sea was a sheet of
+saturated brown and the continents were washed out.
+
+The static panels never showed it: they are cut to the eastern United
+States, and their own mask (the model's climate expects no snow) covers
+the water inside that box.  A map of the whole world does show it.
+
+So the map paints the field **on the land** and leaves the sea as sea:
+
+- the renderer asks its own land mask - the same Natural Earth 1:50m the
+  earth is baked from - before it paints a cell, so the coastline is as
+  fine as the map's coastline and not as coarse as the 1 degree grid;
+- the exporter's anomaly scale is worked out over the land, so the sea's
+  meaningless numbers cannot swallow the colour range;
+- the test asks the same mask before it compares a colour.
+
+`Renderer.landAt(lon, lat)` is the new question the renderer can answer.
+
+**A NOTE FOR THE OWNER**: this is the one change on the dev site that
+was not explicitly asked for.  It is on the dev copy, it is one flag in
+the shader (`mk.r > 0.5 && mk.g < 0.5`), and it can be taken back in a
+minute if the sea is wanted back.
