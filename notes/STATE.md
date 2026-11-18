@@ -645,3 +645,83 @@ It is a file now, **`data/.no_publish`**, written by
 same way the gate switch works.  `tools/auto_run.sh` honours either.
 Verified: `auto_publish.sh NOT RUNNING`, `run_nov_queue.py 1 process`,
 `fetch_polar_models.py 1 process`.
+
+## The map carries the models over instead of queueing them (18 Nov 2026)
+
+**THE OWNER ASKED WHY THE MAP NEEDED MORE MODELS WHEN THE STATIC PAGES
+ALREADY HAD THEM.**  The answer was two bugs and one piece of data that
+was already in the repository.
+
+**THE INDEX DROPPED THE MODELS.**  `write_index()` wrote the picker
+from THIS run's summary alone, so every rebuild dropped every model
+whose GRIB was not on disk - even though its rasters and manifest were
+committed and sitting in `docs/data/`.  That is how the ECMWF's export
+was lost (commit `c2751cf` deleted it) and why the map kept needing
+the queue.  The index now keeps every model whose export is on disk
+with its rasters beside it, and the "is it there?" check is separate
+from the list - the same rule the queue learned the same day.
+
+**THE ECMWF'S FIELD WAS ALREADY IN THE REPOSITORY.**  The SEAS5 fetch
+wrote `data/seas5_<init>_snow_em.npz` (the ensemble mean, six lead
+months, the model's own 1 degree grid) and `_snow_hc.npz` (the model's
+own hindcast climate), and BOTH ARE COMMITTED TO GIT.  `tools/
+carry_over_seas5.py` writes them into `data/models/ecmwf-seas5/` in the
+convention the exporter and the panel renderer already read, so both
+products are built from them - no queue, no request, no waiting.  It
+runs in `auto_publish.sh` and in `tools/bootstrap.sh`, so it survives a
+wipe.
+
+**THE FIELD IS THE SAME FIELD.**  Compared cell by cell against the
+committed source the largest difference anywhere is **0.000e+00 in**.
+The static panel re-rendered from the carried-over data differs from
+the published one in **187 of 2,167,620 pixels** - isolated single
+pixels on a contour edge, where the two code paths pick a neighbouring
+bin of the same contour.
+
+**THE QUEUE NOW SKIPS A CARRIED-OVER CENTRE.**  Its skip check looked
+only for the GRIB, so it would have asked the archive for the ECMWF's
+monthly snowfall again.  The check now recognises the carried-over npz,
+and only counts it when it belongs to the centre's OWN init (the init
+is in the npz's meta).  So the queue's slots go where they are needed:
+it moved on to the CMCC, which has nothing at all.
+
+**THE EXTENSION WAS DECODED ON A CONUS CROP.**  The extension past the
+sixth lead month is FETCHED globally but was decoded on the
+20-56N / 134-56W box the panels use, so the map got a 36x78 fragment
+it could not interpolate onto its own grid.  `read_snow()` takes
+`crop=False` for the global case, and `interp_to()` now accepts a pair
+of target AXES as well as a pair of points.
+
+## The map's run total showed an empty field with a diagonal line (18 Nov 2026)
+
+Found by looking at the ECMWF's anomaly on the live map.  Four bugs, all
+in `export_snow_map.py`:
+
+1. **THE RUN TOTAL'S ANOMALY WAS NaN EVERYWHERE.**  The run total is
+   the sum of the monthly anomalies, and a month with no hindcast
+   climate contributes NaN - and `np.sum()` of a NaN is NaN.  The whole
+   run total came out masked and the map's "Total" button showed an
+   empty field with a diagonal line.  The sum now skips the months that
+   have no climate.
+2. **THE RUN TOTAL'S MASK WAS NEVER APPLIED.**  The monthly rasters are
+   masked where the model's own climate expects no snow; the run
+   total's was not, so it showed an anomaly where there is no snow at
+   all.
+3. **THE MULTI-MODEL'S MEAN CLIMATE WAS DILUTED.**  The mean is taken
+   over the members that HAVE a climate.  A member without one
+   contributes zeros, and zeros say "the model expects no snow here",
+   so including them washed the mean climate down and nothing was
+   masked at all.
+4. **THE MULTI-MODEL ASSUMED EVERY MEMBER REACHES AS FAR.**  The ECMWF
+   carries on past the sixth lead month with its extension, so it has
+   seven months where the others have six, and the mean ran off the end
+   of the other members' lists.  The mean is now taken over the months
+   EVERY member has.
+
+And the manifest's per-lead `ym` was the LAST lead month's key in every
+entry, because the loop used the outer loop's variable - so the
+multi-model's month labels came out as null.  Both are fixed.
+
+**THE MAP NOW CARRIES NINE MODELS**: the C3S Multi-Model Mean, the
+CFSv2, the CMCC, the DWD, the ECCC canSIPS, the ECMWF SEAS5, the
+Météo-France System 9, the SFSv1 and the UKMO GloSeas6.
