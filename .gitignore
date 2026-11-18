@@ -74,3 +74,6 @@ data/_gefs_*.grib2
 data/_polz_*.grib
 data/.no_gate
 data/.no_publish
+
+# the tests' own backups never belong in the published data directory
+docs/data/*.bak

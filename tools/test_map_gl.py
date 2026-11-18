@@ -243,8 +243,23 @@ DRAG_JS = r"""
 
 def main():
     port = 8767
-    srv = subprocess.Popen([sys.executable, "-m", "http.server", str(port),
-                             "--directory", DOCS],
+    # A THREADED server: python's own http.server handles ONE request at
+    # a time, and the page asks for a dozen rasters at once, so the
+    # listen backlog overflowed and the browser recorded the overflow as
+    # ERR_CONNECTION_REFUSED - a fault in the test harness, not on the
+    # page.
+    _srv_code = (
+        "import http.server, socketserver, functools, sys\n"
+        "class H(http.server.SimpleHTTPRequestHandler):\n"
+        "    def log_message(self, *a): pass\n"
+        "class S(socketserver.ThreadingMixIn, http.server.HTTPServer):\n"
+        "    daemon_threads = True\n"
+        "    allow_reuse_address = True\n"
+        "S(('127.0.0.1', int(sys.argv[1])), "
+        "functools.partial(H, directory=sys.argv[2])).serve_forever()\n"
+    )
+    srv = subprocess.Popen([sys.executable, "-c", _srv_code, str(port),
+                             DOCS],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1.5)
     fails = []

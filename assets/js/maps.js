@@ -917,15 +917,27 @@
     d3.json("data/snowmap_tags.json").then(function (index) {
       state.index = index;
       if (!msel) { return; }
-      index.forEach(function (m, i) {
+      index.forEach(function (m) {
         var o = document.createElement("option");
         o.value = m.tag;
         o.textContent = m.name + (m.init ? " (" + m.init + ")" : "");
-        if (i === 0) { o.selected = true; }
         msel.appendChild(o);
       });
       msel.addEventListener("change", function () { loadModel(msel.value); });
-      if (index.length) { loadModel(index[0].tag); }
+      /* THE PAGE OPENS ON THE MULTI-MODEL MEAN.  The index puts it first,
+         but the page asks for it by name as well: the index on disk may be
+         an older one, written before the mean existed or before it was
+         given its climate, and a reader should still land on the mean
+         whenever it is there.  If it is not there, the first model in the
+         index is the fallback. */
+      var def = null;
+      for (var i = 0; i < index.length; i++) {
+        if (index[i].tag === "c3s-multi") { def = index[i].tag; break; }
+      }
+      if (!def && index.length) { def = index[0].tag; }
+      if (!def) { return; }
+      msel.value = def;
+      loadModel(def);
     }).catch(function () {});
   }
 

@@ -106,13 +106,33 @@ def make_model():
     }
     with open(os.path.join(DATA, "snowmap_%s.json" % TAG), "w") as fh:
         json.dump(man, fh)
+
+    # A SECOND entry that points at the same rasters, under the tag the
+    # page is supposed to open on.  It is deliberately NOT first in the
+    # index, so the test proves the page picks the multi-model by NAME
+    # and not merely because it happens to be the first entry.
+    #
+    # The REAL multi-model manifest is set aside and put back afterwards:
+    # this file lives beside it in the published data directory.
+    real_multi = os.path.join(DATA, "snowmap_c3s-multi.json")
+    if os.path.exists(real_multi):
+        shutil.copyfile(real_multi, os.path.join(DATA, "snowmap_c3s-multi.json.bak"))
+
+    man2 = dict(man)
+    man2["tag"] = "c3s-multi"
+    man2["name"] = "C3S Multi-Model Mean"
+    with open(real_multi, "w") as fh:
+        json.dump(man2, fh)
+
     # the index the page reads: the REAL one is kept, so the page is not
     # left pointing at a model that is not there
     tags = os.path.join(DATA, "snowmap_tags.json")
     if os.path.exists(tags):
         shutil.copyfile(tags, os.path.join(DATA, "snowmap_tags.json.bak"))
     with open(tags, "w") as fh:
-        json.dump([{"tag": TAG, "name": "TEST MODEL", "init": "2026-11"}], fh)
+        json.dump([{"tag": TAG, "name": "TEST MODEL", "init": "2026-11"},
+                   {"tag": "c3s-multi", "name": "C3S Multi-Model Mean",
+                    "init": "2026-11"}], fh)
     return man
 
 
@@ -132,8 +152,23 @@ def main():
     gate = m.group(1) if m else ""
 
     port = 8765
-    srv = subprocess.Popen([sys.executable, "-m", "http.server", str(port),
-                             "--directory", DOCS],
+    # A THREADED server: python's own http.server handles ONE request at
+    # a time, and the page asks for a dozen rasters at once, so the
+    # listen backlog overflowed and the browser recorded the overflow as
+    # ERR_CONNECTION_REFUSED - a fault in the test harness, not on the
+    # page.
+    _srv_code = (
+        "import http.server, socketserver, functools, sys\n"
+        "class H(http.server.SimpleHTTPRequestHandler):\n"
+        "    def log_message(self, *a): pass\n"
+        "class S(socketserver.ThreadingMixIn, http.server.HTTPServer):\n"
+        "    daemon_threads = True\n"
+        "    allow_reuse_address = True\n"
+        "S(('127.0.0.1', int(sys.argv[1])), "
+        "functools.partial(H, directory=sys.argv[2])).serve_forever()\n"
+    )
+    srv = subprocess.Popen([sys.executable, "-c", _srv_code, str(port),
+                             DOCS],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1.5)
     try:
@@ -150,6 +185,18 @@ def main():
             pg.goto("http://127.0.0.1:%d/_test_maps.html" % port)
             pg.wait_for_timeout(4000)
             pg.screenshot(path="/tmp/maps_globe.png")
+
+            # THE PAGE OPENS ON THE MULTI-MODEL MEAN.  The index in this
+            # test has the test model FIRST, so the page can only land on
+            # the multi-model by asking for it by name.
+            sel = pg.evaluate("() => { var s = document.querySelector('#snowModel');"
+                              " return s ? s.value : ''; }")
+            print("the page opens on:", sel)
+            if sel != "c3s-multi":
+                print("   FAIL: the page should open on the C3S Multi-Model Mean")
+                errors.append("the page opened on %r, not the multi-model" % sel)
+            else:
+                print("   ok")
 
             # the timeline: the second month
             btns = pg.query_selector_all("#maptimeline .tlbtn")
@@ -237,6 +284,19 @@ def main():
             for f in os.listdir(DATA):
                 if f.startswith("snowmap_%s" % TAG):
                     os.remove(os.path.join(DATA, f))
+            # the REAL multi-model manifest goes back: the test stood in
+            # for it, and the published data directory must not keep the
+            # test's copy
+            multi = os.path.join(DATA, "snowmap_c3s-multi.json")
+            bak = os.path.join(DATA, "snowmap_c3s-multi.json.bak")
+            if os.path.exists(bak):
+                shutil.copyfile(bak, multi)
+                os.remove(bak)
+            # the saved copy of the index is a safety net, not a file the
+            # published data directory should carry
+            tbak = os.path.join(DATA, "snowmap_tags.json.bak")
+            if os.path.exists(tbak):
+                os.remove(tbak)
             # put the real model index back, rebuilt from the manifests
             # that are actually there - restoring a saved copy can put
             # back a picker entry for a model the site does not have

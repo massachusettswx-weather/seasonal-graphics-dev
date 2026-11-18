@@ -245,6 +245,20 @@ def write_index(tags, state):
                       "name": "C3S Multi-Model Mean" if tag == "c3s-multi"
                       else meta.get("name", tag),
                       "init": meta.get("init", "")})
+
+    # THE ORDER OF THE PICKER IS THE ORDER THE PAGE OPENS IN: the page
+    # loads the FIRST model in this file, so the multi-model mean has to
+    # be first for it to be what a reader sees when the page opens.
+    # It also belongs at the top of the list on its own merits - it is
+    # the product the whole site is about, and the mean of every centre
+    # is the one card a reader should land on.
+    #
+    # The rest of the list is put in a fixed order rather than the order
+    # the export happened to run in, so the picker does not reshuffle
+    # itself between rebuilds (the multi-model is built last, and used
+    # to land at the bottom of the list).
+    index.sort(key=lambda m: (0 if m["tag"] == "c3s-multi" else 1,
+                               m["name"].lower()))
     with open(os.path.join(OUT, "snowmap_tags.json"), "w") as f:
         json.dump(index, f)
     with open(os.path.join(DATA, "snowmap_tags.json"), "w") as f:

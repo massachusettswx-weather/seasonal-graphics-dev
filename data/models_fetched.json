@@ -139,7 +139,7 @@
   "centre": "eccc",
   "init": "2026-11",
   "leads": 7,
-  "members": 0,
+  "members": 40,
   "merged_from": [
    "eccc-canesm5",
    "eccc-gem5"

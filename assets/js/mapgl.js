@@ -82,22 +82,25 @@
     if (p.view === "flat") {
       return {lon: px / DEG, lat: py / DEG};
     }
-    var z = Math.sqrt(px * px + py * py);
+    var z2 = px * px + py * py;
     /* off the globe there is no point to invert: the far side of the
        world is not behind the limb, it is nowhere */
-    if (z > 1) { return {lon: NaN, lat: NaN}; }
-    var c = Math.asin(Math.max(-1, Math.min(1, z)));
-    var sc = Math.sin(c), cc = Math.cos(c);
-    var lam1 = Math.atan2(px * sc, z * cc);
-    var phi1 = (z > 0) ? Math.asin(Math.max(-1, Math.min(1, py * sc / z))) : 0;
-    /* the centred frame back to the geographic coordinates */
-    var cl = Math.cos(lam1), sl = Math.sin(lam1);
-    var cp = Math.cos(phi1), sp = Math.sin(phi1);
+    if (z2 > 1) { return {lon: NaN, lat: NaN}; }
+    /* THE INVERSE, WITHOUT THE ROUND TRIP.  The point on the sphere is
+       the two screen axes and the depth:
+         P = px * east + py * north + sqrt(1 - px^2 - py^2) * up
+       which is what the old form worked out the long way round, through
+       asin(z), sin(asin(z)) and cos(asin(z)) - and sin(asin(z)) IS z
+       and cos(asin(z)) IS sqrt(1 - z*z).  Saying it outright is not
+       only faster: some GL implementations (SwiftShader among them)
+       carry sin() and cos() to about 1e-4, and that error used to walk
+       straight into the place the snow is sampled. */
+    var s = Math.sqrt(Math.max(0, 1 - z2));
     var sl0 = Math.sin(p.lam0), cl0 = Math.cos(p.lam0);
     var sp0 = Math.sin(p.phi0), cp0 = Math.cos(p.phi0);
-    var Px = -sl0 * (cp * sl) + (-sp0 * cl0) * sp + (cp0 * cl0) * (cp * cl);
-    var Py = cl0 * (cp * sl) + (-sp0 * sl0) * sp + (cp0 * sl0) * (cp * cl);
-    var Pz = cp0 * sp + sp0 * (cp * cl);
+    var Px = -sl0 * px + (-sp0 * cl0) * py + (cp0 * cl0) * s;
+    var Py = cl0 * px + (-sp0 * sl0) * py + (cp0 * sl0) * s;
+    var Pz = cp0 * py + sp0 * s;
     return {lon: Math.atan2(Py, Px) / DEG,
             lat: Math.asin(Math.max(-1, Math.min(1, Pz))) / DEG};
   }
@@ -139,29 +142,24 @@ out vec4 frag;
 const float PI = 3.141592653589793;
 const float DEGR = 0.017453292519943;
 
-/* the centred frame back to the geographic coordinates */
-vec2 frameToGeo(float lam1, float phi1) {
-  float cl = cos(lam1), sl = sin(lam1);
-  float cp = cos(phi1), sp = sin(phi1);
+/* where is this pixel?
+   THE INVERSE WITHOUT THE ROUND TRIP: the point on the sphere is the
+   two screen axes and the depth.  The old form went through
+   asin(z), sin(asin(z)) and cos(asin(z)); since sin(asin(z)) IS z and
+   cos(asin(z)) IS sqrt(1 - z*z), saying it outright is the same answer
+   with three fewer transcendentals - and sin() and cos() are the two
+   functions some GL implementations carry to only about 1e-4. */
+vec2 invert(vec2 sp) {
+  vec2 p = vec2((sp.x - u_trans.x) / u_k, (u_trans.y - sp.y) / u_k);
+  if (u_view == 0) { return p; }
   float sl0 = sin(u_centre.x), cl0 = cos(u_centre.x);
   float sp0 = sin(u_centre.y), cp0 = cos(u_centre.y);
   vec3 east  = vec3(-sl0, cl0, 0.0);
   vec3 north = vec3(-sp0 * cl0, -sp0 * sl0, cp0);
   vec3 up    = vec3(cp0 * cl0, cp0 * sl0, sp0);
-  vec3 P = east * (cp * sl) + north * sp + up * (cp * cl);
+  float s = sqrt(max(0.0, 1.0 - dot(p, p)));
+  vec3 P = east * p.x + north * p.y + up * s;
   return vec2(atan(P.y, P.x), asin(clamp(P.z, -1.0, 1.0)));
-}
-
-/* where is this pixel? */
-vec2 invert(vec2 sp) {
-  vec2 p = vec2((sp.x - u_trans.x) / u_k, (u_trans.y - sp.y) / u_k);
-  if (u_view == 0) { return p; }
-  float z = length(p);
-  float c = asin(clamp(z, -1.0, 1.0));
-  float sc = sin(c), cc = cos(c);
-  float lam1 = atan(p.x * sc, z * cc);
-  float phi1 = (z > 0.0) ? asin(clamp(p.y * sc / z, -1.0, 1.0)) : 0.0;
-  return frameToGeo(lam1, phi1);
 }
 
 void main() {
