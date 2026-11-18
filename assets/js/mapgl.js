@@ -53,7 +53,6 @@
              + cos(phi0) cos(phi) cos(lam-lam0)   towards the centre
 
      and d3's raw projections are the orthographic (X, Y) and the
-     azimuthal equidistant (d/sin d)(X, Y) with d = acos(Z).  The
      equirectangular one is the plain (lam, phi). */
 
   function projectPoint(lam, phi, p) {
@@ -67,13 +66,8 @@
     var px, py;
     if (p.view === "flat") {
       px = lam; py = phi; Z = 1;
-    } else if (p.view === "globe") {
-      px = X; py = Y;
     } else {
-      var d = Math.acos(Math.max(-1, Math.min(1, Z)));
-      var ss = Math.sin(d);
-      var kk = (d < 1e-9) ? 0 : ((Math.abs(ss) < 1e-9) ? 1e9 : d / ss);
-      px = kk * X; py = kk * Y;
+      px = X; py = Y;
     }
     return {x: p.x0 + p.k * px, y: p.y0 - p.k * py, z: Z};
   }
@@ -91,9 +85,8 @@
     var z = Math.sqrt(px * px + py * py);
     /* off the globe there is no point to invert: the far side of the
        world is not behind the limb, it is nowhere */
-    if (p.view === "globe" && z > 1) { return {lon: NaN, lat: NaN}; }
-    if (p.view === "polar" && z > Math.PI) { return {lon: NaN, lat: NaN}; }
-    var c = (p.view === "globe") ? Math.asin(Math.max(-1, Math.min(1, z))) : z;
+    if (z > 1) { return {lon: NaN, lat: NaN}; }
+    var c = Math.asin(Math.max(-1, Math.min(1, z)));
     var sc = Math.sin(c), cc = Math.cos(c);
     var lam1 = Math.atan2(px * sc, z * cc);
     var phi1 = (z > 0) ? Math.asin(Math.max(-1, Math.min(1, py * sc / z))) : 0;
@@ -123,7 +116,7 @@ precision highp float;
 precision highp sampler2D;
 
 uniform vec2  u_res;
-uniform int   u_view;        /* 0 flat, 1 globe, 2 polar */
+uniform int   u_view;        /* 0 flat, 1 globe */
 uniform vec2  u_centre;      /* lam0, phi0, radians */
 uniform float u_k;           /* the scale, px per projected unit */
 uniform vec2  u_trans;       /* x0, y0, px */
@@ -164,7 +157,7 @@ vec2 invert(vec2 sp) {
   vec2 p = vec2((sp.x - u_trans.x) / u_k, (u_trans.y - sp.y) / u_k);
   if (u_view == 0) { return p; }
   float z = length(p);
-  float c = (u_view == 1) ? asin(clamp(z, -1.0, 1.0)) : z;
+  float c = asin(clamp(z, -1.0, 1.0));
   float sc = sin(c), cc = cos(c);
   float lam1 = atan(p.x * sc, z * cc);
   float phi1 = (z > 0.0) ? asin(clamp(p.y * sc / z, -1.0, 1.0)) : 0.0;
@@ -175,11 +168,10 @@ void main() {
   vec2 sp = vec2(gl_FragCoord.x, u_res.y - gl_FragCoord.y);
   float r = length(sp - u_trans);
   vec4 outc = vec4(0.0);
-  /* the sea: the sphere on the globe, the whole disc on the polar
-     projection, and the whole rectangle on the flat map */
+  /* the sea: the sphere on the globe, and the whole rectangle on the
+     flat map */
   float oceanR = 1e9;
   if (u_view == 1) { oceanR = u_k; }
-  else if (u_view == 2) { oceanR = u_k * PI; }
   if (r <= oceanR) {
     vec2 ll = invert(sp);
     vec3 e = u_ocean;
@@ -195,13 +187,10 @@ void main() {
          arithmetic the CPU version used - the same four cells, the
          same weights, the same published table - so the map IS the
          static map and not merely a map of the same data. */
-      /* THE FIELD IS PAINTED EVERYWHERE THE EARTH IS.  The polar view
-         used to stop the field at the equator (r > k*PI/2), which drew
-         the land and the coastlines of the southern hemisphere and left
-         them bare: Antarctica's snowfall was in the model's own output
-         and simply never reached the screen.  The field now follows the
-         earth over the whole disc. */
-      if (true) {
+      /* THE FIELD IS PAINTED EVERYWHERE THE EARTH IS: the land, the
+         coastlines and the snow are the same picture, and none of them
+         is left bare. */
+      {
         float glat0 = u_grid.x;
         float gdlat = u_grid.y;
         float glon0 = u_grid.z;
@@ -322,13 +311,7 @@ vec3 forward(vec2 ll) {
   float Z = sl0 * sp + cl0 * cp * cd;
   vec2 pr;
   if (u_view == 0) { pr = vec2(lam, phi); Z = 1.0; }
-  else if (u_view == 1) { pr = vec2(X, Y); }
-  else {
-    float d = acos(clamp(Z, -1.0, 1.0));
-    float ss = sin(d);
-    float kk = (d < 1e-9) ? 0.0 : ((abs(ss) < 1e-9) ? 1e9 : d / ss);
-    pr = vec2(kk * X, kk * Y);
-  }
+  else { pr = vec2(X, Y); }
   return vec3(u_trans.x + u_k * pr.x, u_trans.y - u_k * pr.y, Z);
 }
 
@@ -483,27 +466,6 @@ void main() {
     return lines;
   }
 
-  function graticulePolar() {
-    var lines = [];
-    /* the parallels: every 30 degrees, right round the disc */
-    [60, 30, 0, -30, -60].forEach(function (lat) {
-      var c = [];
-      for (var i = 0; i <= 360; i += 2) { c.push([i % 360, lat]); }
-      lines.push(c);
-    });
-    /* the meridians: from the pole at the centre right out towards the
-       rim of the disc, which is the far side of the world - the polar
-       view shows the whole globe, so the graticule has to reach all of
-       it.  They stop at 85 degrees south: the pole itself is the
-       antipode of the centre, and in this projection it is the one
-       point that cannot be drawn. */
-    for (var lon = 0; lon < 360; lon += 30) {
-      lines.push([[lon, 90], [lon, 60], [lon, 30], [lon, 0],
-                  [lon, -30], [lon, -60], [lon, -85]]);
-    }
-    return lines;
-  }
-
   /* The graticule's instances: the distance along each line is needed
      for the dashes, and it is a distance on the screen, so it is worked
      out again for every frame (the graticule is a thousand points, so
@@ -634,6 +596,20 @@ void main() {
     });
     if (!gl) { throw new Error("WebGL2 is not available"); }
     this.gl = gl;
+    /* A lost context is worth knowing about: the browser takes the GPU
+       away when the tab is hidden for a long time or the driver resets,
+       and the map has to be told rather than left showing a frozen
+       picture.  The flag is set by the event, so anything can ask
+       whether the context is still alive without calling into the GPU. */
+    this.contextLost = false;
+    var self = this;
+    canvas.addEventListener("webglcontextlost", function (ev) {
+      self.contextLost = true;
+      if (ev.preventDefault) { ev.preventDefault(); }
+    }, false);
+    canvas.addEventListener("webglcontextrestored", function () {
+      self.contextLost = false;
+    }, false);
     this.earth = program(gl, VERT_QUAD, FRAG_EARTH);
     this.line = program(gl, VERT_LINE, FRAG_LINE);
 
@@ -657,7 +633,7 @@ void main() {
                   new Float32Array([-1, 0, 1, 0, -1, 1, 1, 1]),
                   gl.STATIC_DRAW);
 
-    /* the outlines: one set for the globe and the polar view, one for
+    /* the outlines: one set for the globe, one for
        the flat map, which is cut at the antimeridian */
     this.geoSeg = gl.createBuffer();
     this.geoDist = gl.createBuffer();
@@ -950,8 +926,7 @@ void main() {
     var E = this.earth;
     gl.useProgram(E.prog);
     gl.uniform2f(E.u.u_res, W, H);
-    gl.uniform1i(E.u.u_view, p.view === "flat" ? 0 :
-                                  (p.view === "globe" ? 1 : 2));
+    gl.uniform1i(E.u.u_view, p.view === "flat" ? 0 : 1);
     gl.uniform2f(E.u.u_centre, p.lam0, p.phi0);
     gl.uniform1f(E.u.u_k, p.k);
     gl.uniform2f(E.u.u_trans, p.x0, p.y0);
@@ -1004,8 +979,7 @@ void main() {
     var L = this.line;
     gl.useProgram(L.prog);
     gl.uniform2f(L.u.u_res, W, H);
-    gl.uniform1i(L.u.u_view, p.view === "flat" ? 0 :
-                                  (p.view === "globe" ? 1 : 2));
+    gl.uniform1i(L.u.u_view, p.view === "flat" ? 0 : 1);
     gl.uniform2f(L.u.u_centre, p.lam0, p.phi0);
     gl.uniform1f(L.u.u_k, p.k);
     gl.uniform2f(L.u.u_trans, p.x0, p.y0);
@@ -1109,9 +1083,6 @@ void main() {
     var dx = x - p.x0, dy = y - p.y0;
     var rr = Math.sqrt(dx * dx + dy * dy);
     if (p.view === "globe" && rr > p.k) { return {lon: 0, lat: 0, byte: null}; }
-    if (p.view === "polar" && rr > p.k * Math.PI) {
-      return {lon: 0, lat: 0, byte: null};
-    }
     var ll = invertPoint(x, y, p);
     var out = {lon: ll.lon, lat: ll.lat, byte: null};
     var g = this.grid;
@@ -1158,7 +1129,6 @@ void main() {
     invertPoint: invertPoint,
     buildSegments: buildSegments,
     graticule10: graticule10,
-    graticulePolar: graticulePolar,
     hitCountry: hitCountry,
     hexToRgb: hexToRgb
   };

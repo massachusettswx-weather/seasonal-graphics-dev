@@ -173,14 +173,14 @@ def main():
                 pg.wait_for_timeout(2500)
                 pg.screenshot(path="/tmp/maps_flat.png")
 
-            # the polar view
+            # the globe view
             vb = pg.query_selector_all("#mapviews button")
-            if len(vb) > 2:
-                vb[2].click()
+            if len(vb) > 1:
+                vb[1].click()
                 pg.wait_for_timeout(2500)
-                pg.screenshot(path="/tmp/maps_polar.png")
+                pg.screenshot(path="/tmp/maps_globe.png")
 
-            # the polar section's sectors must NOT be painted on the
+            # the polar SECTION's sectors must NOT be painted on the
             # snowfall map - they belong to the stratosphere page
             furniture = pg.evaluate(
                 "() => document.querySelectorAll("

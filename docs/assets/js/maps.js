@@ -7,8 +7,6 @@
 
      2D Map   the flat world on an equirectangular grid
      3D Globe the same world on an orthographic globe you can spin
-     Polar    the same world on a north polar projection - the whole
-              Earth, centred on the pole
 
    The field is the model's OWN output - the whole world, at the grid the
    model came on, with no resampling - and it comes in two flavours: the
@@ -48,7 +46,7 @@
      d3's rotate() puts (-lambda, -phi) at the centre */
   var GLOBE_ROT = [95, -35];
 
-  var state = {view: "globe", rot: GLOBE_ROT.slice(), prot: [0, -90],
+  var state = {view: "globe", rot: GLOBE_ROT.slice(),
                drag: null, zoom: 1,
                pan: [0, 0], field: "total", month: -1, tag: null,
                manifest: null, raster: null, index: null,
@@ -207,6 +205,20 @@
   /* ---------------------------------------------------------------- */
   /* the interaction                                                    */
 
+  /* How far the map moves for one pixel of pointer movement.
+
+     The globe used to spin at a fixed 0.45 degrees a pixel, which meant
+     the SAME drag threw it much further once the map was zoomed in: at
+     306% the visible face moved seven pixels for every pixel of the
+     pointer, and the map was impossible to hold still.  The spin is now
+     divided by the zoom, so the face moves the same distance on the
+     screen whatever the magnification, and the base rate is gentler.
+
+     The flat map pans under the pointer.  It follows more slowly than
+     the pointer now: the map drifts a little behind the hand, which
+     makes it easier to stop on the thing you are looking at. */
+  var DRAG_GAIN = {flat: 0.75, globe: 0.30};
+
   /* The coastlines are drawn by the GPU now, so the SVG is only the
      sheet the pointer talks to - and, on the globe, the marker for the
      pole when the pole is on the near side. */
@@ -216,28 +228,28 @@
     if (state.view === "globe") {
       state.pole = svg.append("circle").attr("class", "pole").attr("r", 3);
     }
-    /* the drag: the flat map pans, the globe spins, the polar view
-       spins about the pole */
+    /* the drag: the flat map pans, the globe spins */
     svg.call(d3.drag()
       .on("start", function (ev) { state.drag = d3.pointer(ev, this); })
       .on("drag", function (ev) {
         var p = d3.pointer(ev, this);
         var dx = p[0] - state.drag[0], dy = p[1] - state.drag[1];
         if (state.view === "flat") {
-          state.pan[0] += dx;
-          state.pan[1] += dy;
-        } else if (state.view === "globe") {
-          state.rot[0] += dx * 0.45;
-          state.rot[1] = Math.max(-90, Math.min(90, state.rot[1] - dy * 0.45));
+          state.pan[0] += dx * DRAG_GAIN.flat;
+          state.pan[1] += dy * DRAG_GAIN.flat;
         } else {
-          state.prot[0] = (state.prot[0] + dx * 0.5) % 360;
+          /* the spin is divided by the zoom, so the map moves the same
+             distance on the screen at every magnification */
+          var g = DRAG_GAIN.globe / state.zoom;
+          state.rot[0] += dx * g;
+          state.rot[1] = Math.max(-90, Math.min(90, state.rot[1] - dy * g));
         }
         state.drag = p;
         requestDraw();
       }));
     svg.on("wheel", function (ev) {
       ev.preventDefault();
-      zoomAt(ev, ev.deltaY < 0 ? 1.15 : 1 / 1.15);
+      zoomAt(ev, ev.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP);
     });
   }
 
@@ -245,15 +257,10 @@
     if (state.view === "flat") {
       note("The whole world on an equirectangular grid. Drag it to pan, " +
            "scroll or use the buttons to zoom. The equirectangular " +
-           "projection squeezes the polar regions, which is why the polar " +
-           "view exists.");
-    } else if (state.view === "globe") {
+           "projection squeezes the polar regions.");
+    } else {
       note("The same world on an orthographic globe - drag it to spin, scroll " +
            "or use the buttons to zoom.");
-    } else {
-      note("The whole world on a north polar projection: the pole at the " +
-           "centre, every continent radiating from it. Drag it to spin around " +
-           "the pole, scroll or use the buttons to zoom.");
     }
   }
 
@@ -267,6 +274,13 @@
      can be panned. */
 
   var ZOOM_MIN = 1, ZOOM_MAX = 12;
+
+  /* The zoom step.  It used to be a tenth of the map's size for every
+     notch of the wheel, which is a big jump when the map is small on the
+     screen and a small one when it is zoomed in - so it is now a step of
+     a tenth of the way to the next size, and the buttons take the same
+     step. */
+  var ZOOM_STEP = 1.12;
 
   function setZoom(z) {
     state.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
@@ -299,7 +313,6 @@
     state.zoom = 1;
     state.pan = [0, 0];
     state.rot = GLOBE_ROT.slice();
-    state.prot = [0, -90];
     requestDraw();
   }
 
@@ -320,8 +333,8 @@
       ev.preventDefault();
       ev.stopPropagation();
       var z = b.getAttribute("data-z");
-      if (z === "in") { setZoom(state.zoom * 1.35); }
-      else if (z === "out") { setZoom(state.zoom / 1.35); }
+      if (z === "in") { setZoom(state.zoom * ZOOM_STEP); }
+      else if (z === "out") { setZoom(state.zoom / ZOOM_STEP); }
       else { resetView(); }
     });
     c.addEventListener("wheel", function (ev) { ev.stopPropagation(); },
@@ -612,14 +625,10 @@
       if (state.view === "flat") {
         proj = d3.geoEquirectangular()
           .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"});
-      } else if (state.view === "globe") {
+      } else {
         proj = d3.geoOrthographic()
           .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"})
           .rotate(state.rot);
-      } else {
-        proj = d3.geoAzimuthalEquidistant()
-          .rotate(state.prot)
-          .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"});
       }
       state.base = {k: proj.scale(), t: proj.translate()};
       state.baseKey = key;
@@ -633,9 +642,6 @@
     if (state.view === "globe") {
       lam0 = -state.rot[0] * Math.PI / 180;
       phi0 = -state.rot[1] * Math.PI / 180;
-    } else if (state.view === "polar") {
-      lam0 = -state.prot[0] * Math.PI / 180;
-      phi0 = -state.prot[1] * Math.PI / 180;
     }
     return {view: state.view, lam0: lam0, phi0: phi0,
             k: b.k * state.zoom,
@@ -649,8 +655,6 @@
          is given a 2:1 box: it fills the width of the page instead of
          sitting in a letterbox with empty ocean at the sides */
       return Math.round(Math.min(900, Math.max(320, W * 0.52)));
-    } else if (state.view === "polar") {
-      return Math.round(Math.min(720, Math.max(380, W * 0.64)));
     }
     return Math.round(Math.min(640, Math.max(400, W * 0.64)));
   }
@@ -780,8 +784,7 @@
     state.gl.setSplitGeometry(state.data.countries.features,
                               bigLakes(state.data.lakes).features,
                               state.data.states.features);
-    state.gl.setGraticule(state.view === "polar" ? MapGL.graticulePolar()
-                                                  : MapGL.graticule10());
+    state.gl.setGraticule(MapGL.graticule10());
     bakeMask();
   }
 
@@ -893,8 +896,7 @@
     setupTip(svg);
     viewNote();
     if (state.gl) {
-      state.gl.setGraticule(v === "polar" ? MapGL.graticulePolar()
-                                         : MapGL.graticule10());
+      state.gl.setGraticule(MapGL.graticule10());
       state.gl.setHover(-1);
     }
     load();

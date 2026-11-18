@@ -1200,8 +1200,8 @@ def build_maps_page(reg):
     painted on it.  The field is the model's own output - every grid cell
     the model came on, nothing resampled - and it can be read as the
     accumulated snowfall or as the anomaly against that model's own
-    hindcast climate.  Three views of the same geography - the flat world,
-    the globe and the polar region - drawn in the
+    hindcast climate.  Two views of the same geography - the flat world
+    and the globe - drawn in the
     browser from the Natural Earth 1:50m files that are committed to the
     repository.  The script and the map data are copied into the site by
     copy_map_assets().
@@ -1215,14 +1215,12 @@ def build_maps_page(reg):
   The field is the model's own output - every grid cell the model came on,
   nothing resampled - and it can be read as the accumulated snowfall or as
   the anomaly against that model's own hindcast climate. The map can be
-  the flat world on an equirectangular grid, the globe you can spin, or
-  the polar projection with the pole at the centre. Zoom in and out with
-  the buttons on the map, with the scroll wheel or with the keyboard, and
-  drag the flat map to pan it.</p>
+  the flat world on an equirectangular grid or the globe you can spin. Zoom in
+  and out with the buttons on the map, with the scroll wheel or with the
+  keyboard, and drag the flat map to pan it.</p>
   <div class="mapviews" id="mapviews">
     <button data-view="flat">2D Map</button>
     <button data-view="globe" class="active">3D Globe</button>
-    <button data-view="polar">Polar</button>
   </div>
   <div class="picker">
     <label for="snowModel">Model</label>

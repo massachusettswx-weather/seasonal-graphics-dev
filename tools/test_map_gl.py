@@ -35,28 +35,24 @@ PROJ_JS = r"""
   var st = window.__maps;
   var DEG = Math.PI / 180;
   var W = 1200, H = 700;
-  var views = ["flat", "globe", "polar"];
+  var views = ["flat", "globe"];
   var rots = [[95, -35], [0, 0], [-120, 20], [30, 60]];
   var zooms = [1, 2.5, 6];
   var worstFwd = 0, worstInv = 0, worstCase = "";
-  function mk(v, rot, prot, zoom) {
+  function mk(v, rot, zoom) {
     var proj;
     if (v === "flat") {
       proj = d3.geoEquirectangular()
         .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"});
-    } else if (v === "globe") {
+    } else {
       proj = d3.geoOrthographic()
         .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"})
         .rotate(rot);
-    } else {
-      proj = d3.geoAzimuthalEquidistant().rotate(prot)
-        .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"});
     }
     if (zoom !== 1) { proj.scale(proj.scale() * zoom); }
     var t = proj.translate();
     var lam0 = 0, phi0 = 0;
     if (v === "globe") { lam0 = -rot[0] * DEG; phi0 = -rot[1] * DEG; }
-    if (v === "polar") { lam0 = -prot[0] * DEG; phi0 = -prot[1] * DEG; }
     return {proj: proj, p: {view: v, lam0: lam0, phi0: phi0,
                              k: proj.scale(), x0: t[0], y0: t[1]}};
   }
@@ -64,7 +60,7 @@ PROJ_JS = r"""
     for (var ri = 0; ri < rots.length; ri++) {
       for (var zi = 0; zi < zooms.length; zi++) {
         var v = views[vi];
-        var m = mk(v, rots[ri], [0, -90], zooms[zi]);
+        var m = mk(v, rots[ri], zooms[zi]);
         var proj = m.proj, p = m.p;
         /* forward: a grid of points on the sphere */
         for (var a = -80; a <= 80; a += 20) {
@@ -312,6 +308,29 @@ def main():
                 fails.append("%d anomaly pixels are the wrong colour"
                              % an["bad"])
 
+            # is the context still alive?  the renderer records the loss in
+            # an event, so this does not have to call into the GPU - which
+            # is what used to hang the whole test under the software
+            # renderer.  It is asked BEFORE the drag: the drag leaves the
+            # software renderer with a lot of queued work, and anything
+            # that talks to the page afterwards waits behind it.
+            alive = pg.evaluate(
+                "() => !!(window.__maps.gl.contextLost)")
+            print("context lost:", alive)
+            if alive:
+                fails.append("the WebGL context was lost")
+
+            # the picture is a nice-to-have: under the software renderer
+            # the page can still be busy with the drag, and a screenshot
+            # that times out must not fail the whole test
+            try:
+                pg.wait_for_timeout(1500)
+                t = time.time()
+                pg.screenshot(path="/tmp/map_gl_test.png", timeout=25000)
+                print("screenshot: %.1f s" % (time.time() - t))
+            except Exception as e:
+                print("screenshot did not make it (%s)" % e)
+
             # 3. the drag
             dr = pg.evaluate(DRAG_JS)
             print("drag: %.2f ms of CPU a frame, %.2f ms with the GPU "
@@ -320,35 +339,6 @@ def main():
             if dr["cpu"] > 20:
                 fails.append("the CPU part of a frame costs %.1f ms" % dr["cpu"])
 
-            # is the context still alive?  under the software renderer this
-            # call can take a very long time, so it is given a deadline of
-            # its own: a hung evaluate must not hang the whole test.  The
-            # evaluate does not take a timeout of its own, so the page's
-            # default is lowered for the call.
-            alive = True
-            try:
-                pg.set_default_timeout(20000)
-                alive = pg.evaluate(
-                    "() => window.__maps.gl.gl.isContextLost()")
-            except Exception as e:
-                print("the context check did not answer in time (%s) - "
-                      "taking it as lost" % e)
-                alive = True
-            finally:
-                pg.set_default_timeout(30000)
-            print("context lost:", alive)
-            if alive:
-                fails.append("the WebGL context was lost")
-            # the picture is a nice-to-have: under the software renderer
-            # the page can still be busy with the drag, and a screenshot
-            # that times out must not fail the whole test
-            try:
-                pg.wait_for_timeout(1500)
-                t = time.time()
-                pg.screenshot(path="/tmp/map_gl_test.png", timeout=60000)
-                print("screenshot: %.1f s" % (time.time() - t))
-            except Exception as e:
-                print("screenshot did not make it (%s)" % e)
             b.close()
         print("console errors:", errors if errors else "none")
         if errors:
