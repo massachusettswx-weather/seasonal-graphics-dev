@@ -19,21 +19,19 @@
    ----------------------
    The exporter writes each field as an 8-bit greyscale PNG, one byte per
    cell, on the model's own grid.  Here the PNG is decoded into a byte
-   array and the map is painted PIXEL BY PIXEL: d3's projection can invert
-   a screen point back to a longitude and a latitude, so every pixel of
-   the canvas asks the projection where it is and samples the field
-   there.
+   array and handed to the WebGL renderer in mapgl.js.
 
-   That inverse is the expensive part, and the timeline makes it expensive
-   a lot: moving along the months must not re-invert the map.  So the
-   inverse is done ONCE per view and cached as a sampling plan - for
-   every pixel, which cell it lands in and how far into it - and moving
-   along the timeline then only re-reads the field and re-colours the
-   pixels, which is fast.
+   The renderer asks, for every pixel of the canvas, where that pixel is
+   on the globe, and reads the model's own grid there - with the same
+   four cells, the same weights and the same published colour table the
+   static panels use, so the map IS the static map and not merely a map
+   of the same data.  Doing that on the CPU meant two million
+   projections a frame and a three second drag; on the GPU it is two
+   draw calls.
 
-   The earth itself (the ocean and the land) is painted on the same
-   canvas underneath the field, with the coastlines drawn over it in the
-   SVG above, so nothing is hidden by an opaque fill.
+   The earth (the sea, the land and the lakes) is baked once into an
+   equirectangular mask, and the coastlines are drawn as GPU lines, so
+   nothing has to be rebuilt while the map is being dragged.
    ------------------------------------------------------------------ */
 (function () {
   "use strict";
@@ -52,8 +50,9 @@
   var state = {view: "globe", rot: GLOBE_ROT.slice(), prot: [0, -90],
                drag: null, zoom: 1,
                pan: [0, 0], field: "total", month: -1, tag: null,
-               manifest: null, raster: null, plan: null, index: null,
-               timer: null, data: {}};
+               manifest: null, raster: null, index: null,
+               timer: null, data: {}, gl: null, hover: -1,
+               base: null, baseKey: null, pending: false};
 
   function el(id) { return document.getElementById(id); }
 
@@ -106,214 +105,84 @@
     }
   }
 
-  function paintEarth(ctx, proj, W, H) {
-    /* the ocean: the sphere, or the rectangle on the flat map */
-    ctx.clearRect(0, 0, W, H);
-    var path = d3.geoPath(proj, ctx);
-    if (state.view === "flat") {
-      ctx.fillStyle = OCEAN;
-      ctx.fillRect(0, 0, W, H);
-    } else {
-      /* the sky the globe floats in */
-      paintSpace(ctx, W, H);
-      /* the atmosphere: a soft rim of light round the limb, so the globe
-         never dissolves into the background */
-      ctx.save();
-      ctx.shadowColor = "rgba(125,175,235,0.55)";
-      ctx.shadowBlur = 30;
-      ctx.fillStyle = OCEAN;
-      ctx.beginPath();
-      path({type: "Sphere"});
-      ctx.fill();
-      ctx.restore();
+  /* ---------------------------------------------------------------- */
+  /* the earth, baked once                                             */
+
+  /* The sea, the land and the lakes do not change while the map is
+     being dragged, so they are drawn ONCE into an equirectangular mask
+     - the land in red, the lakes in green - and the GPU reads that mask
+     for every pixel.  Re-projecting and re-filling the earth on every
+     frame of a drag is what used to make the map crawl. */
+  var MASK_W = 4096, MASK_H = 2048;
+
+  /* There are hundreds of lakes in the 1:50m file, and at the scale of
+     the map the small ones are a speckle of dots rather than lakes.  The
+     ones a reader would name are the big ones, so the small ones are
+     left out - in the mask and in the outlines alike, or the map would
+     show them twice. */
+  function bigLakes(lakes) {
+    if (!lakes) { return lakes; }
+    var keep = [];
+    for (var f = 0; f < lakes.features.length; f++) {
+      var feat = lakes.features[f];
+      var g = feat.geometry;
+      if (!g) { continue; }
+      var polys = (g.type === "MultiPolygon") ? g.coordinates : [g.coordinates];
+      var ok = false;
+      for (var p = 0; p < polys.length && !ok; p++) {
+        for (var r = 0; r < polys[p].length && !ok; r++) {
+          var ring = polys[p][r];
+          var x0 = 999, x1 = -999, y0 = 999, y1 = -999;
+          for (var i = 0; i < ring.length; i++) {
+            var x = ring[i][0], y = ring[i][1];
+            if (x < x0) { x0 = x; }
+            if (x > x1) { x1 = x; }
+            if (y < y0) { y0 = y; }
+            if (y > y1) { y1 = y; }
+          }
+          if (Math.max(x1 - x0, y1 - y0) >= 1.0) { ok = true; }
+        }
+      }
+      if (ok) { keep.push(feat); }
     }
-    /* the land and the lakes, clipped to the sphere: on the polar
-       projection Antarctica's ring runs right around the disc and would
-       otherwise paint over the sky */
-    ctx.save();
-    ctx.beginPath();
-    path({type: "Sphere"});
-    ctx.clip();
-    if (state.data.land) {
-      ctx.fillStyle = LAND;
-      ctx.beginPath();
-      path(state.data.land);
-      ctx.fill();
-    }
-    if (state.data.lakes) {
-      ctx.fillStyle = OCEAN;
-      ctx.beginPath();
-      path(state.data.lakes);
-      ctx.fill();
-    }
-    ctx.restore();
+    return {type: "FeatureCollection", features: keep};
   }
 
-  /* ---------------------------------------------------------------- */
-  /* the sampling plan: the expensive part, done once per view         */
-
-  function buildPlan(proj, W, H) {
-    var man = state.manifest;
-    var g = man.grid;
-    var nlat = g.nlat, nlon = g.nlon;
-    var plan = {W: W, H: H,
-                i0: new Int32Array(W * H), j0: new Int32Array(W * H),
-                fx: new Float32Array(W * H), fy: new Float32Array(W * H),
-                ok: new Uint8Array(W * H)};
-    var lat0 = g.lat0, dlat = g.dlat, lon0 = g.lon0, dlon = g.dlon;
-    /* A field that does not cover the whole world must not be painted
-       outside its own domain.  The longitude is checked against the
-       model's own grid - in the model's own convention - and a pixel
-       outside that box is left alone.  (A global field covers every
-       longitude, so there the longitude wraps, which is what it must
-       do.)  Without this the box of a regional field is smeared around
-       the whole world, once round for every degree of longitude. */
-    var span = nlon * dlon;
-    var isGlobal = span >= 359.5;
-    /* On the globe, d3's invert() answers for the WHOLE sphere - it does
-       not clip to the visible hemisphere - so without this the field would
-       be painted on the dark sky outside the limb, showing the far side of
-       the world through the back of the planet.  The polar projection has
-       the same problem: its disc is the northern hemisphere, and the
-       azimuthal projection can invert the southern one as well. */
-    var disc = null;
-    if (state.view === "globe") {
-      var t = proj.translate();
-      disc = {cx: t[0], cy: t[1], r: proj.scale()};
-    } else if (state.view === "polar") {
-      var t2 = proj.translate();
-      /* the equidistant azimuthal projection puts the equator at
-         r = k * pi/2 */
-      disc = {cx: t2[0], cy: t2[1], r: proj.scale() * Math.PI / 2};
-    }
-    for (var y = 0; y < H; y++) {
-      for (var x = 0; x < W; x++) {
-        if (disc) {
-          var dx = x - disc.cx, dy = y - disc.cy;
-          if (dx * dx + dy * dy > disc.r * disc.r) { continue; }
-        }
-        var ll = proj.invert([x, y]);
-        if (!ll) { continue; }
-        var lon = ll[0], lat = ll[1];
-        if (lat > lat0 || lat < lat0 - (nlat - 1) * dlat) { continue; }
-        var fi = (lat0 - lat) / dlat;
-        var fj;
-        if (isGlobal) {
-          fj = ((lon - lon0) / dlon) % nlon;
-          if (fj < 0) { fj += nlon; }
-        } else {
-          var la = lon;
-          if (lon0 >= 0) {
-            while (la < 0) { la += 360; }
-            while (la >= 360) { la -= 360; }
-          } else {
-            while (la > 180) { la -= 360; }
-            while (la < -180) { la += 360; }
-          }
-          if (la < lon0 - 1e-9 || la > lon0 + span - 1e-9) { continue; }
-          fj = (la - lon0) / dlon;
-          if (fj < 0) { fj += nlon; }
-          if (fj >= nlon) { fj -= nlon; }
-        }
-        var i0 = Math.floor(fi);
-        var j0 = Math.floor(fj);
-        if (i0 < 0) { i0 = 0; }
-        if (i0 > nlat - 2) { i0 = nlat - 2; }
-        if (j0 > nlon - 2) { j0 = nlon - 2; }
-        var k = y * W + x;
-        plan.i0[k] = i0;
-        plan.j0[k] = j0;
-        plan.fy[k] = fi - i0;
-        plan.fx[k] = fj - j0;
-        plan.ok[k] = 1;
-      }
-    }
-    return plan;
+  function bakeMask() {
+    if (!state.data.land || !state.data.lakes || !state.gl) { return; }
+    var c = document.createElement("canvas");
+    c.width = MASK_W;
+    c.height = MASK_H;
+    var ctx = c.getContext("2d");
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, MASK_W, MASK_H);
+    var proj = d3.geoEquirectangular()
+      .scale(MASK_W / (2 * Math.PI))
+      .translate([MASK_W / 2, MASK_H / 2]);
+    var path = d3.geoPath(proj, ctx);
+    /* d3's geoPath does not start a new path: it draws into the one
+       that is there, so each shape has to begin its own */
+    ctx.fillStyle = "#ff0000";
+    ctx.beginPath();
+    path(state.data.land);
+    ctx.fill();
+    /* the lakes are holes in the land: they are added, so the red of
+       the land stays underneath them */
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = "#00ff00";
+    ctx.beginPath();
+    path(bigLakes(state.data.lakes));
+    ctx.fill();
+    state.gl.setMask(c);
   }
 
   /* ---------------------------------------------------------------- */
   /* the field                                                         */
 
-  /* the colour of a byte on the published ladder.
-
-     The exporter ships the ladder's own table: byte -> colour, bucket for
-     bucket, made with the same BoundaryNorm(clip=True) the static panels
-     use.  So the map and the static panels are the same map - over the
-     top of the ladder is the top colour, not a white hole, and a trace of
-     snow is the bottom colour.  The old interpolated ramp of its own is
-     only a fallback for a manifest that carries no table. */
-  function rampIndex(byte, ramp) {
-    if (byte >= 255) { return ramp.length - 1; }
-    return Math.round(byte / 254 * (ramp.length - 1));
-  }
-
-  function anomIndex(byte, colors) {
-    if (byte >= 255) { return -1; }          /* masked */
-    return Math.round(byte / 254 * (colors.length - 1));
-  }
-
   function hexToRgb(h) {
     return [parseInt(h.substr(1, 2), 16),
             parseInt(h.substr(3, 2), 16),
             parseInt(h.substr(5, 2), 16)];
-  }
-
-  function paintField(ctx, W, H) {
-    var plan = state.plan, r = state.raster, man = state.manifest;
-    if (!plan || !r) { return; }
-    var nlon = man.grid.nlon;
-    var base = ctx.getImageData(0, 0, W, H);
-    var bp = base.data;
-    var isAnom = state.field === "anom";
-    /* the ladder table: byte -> the colour the static panels give it */
-    var lutRGB = null;
-    if (man.lut && man.lut.length === 256) {
-      lutRGB = man.lut.map(hexToRgb);
-    }
-    var ramp = man.colors || man.ramp;
-    var rampRGB = lutRGB || (ramp || []).map(hexToRgb);
-    /* the bottom of the ladder is "no snow".  On the static panels that is
-       the white of the paper; on the map it has to be the earth showing
-       through, or the dark map carries a bright white fringe round every
-       snow field. */
-    var bottomRGB = hexToRgb((man.colors || ["#ffffff"])[0]);
-    var anomRGB = (man.anom_colors || []).map(hexToRgb);
-    var bytes = r.bytes;
-    var alpha = isAnom ? 0.82 : 1.0;
-
-    for (var y = 0; y < H; y++) {
-      for (var x = 0; x < W; x++) {
-        var k = y * W + x;
-        if (!plan.ok[k]) { continue; }
-        var i0 = plan.i0[k], j0 = plan.j0[k];
-        var fx = plan.fx[k], fy = plan.fy[k];
-        var a = bytes[i0 * nlon + j0];
-        var b = bytes[i0 * nlon + Math.min(j0 + 1, nlon - 1)];
-        var c = bytes[Math.min(i0 + 1, man.grid.nlat - 1) * nlon + j0];
-        var d = bytes[Math.min(i0 + 1, man.grid.nlat - 1) * nlon +
-                      Math.min(j0 + 1, nlon - 1)];
-        var v = (1 - fx) * ((1 - fy) * a + fy * c) +
-                fx * ((1 - fy) * b + fy * d);
-        if (isAnom) {
-          var ai = anomIndex(v, anomRGB);
-          if (ai < 0) { continue; }          /* masked: no snow expected */
-          if (v < 1.5 && v > 252.5) { continue; }   /* nothing to say */
-          var col = anomRGB[ai];
-        } else {
-          if (v < 0.5) { continue; }          /* no snow */
-          var col = lutRGB ? lutRGB[Math.min(255, Math.round(v))]
-                           : rampRGB[rampIndex(v, ramp)];
-          if (col[0] === bottomRGB[0] && col[1] === bottomRGB[1] &&
-              col[2] === bottomRGB[2]) { continue; }   /* the bottom colour */
-        }
-        var o = k * 4;
-        bp[o] = col[0] * alpha + bp[o] * (1 - alpha);
-        bp[o + 1] = col[1] * alpha + bp[o + 1] * (1 - alpha);
-        bp[o + 2] = col[2] * alpha + bp[o + 2] * (1 - alpha);
-        bp[o + 3] = 255;
-      }
-    }
-    ctx.putImageData(base, 0, 0);
   }
 
   /* the value a byte stands for, for the tooltip */
@@ -334,132 +203,56 @@
   }
 
   /* ---------------------------------------------------------------- */
-  /* the vector layer                                                  */
+  /* the interaction                                                    */
 
-  function drawFlat(svg, proj, W, H) {
-    var path = d3.geoPath(proj);
-    svg.append("path").datum(d3.geoGraticule10()).attr("class", "grat")
-      .attr("d", path);
-    var g = svg.append("g");
-    g.selectAll("path.country").data(state.data.countries.features)
-      .join("path").attr("class", "country").attr("d", path);
-    g.selectAll("path.lake").data(state.data.lakes.features)
-      .join("path").attr("class", "lake").attr("d", path);
-
-    /* the flat map is dragged to pan and scrolled to zoom */
+  /* The coastlines are drawn by the GPU now, so the SVG is only the
+     sheet the pointer talks to - and, on the globe, the marker for the
+     pole when the pole is on the near side. */
+  function setupInteraction(svg) {
+    svg.selectAll("*").remove();
+    state.pole = null;
+    if (state.view === "globe") {
+      state.pole = svg.append("circle").attr("class", "pole").attr("r", 3);
+    }
+    /* the drag: the flat map pans, the globe spins, the polar view
+       spins about the pole */
     svg.call(d3.drag()
       .on("start", function (ev) { state.drag = d3.pointer(ev, this); })
       .on("drag", function (ev) {
         var p = d3.pointer(ev, this);
         var dx = p[0] - state.drag[0], dy = p[1] - state.drag[1];
-        state.pan[0] += dx;
-        state.pan[1] += dy;
+        if (state.view === "flat") {
+          state.pan[0] += dx;
+          state.pan[1] += dy;
+        } else if (state.view === "globe") {
+          state.rot[0] += dx * 0.45;
+          state.rot[1] = Math.max(-90, Math.min(90, state.rot[1] - dy * 0.45));
+        } else {
+          state.prot[0] = (state.prot[0] + dx * 0.5) % 360;
+        }
         state.drag = p;
-        state.plan = null;
-        draw();
+        requestDraw();
       }));
     svg.on("wheel", function (ev) {
       ev.preventDefault();
       zoomAt(ev, ev.deltaY < 0 ? 1.15 : 1 / 1.15);
     });
-    note("The whole world on an equirectangular grid. Drag it to pan, " +
-         "scroll or use the buttons to zoom. The equirectangular " +
-         "projection squeezes the polar regions, which is why the polar " +
-         "view exists.");
   }
 
-  function drawGlobe(svg, proj, W, H) {
-    var path = d3.geoPath(proj);
-    var defs = svg.append("defs");
-    var grad = defs.append("radialGradient")
-      .attr("id", "atmosgrad").attr("cx", "50%").attr("cy", "50%")
-      .attr("r", "50%");
-    grad.append("stop").attr("offset", "62%").attr("stop-color", "#3d8fe8")
-      .attr("stop-opacity", 0);
-    grad.append("stop").attr("offset", "82%").attr("stop-color", "#4f9df0")
-      .attr("stop-opacity", .35);
-    grad.append("stop").attr("offset", "93%").attr("stop-color", "#79b9ff")
-      .attr("stop-opacity", .75);
-    grad.append("stop").attr("offset", "100%").attr("stop-color", "#a8d2ff")
-      .attr("stop-opacity", 0);
-    svg.append("circle").attr("class", "atmos")
-      .attr("cx", W / 2).attr("cy", H / 2).attr("r", path({type: "Sphere"}).length * 1.16)
-      .attr("fill", "url(#atmosgrad)");
-
-    svg.append("path").datum(d3.geoGraticule10()).attr("class", "grat")
-      .attr("d", path);
-    var g = svg.append("g");
-    g.selectAll("path.country").data(state.data.countries.features)
-      .join("path").attr("class", "country").attr("d", path);
-    g.selectAll("path.lake").data(state.data.lakes.features)
-      .join("path").attr("class", "lake").attr("d", path);
-
-    /* the pole, when it is on the near side of the globe */
-    var pole = proj([0, 90]);
-    if (pole) {
-      svg.append("circle").attr("class", "pole")
-        .attr("cx", pole[0]).attr("cy", pole[1]).attr("r", 3);
+  function viewNote() {
+    if (state.view === "flat") {
+      note("The whole world on an equirectangular grid. Drag it to pan, " +
+           "scroll or use the buttons to zoom. The equirectangular " +
+           "projection squeezes the polar regions, which is why the polar " +
+           "view exists.");
+    } else if (state.view === "globe") {
+      note("The same world on an orthographic globe - drag it to spin, scroll " +
+           "or use the buttons to zoom.");
+    } else {
+      note("The whole world on a north polar projection: the pole at the " +
+           "centre, every continent radiating from it. Drag it to spin around " +
+           "the pole, scroll or use the buttons to zoom.");
     }
-
-    /* the globe is dragged to spin */
-    svg.call(d3.drag()
-      .on("start", function (ev) { state.drag = d3.pointer(ev, this); })
-      .on("drag", function (ev) {
-        var p = d3.pointer(ev, this);
-        var dx = p[0] - state.drag[0], dy = p[1] - state.drag[1];
-        state.rot[0] += dx * 0.45;
-        state.rot[1] = Math.max(-90, Math.min(90, state.rot[1] - dy * 0.45));
-        state.drag = p;
-        state.plan = null;
-        draw();
-      }));
-
-    svg.on("wheel", function (ev) {
-      ev.preventDefault();
-      zoomAt(ev, ev.deltaY < 0 ? 1.15 : 1 / 1.15);
-    });
-
-    note("The same world on an orthographic globe - drag it to spin, scroll " +
-         "or use the buttons to zoom.");
-  }
-
-  function drawPolar(svg, proj, W, H) {
-    var path = d3.geoPath(proj);
-    var g = svg.append("g");
-    g.selectAll("path.country").data(state.data.countries.features)
-      .join("path").attr("class", "country").attr("d", path);
-    g.selectAll("path.lake").data(state.data.lakes.features)
-      .join("path").attr("class", "lake").attr("d", path);
-    var grat = {type: "MultiLineString", coordinates: []};
-    [60, 30].forEach(function (lat) {
-      var c = [];
-      for (var i = 0; i <= 360; i++) { c.push([i % 360, lat]); }
-      grat.coordinates.push(c);
-    });
-    for (var lon = 0; lon < 360; lon += 30) {
-      grat.coordinates.push([[lon, 60], [lon, 90]]);
-    }
-    svg.append("path").datum(grat).attr("class", "grat").attr("d", path);
-
-    /* the polar view is dragged to spin around the pole */
-    svg.call(d3.drag()
-      .on("start", function (ev) { state.drag = d3.pointer(ev, this); })
-      .on("drag", function (ev) {
-        var p = d3.pointer(ev, this);
-        var dx = p[0] - state.drag[0];
-        state.prot[0] = (state.prot[0] + dx * 0.5) % 360;
-        state.drag = p;
-        state.plan = null;
-        draw();
-      }));
-    svg.on("wheel", function (ev) {
-      ev.preventDefault();
-      zoomAt(ev, ev.deltaY < 0 ? 1.15 : 1 / 1.15);
-    });
-
-    note("The whole world on a north polar projection: the pole at the " +
-         "centre, every continent radiating from it. Drag it to spin around " +
-         "the pole, scroll or use the buttons to zoom.");
   }
 
   /* ---------------------------------------------------------------- */
@@ -475,8 +268,7 @@
 
   function setZoom(z) {
     state.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
-    state.plan = null;
-    draw();
+    requestDraw();
   }
 
   /* Zoom about the pointer, so the place under the cursor stays under
@@ -498,8 +290,7 @@
       state.pan[1] += (py - cy) * (1 - z / state.zoom);
     }
     state.zoom = z;
-    state.plan = null;
-    draw();
+    requestDraw();
   }
 
   function resetView() {
@@ -507,8 +298,7 @@
     state.pan = [0, 0];
     state.rot = GLOBE_ROT.slice();
     state.prot = [0, -90];
-    state.plan = null;
-    draw();
+    requestDraw();
   }
 
   function buildControls() {
@@ -568,7 +358,8 @@
         bytes[i] = data[j];
       }
       state.raster = {w: img.width, h: img.height, bytes: bytes};
-      draw();
+      uploadField();
+      requestDraw();
     };
     img.onerror = function () {
       var n = el("mapload");
@@ -584,7 +375,6 @@
     state.tag = tag;
     state.manifest = null;
     state.raster = null;
-    state.plan = null;
     state.month = -1;
     if (!tag) { draw(); return; }
     d3.json("data/snowmap_" + tag + ".json").then(function (d) {
@@ -799,89 +589,192 @@
   /* ---------------------------------------------------------------- */
   /* drawing                                                          */
 
-  function makeProjection(W, H) {
-    var proj;
-    if (state.view === "flat") {
-      proj = d3.geoEquirectangular()
-        .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"});
-    } else if (state.view === "globe") {
-      proj = d3.geoOrthographic()
-        .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"})
-        .rotate(state.rot);
-    } else {
-      proj = d3.geoAzimuthalEquidistant()
-        .rotate(state.prot)
-        .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"});
+  /* ---------------------------------------------------------------- */
+  /* the projection                                                     */
+
+  /* d3 works out the scale and the translate: the map is fitted into the
+     box exactly as it always was.  The zoom and the pan go on top of
+     that, and the renderer is told where the centre of the projection
+     is - which is the point the sphere is being looked from.
+
+     d3's rotate() puts (-lambda, -phi) at the centre, and that is what
+     mapgl.js works in. */
+  function baseProjection(W, H) {
+    var key = state.view + ":" + W + "x" + H;
+    if (state.baseKey !== key) {
+      var proj;
+      if (state.view === "flat") {
+        proj = d3.geoEquirectangular()
+          .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"});
+      } else if (state.view === "globe") {
+        proj = d3.geoOrthographic()
+          .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"})
+          .rotate(state.rot);
+      } else {
+        proj = d3.geoAzimuthalEquidistant()
+          .rotate(state.prot)
+          .fitExtent([[10, 10], [W - 10, H - 10]], {type: "Sphere"});
+      }
+      state.base = {k: proj.scale(), t: proj.translate()};
+      state.baseKey = key;
     }
-    /* the zoom: the scale goes up about the centre of the projection, and
-       the flat map can then be panned away from that centre */
-    if (state.zoom !== 1) {
-      proj.scale(proj.scale() * state.zoom);
-    }
-    if (state.pan[0] || state.pan[1]) {
-      var t = proj.translate();
-      proj.translate([t[0] + state.pan[0], t[1] + state.pan[1]]);
-    }
-    return proj;
+    return state.base;
   }
 
-  function draw() {
-    if (!state.data.countries) { return; }
-    var svg = d3.select("#mapsvg");
-    svg.selectAll("*").remove();
-    var box = el("mapbox");
-    var W = Math.max(320, Math.round(box.clientWidth));
-    var H;
+  function projParams(W, H) {
+    var b = baseProjection(W, H);
+    var lam0 = 0, phi0 = 0;
+    if (state.view === "globe") {
+      lam0 = -state.rot[0] * Math.PI / 180;
+      phi0 = -state.rot[1] * Math.PI / 180;
+    } else if (state.view === "polar") {
+      lam0 = -state.prot[0] * Math.PI / 180;
+      phi0 = -state.prot[1] * Math.PI / 180;
+    }
+    return {view: state.view, lam0: lam0, phi0: phi0,
+            k: b.k * state.zoom,
+            x0: b.t[0] + state.pan[0],
+            y0: b.t[1] + state.pan[1]};
+  }
+
+  function mapHeight(W) {
     if (state.view === "flat") {
       /* the whole world is twice as wide as it is tall, so the flat map
          is given a 2:1 box: it fills the width of the page instead of
          sitting in a letterbox with empty ocean at the sides */
-      H = Math.round(Math.min(900, Math.max(320, W * 0.52)));
+      return Math.round(Math.min(900, Math.max(320, W * 0.52)));
     } else if (state.view === "polar") {
-      H = Math.round(Math.min(720, Math.max(380, W * 0.64)));
-    } else {
-      H = Math.round(Math.min(640, Math.max(400, W * 0.64)));
+      return Math.round(Math.min(720, Math.max(380, W * 0.64)));
     }
+    return Math.round(Math.min(640, Math.max(400, W * 0.64)));
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* the redraw                                                        */
+
+  /* A drag fires far more events than the screen can show, and only the
+     last one matters: the redraws are coalesced into one per frame. */
+  function requestDraw() {
+    if (state.pending) { return; }
+    state.pending = true;
+    requestAnimationFrame(function () {
+      state.pending = false;
+      draw();
+    });
+  }
+
+  function draw() {
+    if (!state.gl || !state.data.countries) { return; }
+    var svg = d3.select("#mapsvg");
+    var box = el("mapbox");
+    var W = Math.max(320, Math.round(box.clientWidth));
+    var H = mapHeight(W);
     svg.attr("width", W).attr("height", H)
       .attr("viewBox", "0 0 " + W + " " + H);
 
     var canvas = el("mapcanvas");
     if (canvas) {
-      canvas.width = W;
-      canvas.height = H;
+      if (canvas.width !== W) { canvas.width = W; }
+      if (canvas.height !== H) { canvas.height = H; }
       canvas.style.width = W + "px";
       canvas.style.height = H + "px";
     }
-
-    var proj = makeProjection(W, H);
-    if (state.manifest && !state.plan) {
-      state.plan = buildPlan(proj, W, H);
+    /* the sky the globe floats in does not move when the globe spins,
+       so it is painted once on the canvas behind it */
+    var bg = el("mapbg");
+    if (bg) {
+      if (bg.width !== W) { bg.width = W; }
+      if (bg.height !== H) { bg.height = H; }
+      bg.style.width = W + "px";
+      bg.style.height = H + "px";
+      var key = state.view + ":" + W + "x" + H;
+      if (state.view === "flat") {
+        bg.getContext("2d").clearRect(0, 0, W, H);
+        bg.setAttribute("data-painted", "");
+      } else if (bg.getAttribute("data-painted") !== key) {
+        paintSpace(bg.getContext("2d"), W, H);
+        bg.setAttribute("data-painted", key);
+      }
     }
-    if (canvas) {
-      var ctx = canvas.getContext("2d");
-      paintEarth(ctx, proj, W, H);
-      paintField(ctx, W, H);
-    }
 
-    if (state.view === "flat") { drawFlat(svg, proj, W, H); }
-    else if (state.view === "globe") { drawGlobe(svg, proj, W, H); }
-    else { drawPolar(svg, proj, W, H); }
+    var params = projParams(W, H);
+    state.params = params;
+    state.gl.setProjection(params);
+    state.gl.setMode(state.field === "anom" ? 1 : 0);
+    state.gl.render();
+
+    /* the pole, when it is on the near side of the globe */
+    if (state.pole) {
+      var pole = MapGL.projectPoint(0, Math.PI / 2, params);
+      if (pole.z > 0) {
+        state.pole.attr("cx", pole.x).attr("cy", pole.y)
+          .style("display", null);
+      } else {
+        state.pole.style("display", "none");
+      }
+    }
     updateZoomLabel();
+  }
 
-    /* the tooltip reads the field under the pointer */
+  /* the field goes to the GPU as it is: the model's own grid, one byte
+     a cell, and the published ladder's own table for the colours */
+  function uploadField() {
+    if (!state.gl || !state.raster || !state.manifest) { return; }
+    var man = state.manifest;
+    var g = man.grid;
+    var span = g.nlon * g.dlon;
+    state.gl.setField(state.raster.bytes, {
+      lat0: g.lat0, dlat: g.dlat, lon0: g.lon0, dlon: g.dlon,
+      nlat: g.nlat, nlon: g.nlon, isGlobal: span >= 359.5
+    });
+    state.gl.setBytes(state.raster.bytes);
+    var bottom = MapGL.hexToRgb((man.colors || ["#ffffff"])[0]);
+    /* the anomalies have a table of their own, built with the panels'
+       own norm: the colour of a cell is decided by the value it stands
+       for, not by where the byte sits in a ramp */
+    var anomLut = (man.anom_lut && man.anom_lut.length === 256)
+                  ? man.anom_lut : null;
+    if (man.lut && man.lut.length === 256) {
+      state.gl.setLut(man.lut, anomLut, bottom);
+    } else {
+      /* a manifest with no table of its own: build one from the ramp */
+      var ramp = man.colors || man.ramp || [];
+      var lut = [];
+      for (var b = 0; b < 256; b++) {
+        var i = Math.round(b / 254 * (ramp.length - 1));
+        lut.push(ramp[Math.min(i, ramp.length - 1)]);
+      }
+      state.gl.setLut(lut, anomLut, bottom);
+    }
+    state.gl.setAnom(man.anom_colors || []);
+  }
+
+  /* the outlines and the earth, once */
+  function buildGeometry() {
+    if (!state.gl) { return; }
+    state.gl.setGeometry(state.data.countries.features,
+                         bigLakes(state.data.lakes).features);
+    state.gl.setSplitGeometry(state.data.countries.features,
+                              bigLakes(state.data.lakes).features);
+    state.gl.setGraticule(state.view === "polar" ? MapGL.graticulePolar()
+                                                  : MapGL.graticule10());
+    bakeMask();
+  }
+
+  /* the tooltip reads the field under the pointer */
+  function setupTip(svg) {
     svg.on("mousemove", function (ev) {
-      if (!state.plan || !state.raster) { hideTip(); return; }
-      var p = d3.pointer(ev, svg.node());
-      var k = Math.round(p[1]) * state.plan.W + Math.round(p[0]);
-      if (k < 0 || k >= state.plan.W * state.plan.H || !state.plan.ok[k]) {
+      if (!state.gl || !state.raster || !state.manifest) {
         hideTip();
         return;
       }
-      var ll = proj.invert(p);
-      if (!ll) { hideTip(); return; }
-      var nlon = state.manifest.grid.nlon;
-      var i0 = state.plan.i0[k], j0 = state.plan.j0[k];
-      var v = state.raster.bytes[i0 * nlon + j0];
+      var p = d3.pointer(ev, svg.node());
+      var hit = state.gl.pick(p[0], p[1]);
+      if (hit.byte === null || hit.byte === undefined) {
+        hideTip();
+        return;
+      }
+      var v = hit.byte;
       var val = byteValue(v);
       var txt;
       if (state.field === "anom") {
@@ -891,10 +784,25 @@
       } else {
         txt = (v < 0.5) ? "no snow" : (val.toFixed(1) + " in");
       }
-      txt = Math.abs(ll[1]).toFixed(1) + (ll[1] >= 0 ? "N" : "S") + " " +
-        Math.abs(ll[0]).toFixed(1) + (ll[0] >= 0 ? "E" : "W") + " · " + txt;
+      txt = Math.abs(hit.lat).toFixed(1) + (hit.lat >= 0 ? "N" : "S") + " " +
+        Math.abs(hit.lon).toFixed(1) + (hit.lon >= 0 ? "E" : "W") + " · " + txt;
       showTip(ev, txt, p[0], p[1]);
-    }).on("mouseleave", hideTip);
+      /* the country under the pointer, in the house's amber */
+      var h = MapGL.hitCountry(state.data.countries.features,
+                               hit.lon, hit.lat);
+      if (h !== state.hover) {
+        state.hover = h;
+        state.gl.setHover(h);
+        requestDraw();
+      }
+    }).on("mouseleave", function () {
+      hideTip();
+      if (state.hover !== -1) {
+        state.hover = -1;
+        if (state.gl) { state.gl.setHover(-1); }
+        requestDraw();
+      }
+    });
   }
 
   function load() {
@@ -913,6 +821,7 @@
         if (!state.data.land) { state.data.land = res[i++]; }
         var n2 = el("mapload");
         if (n2) { n2.style.display = "none"; }
+        buildGeometry();
         draw();
       }).catch(function (e) {
         var n3 = el("mapload");
@@ -925,14 +834,23 @@
 
   function setView(v) {
     state.view = v;
-    state.plan = null;
     state.pan = [0, 0];
+    state.hover = -1;
     var btns = document.querySelectorAll("#mapviews button");
     Array.prototype.forEach.call(btns, function (b) {
       b.classList.toggle("active", b.dataset.view === v);
     });
     var box = el("mapbox");
     if (box) { box.className = "mapbox " + v; }
+    var svg = d3.select("#mapsvg");
+    setupInteraction(svg);
+    setupTip(svg);
+    viewNote();
+    if (state.gl) {
+      state.gl.setGraticule(v === "polar" ? MapGL.graticulePolar()
+                                         : MapGL.graticule10());
+      state.gl.setHover(-1);
+    }
     load();
   }
 
@@ -965,6 +883,13 @@
 
   function init() {
     if (typeof d3 === "undefined") { return; }
+    var canvas = el("mapcanvas");
+    try {
+      state.gl = new MapGL.Renderer(canvas);
+    } catch (e) {
+      fail("This map needs WebGL2, which this browser does not have: " + e);
+      return;
+    }
     var btns = document.querySelectorAll("#mapviews button");
     Array.prototype.forEach.call(btns, function (b) {
       b.addEventListener("click", function () { setView(b.dataset.view); });
@@ -974,8 +899,8 @@
       b.addEventListener("click", function () { setField(b.dataset.field); });
     });
     window.addEventListener("resize", function () {
-      state.plan = null;
-      draw();
+      state.baseKey = null;
+      requestDraw();
     });
     /* the keyboard, for the people who scroll with it */
     window.addEventListener("keydown", function (ev) {

@@ -276,10 +276,13 @@ a{color:#1c4b8a}
 .mapctl button:hover{background:rgba(255,255,255,.22)}
 .mapctl .zlabel{font-size:11.5px; color:#e8eef5; min-width:44px; text-align:center;
   font-variant-numeric:tabular-nums}
-/* the maps page: the earth and the snowfall field are painted on a canvas
-   UNDER the vectors, so the SVG's fills must not cover them */
-.mapbox canvas{position:absolute; left:0; top:0; display:block; z-index:1}
-.mapbox svg{position:relative; z-index:2}
+/* the maps page: the sky is on a canvas of its own, the map (the earth
+   and the snowfall field) on the canvas above it, and the SVG is only
+   the sheet the pointer talks to */
+.mapbox canvas{position:absolute; left:0; top:0; display:block}
+.mapbox #mapbg{z-index:1}
+.mapbox #mapcanvas{z-index:2}
+.mapbox svg{position:relative; z-index:3}
 .mapbox .ocean{fill:none}
 .mapbox .lake{fill:none}
 .mapbox .country{fill:none}
@@ -1225,6 +1228,7 @@ def build_maps_page(reg):
   <div class="maplegend" id="maplegend"></div>
   <div class="maptimeline" id="maptimeline"></div>
   <div class="mapbox" id="mapbox">
+    <canvas id="mapbg"></canvas>
     <canvas id="mapcanvas"></canvas>
     <svg id="mapsvg"></svg>
     <div id="maptip"></div>
@@ -1234,7 +1238,8 @@ def build_maps_page(reg):
 </div>
 
 <script src="assets/js/d3.v7.min.js?v=%s"></script>
-<script src="assets/js/maps.js?v=%s"></script>""" % (VER, VER)
+<script src="assets/js/mapgl.js?v=%s"></script>
+<script src="assets/js/maps.js?v=%s"></script>""" % (VER, VER, VER)
     open(os.path.join(SITE, "maps.html"), "w").write(
         page("Maps", "maps.html", body, VER))
 
@@ -1250,6 +1255,8 @@ def copy_map_assets():
     os.makedirs(jsdir, exist_ok=True)
     shutil.copy(os.path.join(HERE, "assets", "js", "d3.v7.min.js"),
                 os.path.join(jsdir, "d3.v7.min.js"))
+    shutil.copy(os.path.join(HERE, "assets", "js", "mapgl.js"),
+                os.path.join(jsdir, "mapgl.js"))
     shutil.copy(os.path.join(HERE, "assets", "js", "maps.js"),
                 os.path.join(jsdir, "maps.js"))
     nedir = os.path.join(ASSETS, "ne")

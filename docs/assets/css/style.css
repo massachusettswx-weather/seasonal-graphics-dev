@@ -201,10 +201,13 @@ a{color:#1c4b8a}
 .mapctl button:hover{background:rgba(255,255,255,.22)}
 .mapctl .zlabel{font-size:11.5px; color:#e8eef5; min-width:44px; text-align:center;
   font-variant-numeric:tabular-nums}
-/* the maps page: the earth and the snowfall field are painted on a canvas
-   UNDER the vectors, so the SVG's fills must not cover them */
-.mapbox canvas{position:absolute; left:0; top:0; display:block; z-index:1}
-.mapbox svg{position:relative; z-index:2}
+/* the maps page: the sky is on a canvas of its own, the map (the earth
+   and the snowfall field) on the canvas above it, and the SVG is only
+   the sheet the pointer talks to */
+.mapbox canvas{position:absolute; left:0; top:0; display:block}
+.mapbox #mapbg{z-index:1}
+.mapbox #mapcanvas{z-index:2}
+.mapbox svg{position:relative; z-index:3}
 .mapbox .ocean{fill:none}
 .mapbox .lake{fill:none}
 .mapbox .country{fill:none}

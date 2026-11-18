@@ -200,18 +200,32 @@ def main():
             print("after reset:", reset)
 
             # is anything actually painted on the canvas?
+            # the canvas is drawn on the GPU now, so it is read with
+            # readPixels, a pixel at a time: a read of the whole canvas
+            # takes the context down with it
             painted = pg.evaluate("""() => {
-              var c = document.getElementById('mapcanvas');
-              if (!c) { return 'no canvas'; }
-              var d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-              var n = 0, land = 0;
-              for (var i = 0; i < d.length; i += 4) {
-                if (d[i+3] > 0) { n++; }
-                /* our own land colour: the slate the map is painted with */
-                if (Math.abs(d[i] - 51) < 6 && Math.abs(d[i+1] - 68) < 6 &&
-                    Math.abs(d[i+2] - 90) < 6) { land++; }
+              var st = window.__maps;
+              if (!st || !st.gl) { return 'no renderer'; }
+              var gl = st.gl.gl, c = st.gl.canvas;
+              /* draw again first: the drawing buffer is cleared once the
+                 page has taken it, and a read outside the frame would
+                 come back empty */
+              st.gl.render();
+              var W = c.width, H = c.height;
+              var buf = new Uint8Array(4);
+              var n = 0, land = 0, total = 0;
+              for (var y = 0; y < H; y += 23) {
+                for (var x = 0; x < W; x += 23) {
+                  gl.readPixels(x, H - 1 - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+                  total++;
+                  if (buf[3] > 0) { n++; }
+                  /* our own land colour: the slate the map is painted with */
+                  if (Math.abs(buf[0] - 51) < 6 && Math.abs(buf[1] - 68) < 6 &&
+                      Math.abs(buf[2] - 90) < 6) { land++; }
+                }
               }
-              return n + ' painted pixels, ' + land + ' of them land';
+              return n + ' painted pixels of ' + total + ', ' + land +
+                     ' of them land';
             }""")
             print("canvas:", painted)
             b.close()

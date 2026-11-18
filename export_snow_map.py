@@ -128,6 +128,11 @@ def ladder_lut(levels, colors):
     cmap = ListedColormap(colors, name="snow_depth")
     norm = BoundaryNorm(levels, cmap.N, clip=True)
     lo, hi = float(levels[0]), float(levels[-1])
+    # the bottom bucket is "no snow", and on the map that is the earth
+    # showing through and not a white fringe round every snow field.
+    # It has to be EXACTLY the colour the browser looks for, or the
+    # fringe comes back.
+    none = to_hex(cmap(norm(lo)))
     lut = []
     for b in range(256):
         if b >= OVER:
@@ -135,6 +140,31 @@ def ladder_lut(levels, colors):
             continue
         t = b / 254.0
         v = 10 ** (np.log10(lo) + t * (np.log10(hi) - np.log10(lo)))
+        c = to_hex(cmap(norm(v)))
+        lut.append("#ffffff" if c == none else c)
+    return lut
+
+
+def anom_lut(scale, colors, levels):
+    """The anomaly's own table: the quantised byte -> the colour the STATIC
+    panels give it.
+
+    The panels draw the anomaly with their own BoundaryNorm over
+    ANOM_LEVELS, so the colour of a cell is decided by the VALUE the byte
+    stands for, not by where the byte sits in a ramp.  The map holds the
+    byte, so the table is built here - byte -> value -> bucket -> colour -
+    with the panels' own norm.  A ramp of our own would have been the
+    map reading as a different product from the static panels.
+    """
+    from matplotlib.colors import ListedColormap, BoundaryNorm, to_hex
+    cmap = ListedColormap(colors, name="house")
+    norm = BoundaryNorm(levels, cmap.N, clip=True)
+    lut = []
+    for b in range(256):
+        if b >= OVER:
+            lut.append(colors[0])          # masked: the browser makes it clear
+            continue
+        v = (b / 254.0) * 2.0 * scale - scale
         lut.append(to_hex(cmap(norm(v))))
     return lut
 
@@ -340,6 +370,8 @@ def main():
             "ramp": colors,          # the legend bar: the published ladder
             "lut": lut,
             "anom_colors": anom_colors,
+            "anom_lut": anom_lut(scale, anom_colors,
+                                 PSM.ANOM_LEVELS * PSM.unit_mult()),
             "anom_scale": float(scale),
             "anom_available": bool(has_clim),
             "months": files,
@@ -411,6 +443,8 @@ def main():
             "levels": levels, "colors": colors, "ramp": colors,
             "lut": lut,
             "anom_colors": anom_colors,
+            "anom_lut": anom_lut(scale, anom_colors,
+                                 PSM.ANOM_LEVELS * PSM.unit_mult()),
             "anom_scale": float(scale),
             "anom_available": all(exported[t].get("anom_available", False)
                                   for t in MULTI_MEMBERS),

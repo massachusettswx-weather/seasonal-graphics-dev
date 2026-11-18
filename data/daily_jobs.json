@@ -161,408 +161,344 @@
    "_t0": 1794429666.9627526
   },
   {
-   "job": "4f2aff72-e2ea-4d72-ac7a-c50aaf3d8ac3",
-   "tag": "jma-jra3",
-   "chunk": 0,
-   "centre": "jma",
-   "system": "4",
-   "init": "2026-11",
-   "status": "short",
-   "_t0": 1794429814.0937548,
-   "shorts": 0
-  },
-  {
-   "job": "b627ca24-9c2a-40d5-8e4a-e2bfc1728813",
-   "tag": "jma-jra3",
-   "chunk": 0,
-   "centre": "jma",
-   "system": "4",
-   "init": "2026-11",
-   "status": "short",
-   "_t0": 1794429945.5860813,
-   "shorts": 0
-  },
-  {
-   "job": "e8dde55d-ee37-4676-86d1-1d39b3abf93d",
-   "tag": "jma-jra3",
-   "chunk": 0,
-   "centre": "jma",
-   "system": "4",
-   "init": "2026-11",
-   "status": "short",
-   "_t0": 1794430076.9958937,
-   "shorts": 0,
-   "given_up": false
-  },
-  {
-   "job": "cb851e0b-7b65-4b4f-bbb3-bf45833ec924",
-   "tag": "bom-access-s2",
-   "chunk": 0,
-   "centre": "bom",
-   "system": "2",
-   "init": "2026-11",
-   "status": "failed",
-   "_t0": 1794430208.892401
-  },
-  {
-   "job": "9551c421-6e14-4a8b-b043-f83d01c159f5",
-   "tag": "bom-access-s2",
-   "chunk": 0,
-   "centre": "bom",
-   "system": "2",
-   "init": "2026-11",
-   "status": "failed",
-   "_t0": 1794438458.1541471
-  },
-  {
-   "job": "f858c566-3d26-40ac-8f02-6770b91a81f3",
-   "tag": "bom-access-s2",
-   "chunk": 0,
-   "centre": "bom",
-   "system": "2",
-   "init": "2026-11",
-   "status": "failed",
-   "_t0": 1794445740.4990737
-  },
-  {
-   "job": "9eccf4eb-89d8-4391-b017-df5feaf1b6cc",
-   "tag": "bom-access-s2",
-   "chunk": 0,
-   "centre": "bom",
-   "system": "2",
-   "init": "2026-11",
-   "status": "failed",
-   "_t0": 1794447168.754066
-  },
-  {
-   "job": "490d57ab-3670-4841-9c4a-6030e552e6ac",
-   "tag": "bom-access-s2",
-   "chunk": 0,
-   "centre": "bom",
-   "system": "2",
-   "init": "2026-11",
-   "status": "failed",
-   "_t0": 1794452488.792537
-  },
-  {
-   "job": "4497fba2-b549-48cf-a115-d82185084eeb",
-   "tag": "bom-access-s2",
-   "chunk": 0,
-   "centre": "bom",
-   "system": "2",
-   "init": "2026-11",
-   "status": "accepted",
-   "_t0": 1794453492.7538874
-  },
-  {
-   "job": "29b7e338-d7f2-4f74-ae3d-90f94fea15d7",
+   "job": "8b68e5b1-87ed-4a9d-8f4e-8efebe3374b1",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794604212.4514601
+   "_t0": 1794956126.845886
   },
   {
-   "job": "04a59885-f851-4564-b62f-7e1bc62a1728",
+   "job": "0e188e0c-a6c2-41a9-8b8b-a1e09c452c34",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794604342.700486
+   "_t0": 1794956258.941649
   },
   {
-   "job": "ef0e9daa-13b4-4189-aad6-bc0f7242883f",
+   "job": "4d3ff6cc-e4f7-4259-b78f-17f90e3fdb81",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794604482.2517881
+   "_t0": 1794956386.8677826
   },
   {
-   "job": "3af13cc3-3bdd-4bcf-ad56-c93c607c0a5b",
+   "job": "78d0d5d7-b31e-47c3-af36-85ac69e261d3",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794604612.1624355
+   "_t0": 1794956519.1850543
   },
   {
-   "job": "86cf0f8b-8912-4b7a-9205-89ba9a34231f",
+   "job": "4fd24b33-8caa-4e5b-b6e0-540752728110",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794604740.5459685
+   "_t0": 1794956647.2238407
   },
   {
-   "job": "4ba6fc65-876a-469a-8e08-068697369f93",
+   "job": "3e6d7693-da4b-49e0-8b0a-7ca5dfd84b50",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794604873.743644
+   "_t0": 1794956777.682879
   },
   {
-   "job": "f6bf4b39-1ae1-49b4-b6d2-9f9a0b058e29",
+   "job": "c42ca43f-0533-433a-9aea-5db1a21bcafc",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794605002.295719
+   "_t0": 1794956908.439611
   },
   {
-   "job": "58d05d80-be46-4083-a059-e32b002c226b",
+   "job": "a71c34e2-f99f-435c-8ffb-2a8cc5f0ca67",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794605131.4052622
+   "_t0": 1794957039.453115
   },
   {
-   "job": "b4bcb55a-efe5-40a7-8c28-5a03a8630678",
+   "job": "8af3985c-1a30-415e-9a87-62dabcd5827f",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794605259.8585489
+   "_t0": 1794957170.1643686
   },
   {
-   "job": "9233191c-5515-440c-9949-d46a0598de2d",
+   "job": "d14607d5-7330-433d-a51c-3f47938c064c",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794948766.264193
+   "_t0": 1794957302.7080102
   },
   {
-   "job": "fecbc881-b20c-4280-81ff-dad9fcfac964",
+   "job": "16065240-439f-40af-a585-f1c52a51ca77",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794948896.248437
+   "_t0": 1794957433.9724314
   },
   {
-   "job": "7b991a6b-1912-405d-aa71-eba19bba961e",
+   "job": "ebcc2228-dc1f-4ab6-9625-63a78f6d075d",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794949024.916418
+   "_t0": 1794957565.5617554
   },
   {
-   "job": "b14a115c-a920-4e6f-8ee5-7603e2d9d58c",
+   "job": "0300a6c4-b25e-4028-b8d7-6ad0dbbb9520",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794949154.3469996
+   "_t0": 1794957696.9733698
   },
   {
-   "job": "5ccbeeea-67ca-40e0-b54f-520880ddcea2",
+   "job": "20ea8bb7-b132-4d06-8335-9d2b4923f78b",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794949284.400832
+   "_t0": 1794957826.7003648
   },
   {
-   "job": "68efbd3e-2752-40ae-b72d-09a8e2ba9432",
+   "job": "edf5eb7a-ba36-44b0-b92a-77a762dea90b",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794949413.8668087
+   "_t0": 1794957958.0401008
   },
   {
-   "job": "31f2bbc9-a49b-4f4f-9feb-6c4db78e969c",
+   "job": "720fe1e4-44e6-4b08-aaf2-3612dfe30bc6",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794949542.7357917
+   "_t0": 1794958086.6426573
   },
   {
-   "job": "7ae809d9-3bd4-489c-9bca-0b1e0ca99957",
+   "job": "a335b316-7462-403b-996a-8c16a3b159b4",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794949672.255445
+   "_t0": 1794958218.2467847
   },
   {
-   "job": "4981cb72-038b-47db-89be-ef4cff2cc946",
+   "job": "4132fc7c-70ab-4930-b389-c461ed371d02",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794949800.6701756
+   "_t0": 1794958351.4536011
   },
   {
-   "job": "894b4e9d-7543-4e7d-b2ce-ff658fb066db",
+   "job": "7476474f-4b82-492a-9bc7-46f42078d886",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794949929.0047562
+   "_t0": 1794958483.4427924
   },
   {
-   "job": "3e2fe52e-f3c4-406f-a27f-6335836a40c7",
+   "job": "89d1e5a4-ccfd-481a-9d51-f466f853c265",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794950058.1668568
+   "_t0": 1794958615.1771996
   },
   {
-   "job": "4087812e-9040-40d1-8bb0-6c24cc164533",
+   "job": "0b6adc72-d983-4d9f-878b-21e1ea7c37f3",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794950186.6112664
+   "_t0": 1794958747.8040595
   },
   {
-   "job": "4160c41f-ded6-4e70-be7f-b4183408f886",
+   "job": "850626df-44dd-493b-b423-d61ab7902cd7",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794950314.6264427
+   "_t0": 1794958876.0509834
   },
   {
-   "job": "e55a90fd-71ee-4f65-942e-54c53f3ba9a9",
+   "job": "e95f53ea-b06e-4620-954a-075e7c4a3eaf",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794950443.06086
+   "_t0": 1794959004.9822228
   },
   {
-   "job": "6e015179-68aa-467a-aff3-3df8d3eb4fbd",
+   "job": "1d237677-dbe0-46e1-bed9-14fef1f59608",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794950572.1513278
+   "_t0": 1794959133.158754
   },
   {
-   "job": "3cba3d46-abc4-40f2-aa18-68e29a2ac81c",
+   "job": "1d875b15-c473-41cf-8772-2e4cda9b0031",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794950700.7552762
+   "_t0": 1794959265.7732368
   },
   {
-   "job": "d505586e-fe72-4479-a064-4be1ddd163ce",
+   "job": "cd49404f-3841-465d-b411-8f39c078d70b",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794950834.505964
+   "_t0": 1794959393.8816411
   },
   {
-   "job": "ef1cf8f5-e573-48eb-b3ed-6022ffc88e91",
+   "job": "824b27ad-5004-4b5f-a3bf-5a96b59a4e0a",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794950962.7510347
+   "_t0": 1794959522.8704417
   },
   {
-   "job": "7d2bc5fa-8b2d-4e64-a661-dd978a4aa25f",
+   "job": "877e59ba-119e-4887-8e8c-1a46bd057d6b",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794951090.92765
+   "_t0": 1794959652.4696844
   },
   {
-   "job": "827810a1-2c15-4e54-84db-14e51984e9ce",
+   "job": "c0e4fa5f-0ae8-4de7-85e1-9d245c0c1baf",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794951218.7110655
+   "_t0": 1794959780.6405544
   },
   {
-   "job": "ccf6b7d6-a51b-43dc-9493-6308281ef488",
+   "job": "51159ec2-9cb4-4858-809c-eb5460c80c38",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794951346.6651835
+   "_t0": 1794959912.679289
   },
   {
-   "job": "2f8539ab-0ec9-45dd-8c5e-8ad37cedfbcc",
+   "job": "09b40601-8a8d-4761-b42d-b7fc0c56f7d0",
    "tag": "ukmo-gloseas6",
    "chunk": 0,
    "centre": "ukmo",
    "system": "610",
    "init": "2026-11",
    "status": "accepted",
-   "_t0": 1794951474.7379735
+   "_t0": 1794960040.8399677
+  },
+  {
+   "job": "a09883ec-8968-4eb0-aaf5-50e6d7d7983f",
+   "tag": "ukmo-gloseas6",
+   "chunk": 0,
+   "centre": "ukmo",
+   "system": "610",
+   "init": "2026-11",
+   "status": "accepted",
+   "_t0": 1794960170.0115032
+  },
+  {
+   "job": "9a8c0090-e654-4de2-9fae-472223237592",
+   "tag": "ukmo-gloseas6",
+   "chunk": 0,
+   "centre": "ukmo",
+   "system": "610",
+   "init": "2026-11",
+   "status": "accepted",
+   "_t0": 1794960301.783769
+  },
+  {
+   "job": "51f95311-b8bb-4ffa-b6c3-bad8a065b25c",
+   "tag": "ukmo-gloseas6",
+   "chunk": 0,
+   "centre": "ukmo",
+   "system": "610",
+   "init": "2026-11",
+   "status": "accepted",
+   "_t0": 1794960435.8641853
   }
  ],
  "stall": false,
