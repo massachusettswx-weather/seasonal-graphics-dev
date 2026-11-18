@@ -586,3 +586,62 @@ and its reset, no polar-section furniture, no console errors) and
 **PUBLISHED TO THE DEV SITE ONLY** (commit `3fc5b08`): the live page has
 exactly two views, no gate, the watermark, and the drag numbers above.
 The operational site was NOT touched.
+
+## The queue could not fetch a centre it had already fetched once (18 Nov 2026)
+
+**THE STEP LISTS HAD BEEN NARROWED TO WHAT WAS MISSING AT THE TIME.**
+`run_nov_queue.py`'s `monthly_steps()` was cut down to the two ECCC
+centres in November (they were the only ones missing then) and
+`clim_steps()` was emptied.  **That is wrong for a disposable tree:** a
+list of "what was missing" becomes a list of "what can never come
+back".  A sandbox rebuild wipes `data/models` and the folders with it,
+and a centre that is not on the list is never fetched again, however
+the site is left.
+
+The proof was in the state file: the ECMWF's own monthly snowfall was
+gone from disk while `data/models_fetched.json` still said
+`done: True`, so the map could not carry the ECMWF at all and no
+request would ever have brought it back.
+
+Both lists are now derived from **`SNOW_CENTRES`**, the centres that
+publish a snowfall field:
+
+    SNOW_CENTRES = ("ecmwf-seas5", "ukmo-gloseas6", "meteo-france-s9",
+                    "cmcc-sps4", "dwd-gcfs2", "eccc-gem5", "eccc-canesm5")
+
+JMA and BoM are not on it: they publish no snowfall at all, and MARS
+answers `MarsNoDataError` for it, so a request for their snowfall can
+never succeed.  **The list and the skip check are separate things:**
+the list is the whole set of centres that can serve the request, and
+the pool's "already on disk for the newest init" check is what makes a
+full list cost nothing when the data is there.  Do not narrow the list
+to work around a full queue.
+
+**THE EXTENSION HAD NO SKIP CHECK AT ALL.**  The pool had one for the
+monthly snowfall, the SST, the monthly wind and the hindcast climate,
+but not for the extension past the sixth lead month - so once the
+ECMWF's extension had been written, the next pass asked for it again.
+It had been submitted **46 times**, each one a real 231 MB request that
+the archive had to serve.  It now carries the same check.
+
+**THE META IN AN NPZ IS A JSON STRING, NOT A DICT.**  `save_npz()`
+stores it as `np.array(json.dumps(meta or {}))`, so `d["meta"].item()`
+gives `"{...}"` and `.get("init")` raises.  The first version of the
+reader answered `None` - which would have looked like the fix working
+while the loop went on.  The reader does `json.loads(str(...))`.
+
+**THE EXTENSION'S INIT IS IN THE DECODED FILE, NOT THE GRIB.**  The
+extension's own dates are months past the init, so they do not say
+which init it came from; `decode_ext()` writes the init into the npz's
+meta, and that is what says.  A GRIB with no npz beside it answers
+`None`, and `None` never matches - so a file that was downloaded but
+not decoded is asked for again.
+
+**THE POSTS-OFF SWITCH NOW SURVIVES A WIPE.**  The publisher was held
+off by `NO_PUBLISH`, an environment variable - which a sandbox rebuild
+takes with it, so the next rebuild would have started publishing again.
+It is a file now, **`data/.no_publish`**, written by
+`tools/restore_secrets.sh` from a new `SITE_NO_PUBLISH` secret, the
+same way the gate switch works.  `tools/auto_run.sh` honours either.
+Verified: `auto_publish.sh NOT RUNNING`, `run_nov_queue.py 1 process`,
+`fetch_polar_models.py 1 process`.
