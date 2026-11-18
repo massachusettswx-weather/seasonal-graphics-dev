@@ -320,13 +320,35 @@ def main():
             if dr["cpu"] > 20:
                 fails.append("the CPU part of a frame costs %.1f ms" % dr["cpu"])
 
-            alive = pg.evaluate("() => window.__maps.gl.gl.isContextLost()")
+            # is the context still alive?  under the software renderer this
+            # call can take a very long time, so it is given a deadline of
+            # its own: a hung evaluate must not hang the whole test.  The
+            # evaluate does not take a timeout of its own, so the page's
+            # default is lowered for the call.
+            alive = True
+            try:
+                pg.set_default_timeout(20000)
+                alive = pg.evaluate(
+                    "() => window.__maps.gl.gl.isContextLost()")
+            except Exception as e:
+                print("the context check did not answer in time (%s) - "
+                      "taking it as lost" % e)
+                alive = True
+            finally:
+                pg.set_default_timeout(30000)
             print("context lost:", alive)
             if alive:
                 fails.append("the WebGL context was lost")
-            t = time.time()
-            pg.screenshot(path="/tmp/map_gl_test.png", timeout=120000)
-            print("screenshot: %.1f s" % (time.time() - t))
+            # the picture is a nice-to-have: under the software renderer
+            # the page can still be busy with the drag, and a screenshot
+            # that times out must not fail the whole test
+            try:
+                pg.wait_for_timeout(1500)
+                t = time.time()
+                pg.screenshot(path="/tmp/map_gl_test.png", timeout=60000)
+                print("screenshot: %.1f s" % (time.time() - t))
+            except Exception as e:
+                print("screenshot did not make it (%s)" % e)
             b.close()
         print("console errors:", errors if errors else "none")
         if errors:

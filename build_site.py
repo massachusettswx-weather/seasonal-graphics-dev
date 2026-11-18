@@ -283,6 +283,13 @@ a{color:#1c4b8a}
 .mapbox #mapbg{z-index:1}
 .mapbox #mapcanvas{z-index:2}
 .mapbox svg{position:relative; z-index:3}
+/* THE HOUSE MARK: the panels carry it in the bottom right, so the map
+   carries it in the bottom right too */
+.mapmark{position:absolute; right:12px; bottom:10px; z-index:6;
+  font-size:12.5px; font-weight:bold; color:#c3d2e0; pointer-events:none;
+  text-shadow:0 1px 3px rgba(2,6,13,.9), 0 0 10px rgba(2,6,13,.7)}
+:root[data-theme="light"] .mapmark{color:#41566b;
+  text-shadow:0 1px 3px rgba(255,255,255,.95), 0 0 10px rgba(255,255,255,.8)}
 .mapbox .ocean{fill:none}
 .mapbox .lake{fill:none}
 .mapbox .country{fill:none}
@@ -1232,6 +1239,7 @@ def build_maps_page(reg):
     <canvas id="mapcanvas"></canvas>
     <svg id="mapsvg"></svg>
     <div id="maptip"></div>
+    <div class="mapmark">@Massachusettswx</div>
   </div>
   <p class="mapload" id="mapload" style="display:none">Loading the map data&hellip;</p>
   <p class="mapnote" id="mapnote"></p>
@@ -1263,7 +1271,8 @@ def copy_map_assets():
     os.makedirs(nedir, exist_ok=True)
     for fn in ("ne_50m_admin_0_countries.geojson",
                "ne_50m_lakes.geojson",
-               "ne_50m_land.geojson"):
+               "ne_50m_land.geojson",
+               "ne_50m_admin_1_states_us_can.geojson"):
         src = os.path.join(HERE, "data", fn)
         if os.path.exists(src):
             shutil.copy(src, os.path.join(nedir, fn))

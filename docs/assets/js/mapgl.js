@@ -195,8 +195,13 @@ void main() {
          arithmetic the CPU version used - the same four cells, the
          same weights, the same published table - so the map IS the
          static map and not merely a map of the same data. */
-      bool fieldOK = !(u_view == 2 && r > u_k * PI * 0.5);
-      if (fieldOK) {
+      /* THE FIELD IS PAINTED EVERYWHERE THE EARTH IS.  The polar view
+         used to stop the field at the equator (r > k*PI/2), which drew
+         the land and the coastlines of the southern hemisphere and left
+         them bare: Antarctica's snowfall was in the model's own output
+         and simply never reached the screen.  The field now follows the
+         earth over the whole disc. */
+      if (true) {
         float glat0 = u_grid.x;
         float gdlat = u_grid.y;
         float glon0 = u_grid.z;
@@ -480,21 +485,36 @@ void main() {
 
   function graticulePolar() {
     var lines = [];
-    [60, 30].forEach(function (lat) {
+    /* the parallels: every 30 degrees, right round the disc */
+    [60, 30, 0, -30, -60].forEach(function (lat) {
       var c = [];
       for (var i = 0; i <= 360; i += 2) { c.push([i % 360, lat]); }
       lines.push(c);
     });
+    /* the meridians: from the pole at the centre right out towards the
+       rim of the disc, which is the far side of the world - the polar
+       view shows the whole globe, so the graticule has to reach all of
+       it.  They stop at 85 degrees south: the pole itself is the
+       antipode of the centre, and in this projection it is the one
+       point that cannot be drawn. */
     for (var lon = 0; lon < 360; lon += 30) {
-      lines.push([[lon, 60], [lon, 90]]);
+      lines.push([[lon, 90], [lon, 60], [lon, 30], [lon, 0],
+                  [lon, -30], [lon, -60], [lon, -85]]);
     }
     return lines;
   }
 
-  /* the graticule's instances: the distance along each line is needed
+  /* The graticule's instances: the distance along each line is needed
      for the dashes, and it is a distance on the screen, so it is worked
      out again for every frame (the graticule is a thousand points, so
-     that costs nothing). */
+     that costs nothing).
+
+     The SEGMENTS themselves never change: they are the lines of
+     longitude and latitude, in degrees.  Only the distances move when
+     the map moves.  So the segments are built once, when the graticule
+     is set, and only the distances are worked out per frame - which
+     halves the work and, more to the point, halves the bytes that go
+     over the bus on every frame of a drag. */
   /* The graticule's segments: four numbers each, lonA latA lonB latB.
      The distance along the line is a separate array - the segment
      attribute reads four numbers a segment, so anything else in the
@@ -518,7 +538,16 @@ void main() {
     return {seg: new Float32Array(seg), dist: new Float32Array(dist)};
   }
 
-  /* which country is under the pointer? */
+  /* Which country is under the pointer?
+
+     The naive version - test every ring of every country - walks 99,613
+     points on EVERY mousemove, and a mousemove is what a drag is made
+     of.  So the rings are indexed by their bounding box first: a ring
+     that cannot contain the point is rejected without touching it, and
+     the point-in-polygon test only runs on the few rings that can.
+
+     The index is built once, when the geometry arrives, and the boxes
+     are kept on the feature so nothing is rebuilt while the map moves. */
   function inRing(ring, lon, lat) {
     var inside = false;
     for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -531,15 +560,59 @@ void main() {
     return inside;
   }
 
-  function hitCountry(features, lon, lat) {
+  /* the bounding box of a ring, in lon/lat */
+  function ringBox(ring) {
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (var i = 0; i < ring.length; i++) {
+      var x = ring[i][0], y = ring[i][1];
+      if (x < minX) { minX = x; }
+      if (x > maxX) { maxX = x; }
+      if (y < minY) { minY = y; }
+      if (y > maxY) { maxY = y; }
+    }
+    return {minX: minX, maxX: maxX, minY: minY, maxY: maxY};
+  }
+
+  /* Build the index once: for every feature, the list of its rings with
+     their bounding boxes.  The feature keeps it, so the index is built
+     when the geometry arrives and never again. */
+  function buildHitIndex(features) {
     for (var f = 0; f < features.length; f++) {
       var g = features[f].geometry;
-      if (!g) { continue; }
+      if (!g) { features[f].__rings = []; continue; }
       var polys = (g.type === "MultiPolygon") ? g.coordinates : [g.coordinates];
+      var rings = [];
       for (var p = 0; p < polys.length; p++) {
         for (var r = 0; r < polys[p].length; r++) {
-          if (inRing(polys[p][r], lon, lat)) { return f; }
+          var ring = polys[p][r];
+          if (ring.length < 3) { continue; }
+          var box = ringBox(ring);
+          /* a ring that crosses the antimeridian has a box that spans
+             the whole world: it is always a candidate */
+          if (box.maxX - box.minX > 350) {
+            box.minX = -180; box.maxX = 180;
+          }
+          rings.push({ring: ring, box: box});
         }
+      }
+      features[f].__rings = rings;
+    }
+    return features;
+  }
+
+  function hitCountry(features, lon, lat) {
+    for (var f = 0; f < features.length; f++) {
+      var rings = features[f].__rings;
+      if (!rings) {
+        /* the index has not been built for this set: build it now */
+        buildHitIndex(features);
+        rings = features[f].__rings;
+      }
+      for (var i = 0; i < rings.length; i++) {
+        var b = rings[i].box;
+        if (lat < b.minY || lat > b.maxY) { continue; }
+        if (lon < b.minX || lon > b.maxX) { continue; }
+        if (inRing(rings[i].ring, lon, lat)) { return f; }
       }
     }
     return -1;
@@ -592,6 +665,14 @@ void main() {
     this.splitSeg = gl.createBuffer();
     this.splitDist = gl.createBuffer();
     this.vaoGeoSplit = this.makeVAO(this.splitSeg, this.splitDist);
+    /* the state and province borders: their own buffers, so they can be
+       drawn in their own colour and their own weight */
+    this.stateSeg = gl.createBuffer();
+    this.stateDist = gl.createBuffer();
+    this.vaoState = this.makeVAO(this.stateSeg, this.stateDist);
+    this.splitStateSeg = gl.createBuffer();
+    this.splitStateDist = gl.createBuffer();
+    this.vaoStateSplit = this.makeVAO(this.splitStateSeg, this.splitStateDist);
 
     this.vaoGrat = gl.createVertexArray();
     gl.bindVertexArray(this.vaoGrat);
@@ -627,7 +708,10 @@ void main() {
       ocean: hexToRgb("#12395c"), land: hexToRgb("#33445a"),
       country: hexToRgb("#9cc0d8"), lake: hexToRgb("#1b4d78"),
       grat: hexToRgb("#4d7ea6"), hover: hexToRgb("#c8860d"),
-      pole: hexToRgb("#12263f")
+      pole: hexToRgb("#12263f"),
+      /* the state and province borders: the same steel as the coastlines
+         but a little dimmer, so the national outline stays on top */
+      state: hexToRgb("#7fa6c4")
     };
   }
 
@@ -757,10 +841,14 @@ void main() {
   };
 
   /* the outlines: the countries first, then the lakes, in one buffer */
-  Renderer.prototype.setGeometry = function (countries, lakes) {
+  Renderer.prototype.setGeometry = function (countries, lakes, states) {
     var gl = this.gl;
     this.geo.countries = buildSegments(countries, false);
     this.geo.lakes = buildSegments(lakes, false);
+    /* the state and province borders: their own set of segments, so they
+       can be drawn thinner and in their own colour - the house's rule is
+       that the state lines sit inside the national outline */
+    this.geo.states = states ? buildSegments(states, false) : null;
     var both = new Float32Array(this.geo.countries.data.length +
                                  this.geo.lakes.data.length);
     both.set(this.geo.countries.data, 0);
@@ -768,16 +856,30 @@ void main() {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.geoSeg);
     gl.bufferData(gl.ARRAY_BUFFER, both, gl.STATIC_DRAW);
     this.lakeOffset = this.geo.countries.count * 16;
+    /* the distance along each line: the coastlines are not dashed, so
+       they are all zero.  The array is uploaded ONCE, here, where its
+       size is known - re-uploading a quarter of a megabyte of zeros on
+       every frame of a drag was the biggest cost in the frame. */
     this.geoDistData = new Float32Array(this.geo.countries.count +
                                          this.geo.lakes.count);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.geoDist);
+    gl.bufferData(gl.ARRAY_BUFFER, this.geoDistData, gl.STATIC_DRAW);
+    if (this.geo.states) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.stateSeg);
+      gl.bufferData(gl.ARRAY_BUFFER, this.geo.states.data, gl.STATIC_DRAW);
+      this.stateDistData = new Float32Array(this.geo.states.count);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.stateDist);
+      gl.bufferData(gl.ARRAY_BUFFER, this.stateDistData, gl.STATIC_DRAW);
+    }
   };
 
   /* the flat map has to cut the coastlines at the antimeridian, or a
      coastline is drawn straight across the map */
-  Renderer.prototype.setSplitGeometry = function (countries, lakes) {
+  Renderer.prototype.setSplitGeometry = function (countries, lakes, states) {
     var gl = this.gl;
     this.geo.splitCountries = buildSegments(countries, true);
     this.geo.splitLakes = buildSegments(lakes, true);
+    this.geo.splitStates = states ? buildSegments(states, true) : null;
     var c = this.geo.splitCountries, l = this.geo.splitLakes;
     var both = new Float32Array(c.data.length + l.data.length);
     both.set(c.data, 0);
@@ -786,12 +888,37 @@ void main() {
     gl.bufferData(gl.ARRAY_BUFFER, both, gl.STATIC_DRAW);
     this.splitLakeOffset = c.count * 16;
     this.splitDistData = new Float32Array(c.count + l.count);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.splitDist);
+    gl.bufferData(gl.ARRAY_BUFFER, this.splitDistData, gl.STATIC_DRAW);
+    if (this.geo.splitStates) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.splitStateSeg);
+      gl.bufferData(gl.ARRAY_BUFFER, this.geo.splitStates.data, gl.STATIC_DRAW);
+      this.splitStateDistData = new Float32Array(this.geo.splitStates.count);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.splitStateDist);
+      gl.bufferData(gl.ARRAY_BUFFER, this.splitStateDistData, gl.STATIC_DRAW);
+    }
     this.split = true;
   };
 
   Renderer.prototype.setGraticule = function (lines) {
+    var gl = this.gl;
     this.gratLines = lines;
-    this.gratData = new Float32Array(lines.length * 64 * 5);
+    /* the segments never change: build them once and keep them */
+    var seg = [];
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      for (var j = 0; j + 1 < line.length; j++) {
+        seg.push(line[j][0], line[j][1], line[j + 1][0], line[j + 1][1]);
+      }
+    }
+    this.gratSegData = new Float32Array(seg);
+    this.gratCount = seg.length / 4;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.gratSeg);
+    gl.bufferData(gl.ARRAY_BUFFER, this.gratSegData, gl.STATIC_DRAW);
+    /* the distances: one per segment, worked out again for each frame */
+    this.gratDistData = new Float32Array(this.gratCount);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.gratDist);
+    gl.bufferData(gl.ARRAY_BUFFER, this.gratDistData, gl.DYNAMIC_DRAW);
   };
 
   Renderer.prototype.setProjection = function (p) {
@@ -829,12 +956,21 @@ void main() {
     gl.uniform1f(E.u.u_k, p.k);
     gl.uniform2f(E.u.u_trans, p.x0, p.y0);
     gl.uniform1i(E.u.u_mode, this.mode);
-    gl.uniform3fv(E.u.u_ocean, this.colours.ocean.map(function (v) {
-      return v / 255;
-    }));
-    gl.uniform3fv(E.u.u_land, this.colours.land.map(function (v) {
-      return v / 255;
-    }));
+    /* the colours are turned into 0..1 once, not on every frame */
+    if (!this.colNrm) {
+      this.colNrm = {
+        ocean: this.colours.ocean.map(function (v) { return v / 255; }),
+        land: this.colours.land.map(function (v) { return v / 255; }),
+        country: this.colours.country.map(function (v) { return v / 255; }),
+        lake: this.colours.lake.map(function (v) { return v / 255; }),
+        grat: this.colours.grat.map(function (v) { return v / 255; }),
+        hover: this.colours.hover.map(function (v) { return v / 255; }),
+        state: this.colours.state.map(function (v) { return v / 255; })
+      };
+    }
+    var CN = this.colNrm;
+    gl.uniform3fv(E.u.u_ocean, CN.ocean);
+    gl.uniform3fv(E.u.u_land, CN.land);
     if (this.anomN > 0) {
       gl.uniform3fv(E.u.u_anom, this.anom);
       gl.uniform1i(E.u.u_anomN, this.anomN);
@@ -879,18 +1015,31 @@ void main() {
     /* the graticule: dashed, and the dash is a distance on the screen,
        so its instances are worked out again for this frame */
     if (this.gratLines) {
-      var gd = buildGraticule(this.gratLines, p);
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.gratSeg);
-      gl.bufferData(gl.ARRAY_BUFFER, gd.seg, gl.DYNAMIC_DRAW);
+      /* only the distances are worked out again for this frame: the
+         segments were built once, when the graticule was set */
+      var lines = this.gratLines;
+      var dist = this.gratDistData;
+      var di = 0;
+      for (var gi = 0; gi < lines.length; gi++) {
+        var line = lines[gi];
+        var d = 0;
+        for (var gj = 0; gj + 1 < line.length; gj++) {
+          var A = projectPoint(line[gj][0] * DEG, line[gj][1] * DEG, p);
+          var B = projectPoint(line[gj + 1][0] * DEG, line[gj + 1][1] * DEG, p);
+          var len = Math.sqrt((B.x - A.x) * (B.x - A.x) +
+                               (B.y - A.y) * (B.y - A.y));
+          dist[di++] = d;
+          d += len;
+        }
+      }
       gl.bindBuffer(gl.ARRAY_BUFFER, this.gratDist);
-      gl.bufferData(gl.ARRAY_BUFFER, gd.dist, gl.DYNAMIC_DRAW);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, dist);
       gl.bindVertexArray(this.vaoGrat);
       gl.uniform1f(L.u.u_width, 0.5);
       gl.uniform1f(L.u.u_dashOn, 2.0);
       gl.uniform1f(L.u.u_dashPeriod, 5.0);
-      gl.uniform3f(L.u.u_colour, this.colours.grat[0] / 255,
-                   this.colours.grat[1] / 255, this.colours.grat[2] / 255);
-      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, gd.seg.length / 4);
+      gl.uniform3f(L.u.u_colour, CN.grat[0], CN.grat[1], CN.grat[2]);
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.gratCount);
       gl.bindVertexArray(null);
     }
 
@@ -901,27 +1050,18 @@ void main() {
       var cnt = split ? geo.splitCountries : geo.countries;
       var lks = split ? geo.splitLakes : geo.lakes;
       var segBuf = split ? this.splitSeg : this.geoSeg;
-      var distBuf = split ? this.splitDist : this.geoDist;
       var lakeOff = split ? this.splitLakeOffset : this.lakeOffset;
       var vao = split ? this.vaoGeoSplit : this.vaoGeo;
-      var zeros = split ? this.splitDistData : this.geoDistData;
-      var need = cnt.count + lks.count;
-      if (!zeros || zeros.length < need) {
-        zeros = new Float32Array(need);
-        if (split) { this.splitDistData = zeros; } else { this.geoDistData = zeros; }
-      }
-      /* the distances along the line: nothing but the graticule is
-         dashed, so they are all zero */
-      gl.bindBuffer(gl.ARRAY_BUFFER, distBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, zeros, gl.DYNAMIC_DRAW);
+      /* the distances along the line were uploaded when the geometry
+         was set: nothing but the graticule is dashed, so they are all
+         zero and they never change */
       gl.bindVertexArray(vao);
       gl.uniform1f(L.u.u_dashOn, 0.0);
       gl.uniform1f(L.u.u_dashPeriod, 0.0);
 
       /* the countries */
       gl.uniform1f(L.u.u_width, 0.45);
-      gl.uniform3f(L.u.u_colour, this.colours.country[0] / 255,
-                   this.colours.country[1] / 255, this.colours.country[2] / 255);
+      gl.uniform3f(L.u.u_colour, CN.country[0], CN.country[1], CN.country[2]);
       gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, cnt.count);
 
       /* the country under the pointer, in the house's amber */
@@ -929,8 +1069,7 @@ void main() {
         var rg = cnt.ranges[this.hover];
         if (rg.count > 0) {
           gl.uniform1f(L.u.u_width, 1.1);
-          gl.uniform3f(L.u.u_colour, this.colours.hover[0] / 255,
-                       this.colours.hover[1] / 255, this.colours.hover[2] / 255);
+          gl.uniform3f(L.u.u_colour, CN.hover[0], CN.hover[1], CN.hover[2]);
           gl.bindBuffer(gl.ARRAY_BUFFER, segBuf);
           gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 0, rg.start * 16);
           gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, rg.count);
@@ -941,10 +1080,23 @@ void main() {
       gl.bindBuffer(gl.ARRAY_BUFFER, segBuf);
       gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 0, lakeOff);
       gl.uniform1f(L.u.u_width, 0.35);
-      gl.uniform3f(L.u.u_colour, this.colours.lake[0] / 255,
-                   this.colours.lake[1] / 255, this.colours.lake[2] / 255);
+      gl.uniform3f(L.u.u_colour, CN.lake[0], CN.lake[1], CN.lake[2]);
       gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, lks.count);
       gl.bindVertexArray(null);
+
+      /* THE STATE AND PROVINCE BORDERS.  They are drawn after the
+         countries so the national outline stays on top of them, and
+         thinner and dimmer so they read as the lines inside a country
+         rather than as more countries. */
+      var st = split ? geo.splitStates : geo.states;
+      if (st && st.count > 0) {
+        var sVao = split ? this.vaoStateSplit : this.vaoState;
+        gl.bindVertexArray(sVao);
+        gl.uniform1f(L.u.u_width, 0.5);
+        gl.uniform3f(L.u.u_colour, CN.state[0], CN.state[1], CN.state[2]);
+        gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, st.count);
+        gl.bindVertexArray(null);
+      }
     }
     gl.disable(gl.BLEND);
   };
@@ -957,7 +1109,7 @@ void main() {
     var dx = x - p.x0, dy = y - p.y0;
     var rr = Math.sqrt(dx * dx + dy * dy);
     if (p.view === "globe" && rr > p.k) { return {lon: 0, lat: 0, byte: null}; }
-    if (p.view === "polar" && rr > p.k * Math.PI / 2) {
+    if (p.view === "polar" && rr > p.k * Math.PI) {
       return {lon: 0, lat: 0, byte: null};
     }
     var ll = invertPoint(x, y, p);

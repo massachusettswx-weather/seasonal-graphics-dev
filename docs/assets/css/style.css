@@ -208,6 +208,13 @@ a{color:#1c4b8a}
 .mapbox #mapbg{z-index:1}
 .mapbox #mapcanvas{z-index:2}
 .mapbox svg{position:relative; z-index:3}
+/* THE HOUSE MARK: the panels carry it in the bottom right, so the map
+   carries it in the bottom right too */
+.mapmark{position:absolute; right:12px; bottom:10px; z-index:6;
+  font-size:12.5px; font-weight:bold; color:#c3d2e0; pointer-events:none;
+  text-shadow:0 1px 3px rgba(2,6,13,.9), 0 0 10px rgba(2,6,13,.7)}
+:root[data-theme="light"] .mapmark{color:#41566b;
+  text-shadow:0 1px 3px rgba(255,255,255,.95), 0 0 10px rgba(255,255,255,.8)}
 .mapbox .ocean{fill:none}
 .mapbox .lake{fill:none}
 .mapbox .country{fill:none}

@@ -668,7 +668,11 @@ def decode_daily(path, tag, chunk):
         print("   %s: chunk %d came back with %d members (the best so far "
               "is %d) - discarding it" % (tag, chunk, have, best or have),
               flush=True)
-        return False
+        # the caller unpacks TWO values out of this, so the short answer
+        # has to be a pair as well - a bare False raised "cannot unpack
+        # non-iterable bool object" and the short chunk was never counted,
+        # so the pool asked for the same impossible chunk for ever.
+        return False, have
     dates, m60, mnh = build_matrix(recs, members)
     npz = os.path.join(MDIR, tag, "u10_daily.npz")
     if os.path.exists(npz):

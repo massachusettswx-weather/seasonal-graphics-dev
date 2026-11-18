@@ -40,7 +40,8 @@
   var SRC = {
     countries: NE + "ne_50m_admin_0_countries.geojson",
     lakes: NE + "ne_50m_lakes.geojson",
-    land: NE + "ne_50m_land.geojson"
+    land: NE + "ne_50m_land.geojson",
+    states: NE + "ne_50m_admin_1_states_us_can.geojson"
   };
 
   /* the globe opens over North America, where the snowfall field is:
@@ -52,7 +53,8 @@
                pan: [0, 0], field: "total", month: -1, tag: null,
                manifest: null, raster: null, index: null,
                timer: null, data: {}, gl: null, hover: -1,
-               base: null, baseKey: null, pending: false};
+               base: null, baseKey: null, pending: false,
+               boxW: null, svgW: null, svgH: null, canvasW: null, canvasH: null};
 
   function el(id) { return document.getElementById(id); }
 
@@ -328,7 +330,11 @@
 
   function updateZoomLabel() {
     var l = document.querySelector(".mapctl .zlabel");
-    if (l) { l.textContent = Math.round(state.zoom * 100) + "%"; }
+    if (!l) { return; }
+    var txt = Math.round(state.zoom * 100) + "%";
+    /* the label only changes when the zoom does: writing it on every
+       frame would make the browser lay the page out again */
+    if (l.textContent !== txt) { l.textContent = txt; }
   }
 
   /* ---------------------------------------------------------------- */
@@ -667,17 +673,33 @@
     if (!state.gl || !state.data.countries) { return; }
     var svg = d3.select("#mapsvg");
     var box = el("mapbox");
-    var W = Math.max(320, Math.round(box.clientWidth));
+    /* The size of the box is read ONCE and cached: reading clientWidth
+       every frame forces the browser to lay the page out again, which
+       is exactly the kind of thing that makes a drag stutter.  The
+       resize handler clears the cache. */
+    if (!state.boxW) {
+      state.boxW = Math.max(320, Math.round(box.clientWidth));
+      state.svgW = null;
+    }
+    var W = state.boxW;
     var H = mapHeight(W);
-    svg.attr("width", W).attr("height", H)
-      .attr("viewBox", "0 0 " + W + " " + H);
+    /* the SVG's size only changes when the box does: writing it on every
+       frame makes the browser lay the page out again for nothing */
+    if (state.svgW !== W || state.svgH !== H) {
+      state.svgW = W; state.svgH = H;
+      svg.attr("width", W).attr("height", H)
+        .attr("viewBox", "0 0 " + W + " " + H);
+    }
 
     var canvas = el("mapcanvas");
     if (canvas) {
       if (canvas.width !== W) { canvas.width = W; }
       if (canvas.height !== H) { canvas.height = H; }
-      canvas.style.width = W + "px";
-      canvas.style.height = H + "px";
+      if (state.canvasW !== W || state.canvasH !== H) {
+        state.canvasW = W; state.canvasH = H;
+        canvas.style.width = W + "px";
+        canvas.style.height = H + "px";
+      }
     }
     /* the sky the globe floats in does not move when the globe spins,
        so it is painted once on the canvas behind it */
@@ -753,16 +775,34 @@
   function buildGeometry() {
     if (!state.gl) { return; }
     state.gl.setGeometry(state.data.countries.features,
-                         bigLakes(state.data.lakes).features);
+                         bigLakes(state.data.lakes).features,
+                         state.data.states.features);
     state.gl.setSplitGeometry(state.data.countries.features,
-                              bigLakes(state.data.lakes).features);
+                              bigLakes(state.data.lakes).features,
+                              state.data.states.features);
     state.gl.setGraticule(state.view === "polar" ? MapGL.graticulePolar()
                                                   : MapGL.graticule10());
     bakeMask();
   }
 
-  /* the tooltip reads the field under the pointer */
+  /* The tooltip reads the field under the pointer.
+
+     A mousemove is what a drag is made of, so the work here is kept as
+     small as it can be: the country under the pointer is found through
+     a bounding-box index (not by walking every coastline in the world),
+     and the tooltip itself is written once per frame rather than once
+     per event, so a fast drag does not make the browser lay the page
+     out a hundred times a second. */
   function setupTip(svg) {
+    var pendingTip = null;
+    var tipRaf = false;
+    function flushTip() {
+      tipRaf = false;
+      if (!pendingTip) { return; }
+      var t = pendingTip;
+      pendingTip = null;
+      showTip(t.ev, t.txt, t.x, t.y);
+    }
     svg.on("mousemove", function (ev) {
       if (!state.gl || !state.raster || !state.manifest) {
         hideTip();
@@ -786,7 +826,11 @@
       }
       txt = Math.abs(hit.lat).toFixed(1) + (hit.lat >= 0 ? "N" : "S") + " " +
         Math.abs(hit.lon).toFixed(1) + (hit.lon >= 0 ? "E" : "W") + " · " + txt;
-      showTip(ev, txt, p[0], p[1]);
+      pendingTip = {ev: ev, txt: txt, x: p[0], y: p[1]};
+      if (!tipRaf) {
+        tipRaf = true;
+        requestAnimationFrame(flushTip);
+      }
       /* the country under the pointer, in the house's amber */
       var h = MapGL.hitCountry(state.data.countries.features,
                                hit.lon, hit.lat);
@@ -810,6 +854,7 @@
     if (!state.data.countries) { todo.push(SRC.countries); }
     if (!state.data.lakes) { todo.push(SRC.lakes); }
     if (!state.data.land) { todo.push(SRC.land); }
+    if (!state.data.states) { todo.push(SRC.states); }
     if (!todo.length) { draw(); return; }
     var n = el("mapload");
     if (n) { n.style.display = "block"; }
@@ -819,6 +864,7 @@
         if (!state.data.countries) { state.data.countries = res[i++]; }
         if (!state.data.lakes) { state.data.lakes = res[i++]; }
         if (!state.data.land) { state.data.land = res[i++]; }
+        if (!state.data.states) { state.data.states = res[i++]; }
         var n2 = el("mapload");
         if (n2) { n2.style.display = "none"; }
         buildGeometry();
@@ -900,8 +946,27 @@
     });
     window.addEventListener("resize", function () {
       state.baseKey = null;
+      state.boxW = null;      /* the box is measured again */
+      state.svgW = null;
       requestDraw();
     });
+    /* The box's width is cached, so something has to tell us when it
+       changes.  A ResizeObserver does that on its own, and only when
+       the size really changed. */
+    if (window.ResizeObserver && el("mapbox")) {
+      var ro = new ResizeObserver(function () {
+        var box = el("mapbox");
+        if (!box) { return; }
+        var w = Math.max(320, Math.round(box.clientWidth));
+        if (w !== state.boxW) {
+          state.boxW = w;
+          state.svgW = null;
+          state.baseKey = null;
+          requestDraw();
+        }
+      });
+      ro.observe(el("mapbox"));
+    }
     /* the keyboard, for the people who scroll with it */
     window.addEventListener("keydown", function (ev) {
       if (!ev.ctrlKey && !ev.metaKey && !ev.altKey) {
