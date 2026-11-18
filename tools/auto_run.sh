@@ -123,12 +123,15 @@ fi
 # The publisher watches the model data and publishes the site when it
 # changes.  The owner asked for the scheduled posts to be turned off
 # (17 Nov 2026), so it is NOT started unless a publish is wanted:
-#   NO_PUBLISH=1  -> the publisher stays stopped (the default while the
-#                    posts are off; the data is still pulled and the site
-#                    is still built locally, nothing goes out on its own)
-#   unset          -> the publisher runs as it always did
-if [ -n "${NO_PUBLISH:-}" ]; then
-    log "the publisher stays stopped (NO_PUBLISH is set) - nothing is published"
+#   NO_PUBLISH=1  -> the publisher stays stopped (the data is still pulled
+#                    and the site is still built locally, nothing goes out
+#                    on its own)
+#   data/.no_publish -> the same thing, but it SURVIVES a wipe: the
+#                    environment variable does not, so without the file
+#                    the next rebuild would start publishing again.
+#   neither        -> the publisher runs as it always did
+if [ -n "${NO_PUBLISH:-}" ] || [ -f data/.no_publish ]; then
+    log "the publisher stays stopped (the posts are off) - nothing is published"
 elif ! running "auto_publish.sh"; then
     log "starting the publisher"
     setsid nohup bash auto_publish.sh >logs_auto_publish_watch.log 2>&1 </dev/null &

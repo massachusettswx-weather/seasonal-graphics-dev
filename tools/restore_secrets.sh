@@ -67,6 +67,17 @@ if [ "${SITE_NO_GATE:-}" = "1" ] || [ "${SITE_NO_GATE:-}" = "true" ]; then
     echo "wrote data/.no_gate - the development copy will be published open"
 fi
 
+# The owner asked for the SCHEDULED POSTS to be off (17 Nov 2026): the
+# data is still pulled and the site is still built locally, but nothing
+# goes out on its own.  That switch has to survive a wipe too, so it is
+# a file rather than an environment variable - otherwise the next rebuild
+# would start publishing again.
+if [ "${SITE_NO_PUBLISH:-}" = "1" ] || [ "${SITE_NO_PUBLISH:-}" = "true" ]; then
+    mkdir -p data
+    : > data/.no_publish
+    echo "wrote data/.no_publish - the publisher will stay stopped"
+fi
+
 # a quick check that the key is actually accepted, so a stale key is caught
 # here and not three hours into a queue
 if [ -f .cdsapirc ] && command -v curl >/dev/null 2>&1; then
