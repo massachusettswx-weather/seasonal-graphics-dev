@@ -153,6 +153,15 @@ CENTRES = {
     "ecmwf-seas5": ("ECMWF SEAS5", "ecmwf", "51"),
 }
 
+# The centres that publish a SNOWFALL field.  JMA and BoM are not on it:
+# they publish no snowfall at all, and MARS answers "MarsNoDataError" for
+# it, so a request for their snowfall can never succeed - asking again
+# and again for a request that can never succeed is exactly the repeated
+# submission of invalid requests that ECMWF's protection measures warn
+# about.  The site says so instead.
+SNOW_CENTRES = ("ecmwf-seas5", "ukmo-gloseas6", "meteo-france-s9",
+                "cmcc-sps4", "dwd-gcfs2", "eccc-gem5", "eccc-canesm5")
+
 # The centres whose daily wind is wanted, in the order they are finished.
 # The two centres that are not on the site yet come first - a daily SPV
 # chart for a centre that has no page at all is worth more than a second
@@ -173,7 +182,15 @@ def monthly_steps():
     # again and again for a request that can never succeed is exactly the
     # repeated submission of invalid requests that ECMWF's protection
     # measures warn about.  The site says so instead.
-    for tag in ("eccc-gem5", "eccc-canesm5"):
+    #
+    # The list is EVERY centre that publishes snowfall, not only the ones
+    # that were missing when it was written: the working tree is
+    # disposable, and a sandbox rebuild wipes data/models and the folders
+    # with it.  A centre that is not on this list can never be fetched
+    # again, however the site is left.  The pool skips a centre whose
+    # file is already on disk for the newest init, so a full list costs
+    # nothing when the data is there.
+    for tag in SNOW_CENTRES:
         out.append(("snow:" + tag, tag, "snow"))
     # the SST of the centres that are not on the site yet, and of the ECCC
     # centres whose plume still points at the October init - it is what the
@@ -184,14 +201,19 @@ def monthly_steps():
 
 
 def clim_steps():
-    """-> [(id, tag, kind)] the hindcast climate of the new centres.
+    """-> [(id, tag, kind)] the hindcast climate of the centres.
 
     Without it their anomaly panels cannot be drawn - the anomaly is
-    measured against the model's OWN climate, not against ERA5.
+    measured against the model's OWN climate, not against ERA5, and
+    without the climate the anomaly cells are masked out.
     """
     # JMA and BoM are not in this list: they publish no snowfall field at
     # all, so there is no hindcast of it to fetch either.
-    return []
+    #
+    # Like the monthly list, this is every centre that publishes the
+    # field - the hindcast does not change between inits, so the pool
+    # skips a centre whose climate is already on disk.
+    return [("clim:" + tag, tag, "clim") for tag in SNOW_CENTRES]
 
 
 def daily_steps():
