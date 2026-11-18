@@ -355,8 +355,29 @@ def main():
             cm_in = cm * days * 86400.0 * 1000.0 / 25.4 * PSM.SNOW_RATIO
             clim_in.append(cm_in)
             anom_in.append(monthly_in[k] - cm_in)
-        total_anom = np.sum(np.array(anom_in), axis=0)
-        total_clim = np.sum(np.array(clim_in), axis=0)
+        # The run total's anomaly is the sum of the monthly anomalies - but
+        # only of the months that HAVE a climate.  A month with no climate
+        # contributes NaN, and np.sum() of a NaN is NaN, so the whole run
+        # total came out masked and the map's "Total" button showed an
+        # empty field with a diagonal line across it.
+        #
+        # So the sum skips the months with no climate, and the run total
+        # is the anomaly over the months it can be measured on.  The
+        # number of months is carried in the manifest so the caption can
+        # say how many the total covers.
+        have_clim = np.array([ym in clim for ym in yms])
+        if have_clim.any():
+            anom_stack = np.array(anom_in)
+            clim_stack = np.array(clim_in)
+            total_anom = np.nansum(np.where(have_clim[:, None, None],
+                                            anom_stack, 0.0), axis=0)
+            total_clim = np.sum(np.where(have_clim[:, None, None],
+                                         clim_stack, 0.0), axis=0)
+            # where NO month has a climate there is no anomaly to show
+            total_anom = np.where(have_clim.any(), total_anom, np.nan)
+        else:
+            total_anom = np.full_like(np.array(anom_in[0]), np.nan)
+            total_clim = np.zeros_like(np.array(anom_in[0]))
 
         # the anomaly scale: a round number that covers the field, so the
         # legend is readable and the timeline does not rescale as it moves
@@ -379,7 +400,10 @@ def main():
             a = np.array(anom_in[k], dtype=float)
             a[masks[k]] = np.nan
             write_png(os.path.join(OUT, fn_a), quantise_anom(a, scale))
-            files.append({"ym": "%04d-%02d" % ym, "label": lab,
+            # THIS lead month's own key - the outer loop's ym is the LAST
+            # month of the model, so every entry of the list used to carry
+            # the same one and the manifest said the wrong thing
+            files.append({"ym": "%04d-%02d" % yms[k], "label": lab,
                           "total": fn_t, "anom": fn_a})
         fn_t = "snowmap_%s_m00_total.png" % tag
         fn_a = "snowmap_%s_m00_anom.png" % tag
@@ -427,6 +451,10 @@ def main():
         summary.append(tag)
         exported[tag] = {"months": files, "grid": out["grid"],
                          "anom_available": bool(has_clim),
+                         # the lead months this model reaches, so the
+                         # multi-model mean can take the months EVERY
+                         # member has
+                         "months_ym": ["%04d-%02d" % ym for ym in yms],
                          "monthly_in": monthly_in, "total_in": total_in,
                          "anom_in": anom_in, "total_anom": total_anom,
                          "total_clim": total_clim}
@@ -435,65 +463,111 @@ def main():
     if all(t in exported for t in MULTI_MEMBERS):
         tag = "c3s-multi"
         ref = exported[MULTI_MEMBERS[0]]
-        monthly = [np.mean([exported[t]["monthly_in"][k]
-                            for t in MULTI_MEMBERS], axis=0)
-                   for k in range(len(ref["months"]))]
-        total = np.sum(np.array(monthly), axis=0)
-        # the mean of the members' anomalies: a member that is masked (no
-        # snow expected) must not take the mean down with it
-        import warnings
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)
-            anoms = [np.nanmean([exported[t]["anom_in"][k]
-                                 for t in MULTI_MEMBERS], axis=0)
-                     for k in range(len(ref["months"]))]
-            total_anom = np.nanmean([exported[t]["total_anom"]
-                                     for t in MULTI_MEMBERS], axis=0)
-        # the mask follows the MEAN climate, not the members' own masks: the
-        # mean model expects snow wherever enough of the members do
-        total_clim = np.mean([exported[t]["total_clim"]
-                              for t in MULTI_MEMBERS], axis=0)
-        finite = np.abs(np.concatenate([a[np.isfinite(a)] for a in anoms]
-                                       + [total_anom[np.isfinite(total_anom)]]))
-        scale = nice_scale(np.percentile(finite, 99.5) if finite.size else 4.0)
-        # the mask is the model's OWN climate for the month the anomaly is
-        # about: a place where the model expects no snow in December is not
-        # "drier than normal in December", whatever it does in January
-        masks = [c < PSM.ANOM_MASK_CLIM for c in clim_in]
-        mask = total_clim < PSM.ANOM_MASK_CLIM
-        files = []
-        for k, f in enumerate(ref["months"]):
-            fn_t = "snowmap_%s_m%02d_total.png" % (tag, k + 1)
-            fn_a = "snowmap_%s_m%02d_anom.png" % (tag, k + 1)
-            write_png(os.path.join(OUT, fn_t), quantise_total(monthly[k], levels))
-            write_png(os.path.join(OUT, fn_a), quantise_anom(anoms[k], scale))
-            files.append({"ym": f["ym"], "label": f["label"],
-                          "total": fn_t, "anom": fn_a})
-        fn_t = "snowmap_%s_m00_total.png" % tag
-        fn_a = "snowmap_%s_m00_anom.png" % tag
-        write_png(os.path.join(OUT, fn_t), quantise_total(total, levels))
-        write_png(os.path.join(OUT, fn_a), quantise_anom(total_anom, scale))
-        out = {
-            "tag": tag,
-            "name": "C3S Multi-Model Mean",
-            "init": "",
-            "members": 6,
-            "grid": ref["grid"],
-            "levels": levels, "colors": colors, "ramp": colors,
-            "lut": lut,
-            "anom_colors": anom_colors,
-            "anom_lut": anom_lut(scale, anom_colors,
-                                 PSM.ANOM_LEVELS * PSM.unit_mult()),
-            "anom_scale": float(scale),
-            "anom_available": all(exported[t].get("anom_available", False)
-                                  for t in MULTI_MEMBERS),
-            "months": files,
-            "total": {"total": fn_t, "anom": fn_a},
-        }
-        with open(os.path.join(OUT, "snowmap_%s.json" % tag), "w") as f:
-            json.dump(out, f)
-        print("  %-16s %d months, multi-model mean" % (tag, len(files)))
-        summary.append(tag)
+        # The members do not all reach as far: the ECMWF carries on past
+        # the sixth lead month with its extension, so it has seven months
+        # where the others have six.  The mean is taken over the months
+        # EVERY member has - a mean over months that only some of them
+        # reach would be a mean of different things.
+        #
+        # The months are keyed by their "YYYY-MM" string, which is what
+        # the manifest carries.
+        common = None
+        for t in MULTI_MEMBERS:
+            have = set(exported[t]["months_ym"])
+            common = have if common is None else (common & have)
+        common = sorted(common) if common else []
+        if not common:
+            print("  c3s-multi: the members share no lead month")
+        else:
+            idx = {t: [exported[t]["months_ym"].index(ym)
+                       for ym in common]
+                   for t in MULTI_MEMBERS}
+            monthly = [np.mean([exported[t]["monthly_in"][k]
+                                for t, k in zip(MULTI_MEMBERS,
+                                                idx[t])], axis=0)
+                       for k in range(len(common))]
+            total = np.sum(np.array(monthly), axis=0)
+            # the mean of the members' anomalies: a member that is masked
+            # (no snow expected) must not take the mean down with it
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                anoms = [np.nanmean([exported[t]["anom_in"][k]
+                                     for t, k in zip(MULTI_MEMBERS,
+                                                     idx[t])], axis=0)
+                         for k in range(len(common))]
+                total_anom = np.nanmean([exported[t]["total_anom"]
+                                         for t in MULTI_MEMBERS], axis=0)
+            # the mask follows the MEAN climate, not the members' own masks:
+            # the mean model expects snow wherever enough of the members do
+            #
+            # The mean is over the members that HAVE a climate.  A member
+            # without one contributes zeros, and zeros say "the model
+            # expects no snow here", so including them washed the mean
+            # climate down and the mask came out with nothing masked at
+            # all.  The members with no climate are simply left out of
+            # the mean.
+            with_clim = [t for t in MULTI_MEMBERS
+                         if exported[t].get("anom_available")]
+            if with_clim:
+                total_clim = np.mean([exported[t]["total_clim"]
+                                      for t in with_clim], axis=0)
+            else:
+                total_clim = np.zeros_like(exported[ref]["total_clim"])
+            finite = np.abs(np.concatenate([a[np.isfinite(a)] for a in anoms]
+                                           + [total_anom[np.isfinite(total_anom)]]))
+            scale = nice_scale(np.percentile(finite, 99.5) if finite.size else 4.0)
+            # the mask is the model's OWN climate for the month the anomaly
+            # is about: a place where the model expects no snow in December
+            # is not "drier than normal in December", whatever it does in
+            # January
+            masks = [c < PSM.ANOM_MASK_CLIM for c in clim_in]
+            mask = total_clim < PSM.ANOM_MASK_CLIM
+            files = []
+            for k, ym in enumerate(common):
+                lab = None
+                for t in MULTI_MEMBERS:
+                    for f in exported[t]["months"]:
+                        if f["ym"] == ym:
+                            lab = f["label"]
+                            break
+                    if lab:
+                        break
+                fn_t = "snowmap_%s_m%02d_total.png" % (tag, k + 1)
+                fn_a = "snowmap_%s_m%02d_anom.png" % (tag, k + 1)
+                write_png(os.path.join(OUT, fn_t), quantise_total(monthly[k], levels))
+                write_png(os.path.join(OUT, fn_a), quantise_anom(anoms[k], scale))
+                files.append({"ym": ym, "label": lab,
+                              "total": fn_t, "anom": fn_a})
+            fn_t = "snowmap_%s_m00_total.png" % tag
+            fn_a = "snowmap_%s_m00_anom.png" % tag
+            write_png(os.path.join(OUT, fn_t), quantise_total(total, levels))
+            # the run total's anomaly is masked where the mean climate
+            # expects no snow, exactly as the monthly ones are
+            ta = np.array(total_anom, dtype=float)
+            ta[mask] = np.nan
+            write_png(os.path.join(OUT, fn_a), quantise_anom(ta, scale))
+            out = {
+                "tag": tag,
+                "name": "C3S Multi-Model Mean",
+                "init": "",
+                "members": 6,
+                "grid": ref["grid"],
+                "levels": levels, "colors": colors, "ramp": colors,
+                "lut": lut,
+                "anom_colors": anom_colors,
+                "anom_lut": anom_lut(scale, anom_colors,
+                                     PSM.ANOM_LEVELS * PSM.unit_mult()),
+                "anom_scale": float(scale),
+                "anom_available": all(exported[t].get("anom_available", False)
+                                      for t in MULTI_MEMBERS),
+                "months": files,
+                "total": {"total": fn_t, "anom": fn_a},
+            }
+            with open(os.path.join(OUT, "snowmap_%s.json" % tag), "w") as f:
+                json.dump(out, f)
+            print("  %-16s %d months, multi-model mean" % (tag, len(files)))
+            summary.append(tag)
 
     # the list the maps page reads to build its model picker
     write_index(summary, state)
