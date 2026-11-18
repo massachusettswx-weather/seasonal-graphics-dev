@@ -499,6 +499,16 @@
    "init": "2026-11",
    "status": "accepted",
    "_t0": 1794960435.8641853
+  },
+  {
+   "job": "0c5d496d-de3a-49f7-9556-69bc67baf794",
+   "tag": "ukmo-gloseas6",
+   "chunk": 0,
+   "centre": "ukmo",
+   "system": "610",
+   "init": "2026-11",
+   "status": "accepted",
+   "_t0": 1794960564.0699492
   }
  ],
  "stall": false,

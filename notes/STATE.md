@@ -396,3 +396,61 @@ outputs."  Two things were wrong, and both are fixed:
   serving the old gated build and cannot be updated from here (pull-only).
 - The OPERATIONAL site is untouched: `https://massachusettswx-weather.github.io/
   seasonal-graphics/` (the repo was renamed, so the old `seasonal-snow` path 404s).
+
+## The map is drawn on the GPU (18 Nov 2026)
+The map was drawn on the CPU: every pixel asked d3 where it was, and the answer
+was cached as a sampling plan.  A drag cost about three seconds, and the owner's
+verdict was that the map has to move smoothly.
+
+It is drawn on the GPU now.  `assets/js/mapgl.js` is the renderer (WebGL2);
+`assets/js/maps.js` keeps the UI, the loading and the interaction.
+
+- **The projection is a closed form**, checked against d3 before it was used:
+  forward 8.9e-12 px, inverse 2.8e-14 deg, over three views x four rotations x
+  three zooms.  It is d3's own arithmetic, written out (orthographic, azimuthal
+  equidistant, equirectangular).
+- **The field is sampled in the shader** with the same four cells, the same
+  weights and the same tables the CPU used - the field is the model's own grid,
+  never resampled.
+- **A drag costs ~1.3 ms of CPU and ~1 ms with the GPU** in the software
+  renderer; the real GPU is quicker.
+- **The earth is a baked mask** (4096x2048, R = land, G = lakes) instead of a
+  land path redrawn every frame; the outlines are GPU lines.
+- `tools/test_map_gl.py` checks the projection against d3, the colour at the
+  pixel against the CPU arithmetic (with the outlines turned off - they are
+  drawn over the field on purpose), and the cost of a frame.
+
+Six things were wrong on the way, and they are worth remembering:
+- **A texture fetch comes back normalised (0..1).**  The field's bytes were read
+  as if they were already 0..255, so every cell was one and the map showed the
+  sea.  Multiply by 255.
+- **Padding a texture to a power of two breaks the row stride.**  The data was
+  written with the grid's own width and the texture had another, so the field
+  was read a row out of step.
+- **The vector attribute was bound to the distance buffer** (`makeVAO` took the
+  segment buffer and never used it), so every line was drawn between two
+  garbage points - one diagonal across the map.
+- **The graticule's segments carried five numbers** where the attribute reads
+  four, so every segment after the first was garbage.  That was the speckle of
+  dots over North America, and it was not the lakes: the lakes were filtered
+  and the speckle stayed.
+- **The ladder's bottom bucket is "no snow"**, and on a dark map that has to be
+  transparent or there is a white fringe round every snow field.  The table has
+  to carry that colour EXACTLY, or the browser cannot see it.
+- **The drawing buffer has to be kept** (`preserveDrawingBuffer: true`), or the
+  browser throws the map away as soon as it has been shown and the map goes
+  blank while it is idle.
+
+And two more:
+- **The anomalies have a table of their own now**, built with the panels' own
+  `BoundaryNorm` over `ANOM_LEVELS`: the colour of a cell is decided by the
+  value it stands for, not by where the byte sits in a ramp.  The old ramp was
+  a different product from the static panels.
+- **Only the big lakes are drawn** (a bounding box of a degree or more).  The
+  1:50m file has four hundred of them and the small ones are a speckle of dots
+  rather than lakes.  The mask and the outlines use the same set, or the map
+  would show them twice.
+
+The atmosphere is a rim OUTSIDE the globe now.  It used to be a veil over the
+outer third of the disc, which washed out the field's own colours - and the
+field is the map.
