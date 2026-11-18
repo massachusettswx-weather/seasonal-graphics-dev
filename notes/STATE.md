@@ -454,3 +454,72 @@ And two more:
 The atmosphere is a rim OUTSIDE the globe now.  It used to be a veil over the
 outer third of the disc, which washed out the field's own colours - and the
 field is the map.
+
+## The polar view paints the whole globe, and the states are on the map (18 Nov 2026)
+
+**THE POLAR VIEW WAS NOT A PROJECTION PROBLEM - THE FIELD WAS CUT OFF.**
+The polar view is an azimuthal equidistant projection centred on the north
+pole, so the whole globe fits inside the disc: the equator is at r = k*pi/2
+and the south pole is at r = k*pi.  The shader had
+
+    bool fieldOK = !(u_view == 2 && r > u_k * PI * 0.5);
+
+which painted the field only over the northern hemisphere, while the land
+mask and the coastlines kept drawing the southern hemisphere.  That is the
+owner's screenshot: a snow blob at the pole and a big empty navy ring
+below.  The restriction is gone; the field follows the earth over the whole
+disc, and the graticule reaches the far side of the world with it (the
+meridians stop at 85 degrees south, because the pole itself is the
+antipode of the centre and is the one point this projection cannot draw).
+
+**THE PROOF.**  The renderer's own inverse (`pick()`) against the analytic
+`lat = 90 - degrees(r/k)` agrees to **0.000000 degrees** at 14 radii from
+the centre to the rim.  An A/B on the same page, counting pixels:
+
+| view | before the fix | after |
+|---|---|---|
+| polar / totals | 193 land, 459 ocean | 62 land, 318 ocean |
+
+131 ocean pixels became land pixels: the southern hemisphere's land now
+shows.  The land count FALLS because the field now covers what used to be
+bare earth.
+
+**THE ANTARCTIC RING IS REAL.**  Antarctica's snowfall (30-50 in) is in the
+model's own output; the far hemisphere is compressed into the outer annulus
+of this projection, so it reads as a bright ring.  It is geographically
+correct, not a rendering fault.
+
+**`tools/test_maps_page.py` REPORTING "0 of them land" IS NOT A REGRESSION.**
+The test builds a SYNTHETIC model whose field covers the whole world, so
+after the fix there is no bare land left to count.  A real model still
+shows 62 land pixels in the polar view.
+
+**THE STATES ARE ON THE MAP.**  `tools/make_states_geojson.py` trims
+`data/ne_50m_admin_1_states_provinces.geojson` to the site's own
+geographic scope (the United States and Canada, the set the static panels
+draw): 64 features, 25,288 points, 775 kB.  They are drawn as their own
+layer in a thinner and dimmer steel than the national outline, so the
+outline stays on top, and the antimeridian split is applied to them too.
+
+**THE DRAG DOES LESS WORK.**
+- the hover hit test is indexed by the bounding box of each ring: **2.76 ms
+  -> 0.05 ms**, and it runs on every mousemove;
+- the coastlines, the lakes and the graticule are uploaded ONCE instead of
+  every frame (the coastline's zero buffer was 442 kB a frame);
+- the page is not laid out again for a box width that has not changed (a
+  ResizeObserver watches the box instead), and the zoom label is only
+  written when the zoom changes.
+Measured after: **1.08 ms of CPU a frame, 0.85 ms with the GPU** (the test
+had said 2.49 ms before this round of work).
+
+**THE QUEUE WAS SPINNING.**  `decode_daily()` returned a bare `False` for
+a short chunk, but the caller unpacked two values out of it, so every short
+chunk raised "cannot unpack non-iterable bool object", the short chunk was
+never counted, the give-up-after-three rule never fired, and the pool
+re-submitted the same impossible UKMO request for hours.  A function that
+returns a tuple on one path must return a tuple on every path.  The UKMO's
+sub-daily 10 hPa wind is now correctly given up on (`shorts: 3,
+given_up: True`) and its 60-member monthly wind serves the chart.
+
+**THE WATERMARK** is on the map, bottom right, in the house style
+(`@Massachusettswx`, bold), matching the static panels.
