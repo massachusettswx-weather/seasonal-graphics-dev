@@ -801,3 +801,103 @@ So the map paints the field **on the land** and leaves the sea as sea:
 was not explicitly asked for.  It is on the dev copy, it is one flag in
 the shader (`mk.r > 0.5 && mk.g < 0.5`), and it can be taken back in a
 minute if the sea is wanted back.
+
+## The monthly map was the same picture every month (18 Nov 2026)
+
+**THE OWNER'S SCREENSHOT (543 %, anomaly on, December 2026) SHOWED A
+PLAIN THAT WAS THE SAME IN EVERY MONTH.**  The cause was a variable
+shadowed by an inner comprehension, in the multi-model block of
+`export_snow_map.py`:
+
+    monthly = [np.mean([exported[t]["monthly_in"][k]
+                        for t, k in zip(MULTI_MEMBERS, idx[t])], axis=0)
+               for k in range(len(common))]
+
+The inner `for t, k in zip(...)` binds **its own `k`**, so every month
+of the mean was the same blend - November's ECMWF, December's UKMO,
+January's METFR and so on.  `idx[t]` also resolved the *enclosing* `t`,
+which by then was the last model exported.  All six monthly totals and
+all six monthly anomalies came out byte-identical, and the run total was
+six times that one picture.  The member's own index for THIS month is
+`idx[t][k]`, and nothing else.
+
+The single models were never affected - their months were always
+different - which is why only the mean was wrong.  After the fix every
+month's raster has its own hash (checked live: four of four differ).
+
+**THE LESSON**: a loop variable shadowed by an inner comprehension is a
+silent data bug, and it hides in the ONE place that aggregates many
+things.
+
+## The earth turns (18 Nov 2026)
+
+The owner asked to "turn/rotate earth".  The globe could already spin
+and the flat map could only pan, so the turn button beside the zoom
+buttons (`data-z="turn"`) switches the drag:
+
+- **the flat map**: the map is turned on the screen and the data is not
+  - the shader samples the field through `R(-theta)` about the view
+  centre;
+- **the globe**: the axis tips over - a rotation of the frame about the
+  east axis, so the north pole leans toward the viewer - and the
+  horizontal drag still spins it.
+
+`u_turn` and `u_tilt` are uniforms on both shaders; the CPU's
+`projectPoint`/`invertPoint` mirror them so the tooltip and the hit
+test stay right.  A tilted globe cannot be checked against d3 (d3's
+`geoOrthographic().rotate()` cannot express a tilt), so it is checked
+by the round trip and by the sea/land split: the same point is sea
+before and after the tilt.
+
+Two bugs were found in that new code:
+
+- `import warnings` INSIDE the multi-model block made `warnings`
+  function-local for the WHOLE function, so the per-model block raised
+  `UnboundLocalError`.  A module import inside a function shadows the
+  module-level name for every path in it.
+- the CPU's tilted `up` vector had its components swapped (`ux/uy/uz`),
+  which showed as "inverse 179 deg".  Correct:
+  `ux = (sp0*cl0)*stl + (cp0*cl0)*ctl`, `uy = (sp0*sl0)*stl +
+  (cp0*sl0)*ctl`, `uz = -cp0*stl + sp0*ctl`.  After it: forward
+  1.14e-12 px, inverse 3.69e-13 deg.
+
+## The three-month window is the house's own (18 Nov 2026)
+
+The house already publishes it.  `plot_snow_ref.py` is the authority:
+
+    windows = [(0, 1, 2, "NDJ", "Nov 2026 - Jan 2027"),
+               (1, 2, 3, "DJF", "Dec 2026 - Feb 2027"),
+               (2, 3, 4, "JFM", "Jan 2027 - Mar 2027"),
+               (3, 4, 5, "FMA", "Feb 2027 - Apr 2027")]
+    items.append(dict(field=anom[[i0, i1, i2]].mean(axis=0), ...))
+
+So a window **STARTS** at its month (November's is Nov-Dec-Jan), it is
+named by the three months' own letters, and the anomaly in it is the
+**MEAN of the three months' anomalies** - the panels say "in w.e.
+3-month mean", because an anomaly summed over three months is
+unreadable.  The map's windows had been CENTRED on their month, which
+would have put different months under the label than the house's panel
+of the same name.  They now start at their month, the label is the
+house's code, a run carries the house's FOUR windows and no more, and
+the months without one (and the run total) are dimmed on the timeline
+with the reason on their tooltip.
+
+The caption names the window ("NDJ, 3-month total") and now FOLLOWS the
+month: picking a month redraws the legend, which it did not, so the
+caption kept the last window's name.
+
+**WHAT TO CONFIRM WITH THE OWNER**: totals = the window's accumulation
+on the published ladder; anomaly = the window's mean per month.  That
+is the house's own convention and it is what is on the dev site.
+
+## The ECCC canSIPS pool carries the seventh month (18 Nov 2026)
+
+The lead month past the sixth arrived for both of the ECCC's systems,
+but the pool had not been rebuilt since, so the pooled model was still
+six months while the ECMWF and the UKMO carried seven.  `build_cansips.py`
+already knew how to merge the extensions; the pool simply had not been
+re-run.  It has, and the map's ECCC entry now has seven months.
+
+The extension's `ndays` (31 for May) is the number of days of
+accumulation, not the number of members - the exporter's "at least 20
+days" rule is a completeness test, not a member count.
