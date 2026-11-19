@@ -417,6 +417,23 @@
     return m.avg3_label || null;
   }
 
+  /* the months that carry a three-month window: the house's own four
+     (NDJ, DJF, JFM, FMA) - the ones with a full window */
+  function monthHasWindow(i) {
+    var man = state.manifest;
+    if (!man || i < 0 || !man.months || !man.months[i]) { return false; }
+    return !!man.months[i].avg3_total;
+  }
+
+  function firstWindowMonth() {
+    var man = state.manifest;
+    if (!man || !man.months) { return -1; }
+    for (var i = 0; i < man.months.length; i++) {
+      if (man.months[i].avg3_total) { return i; }
+    }
+    return -1;
+  }
+
   function loadField() {
     var file = fieldFile();
     if (!file) { return; }
@@ -508,21 +525,39 @@
     play.addEventListener("click", function () { togglePlay(); });
     box.appendChild(play);
 
-    var mk = function (label, month, value) {
+    var mk = function (label, month, value, disabled, why) {
       var b = document.createElement("button");
       b.className = "tlbtn" + (state.month === value ? " on" : "");
       b.textContent = label;
       b.dataset.month = String(value);
+      /* THE THREE-MONTH WINDOW: only the months with a full window can
+         be picked - a run of six months has four windows (NDJ, DJF,
+         JFM, FMA), the house's own four - and the run total has none.
+         The buttons that cannot be shown are dimmed and say why. */
+      if (disabled) {
+        b.classList.add("off");
+        b.disabled = true;
+        if (why) { b.title = why; }
+      }
       b.addEventListener("click", function () {
+        if (b.disabled) { return; }
         stopPlay();
         state.month = value;
         markTimeline();
         loadField();
+        /* the caption names the window, so it has to be redrawn with
+           the month - otherwise it keeps the last window's name */
+        drawLegend();
       });
       box.appendChild(b);
     };
-    mk("Total", -1, -1);
-    man.months.forEach(function (m, i) { mk(m.label, i, i); });
+    mk("Total", -1, -1, state.win3,
+       state.win3 ? "the run total has no three-month window" : "");
+    man.months.forEach(function (m, i) {
+      mk(m.label, i, i, state.win3 && !m.avg3_total,
+         (state.win3 && !m.avg3_total) ?
+         "this month has no full three-month window" : "");
+    });
   }
 
   function markTimeline() {
@@ -541,6 +576,7 @@
     state.month = next;
     markTimeline();
     loadField();
+    drawLegend();
     state.timer = setInterval(function () {
       var m = state.manifest;
       if (!m) { stopPlay(); return; }
@@ -549,6 +585,7 @@
       state.month = n;
       markTimeline();
       loadField();
+      drawLegend();
     }, 1100);
     var pb = document.querySelector("#maptimeline button");
     if (pb) { pb.textContent = "❚❚"; }
@@ -1032,6 +1069,12 @@
         Array.prototype.forEach.call(wbtns, function (o) {
           o.classList.toggle("on", o === b);
         });
+        /* the window belongs to a month: the run total has none, so the
+           map moves to the first month that has one */
+        if (state.win3 && !monthHasWindow(state.month)) {
+          state.month = firstWindowMonth();
+        }
+        buildTimeline();
         loadField();
         drawLegend();
         draw();

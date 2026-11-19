@@ -302,6 +302,8 @@ a{color:#1c4b8a}
   cursor:pointer; border:1px solid var(--line); background:var(--card);
   color:var(--text); border-radius:999px}
 .maptimeline .tlbtn.on{background:#12263f; color:#fff; border-color:#12263f}
+/* a month with no full three-month window: dimmed, and it says why */
+.maptimeline .tlbtn.off{opacity:.38; cursor:not-allowed}
 .maptimeline button.ctrl{padding:6px 11px}
 """
 

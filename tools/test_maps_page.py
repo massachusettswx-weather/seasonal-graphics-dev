@@ -68,7 +68,20 @@ def make_model():
         fn_a = "snowmap_%s_m%02d_anom.png" % (TAG, k + 1)
         Image.fromarray(total, mode="L").save(os.path.join(DATA, fn_t))
         Image.fromarray(anom, mode="L").save(os.path.join(DATA, fn_a))
-        months.append({"ym": "2026-11", "label": label, "total": fn_t, "anom": fn_a})
+        entry = {"ym": "2026-11", "label": label, "total": fn_t, "anom": fn_a}
+        # THE THREE-MONTH WINDOW: only the first month of this little run
+        # has a full window (NDJ), exactly as the house's own four sit
+        # at the start of a six-month run.
+        if k == 0:
+            fn_3t = "snowmap_%s_m%02d_avg3_total.png" % (TAG, k + 1)
+            fn_3a = "snowmap_%s_m%02d_avg3_anom.png" % (TAG, k + 1)
+            Image.fromarray(total, mode="L").save(os.path.join(DATA, fn_3t))
+            Image.fromarray(anom, mode="L").save(os.path.join(DATA, fn_3a))
+            entry["avg3_total"] = fn_3t
+            entry["avg3_anom"] = fn_3a
+            entry["avg3_label"] = "NDJ"
+            entry["avg3_months"] = 3
+        months.append(entry)
 
     fn_t = "snowmap_%s_m00_total.png" % TAG
     fn_a = "snowmap_%s_m00_anom.png" % TAG
@@ -245,6 +258,35 @@ def main():
             pg.wait_for_timeout(1200)
             reset = pg.evaluate("() => document.querySelector('.mapctl .zlabel').textContent")
             print("after reset:", reset)
+
+            # THE THREE-MONTH WINDOW: the switch must move the map onto a
+            # month that HAS a window, dim the ones that have not, and the
+            # caption must name the window.
+            pg.query_selector('#snowwindow button[data-window="3"]').click()
+            pg.wait_for_timeout(2000)
+            win3 = pg.evaluate("""() => {
+              var st = window.__maps;
+              var btns = document.querySelectorAll('#maptimeline .tlbtn');
+              var off = 0, totalOff = 0;
+              for (var i = 0; i < btns.length; i++) {
+                if (btns[i].disabled) { off++; }
+              }
+              totalOff = btns.length && btns[0].disabled ? 1 : 0;
+              var cap = (document.querySelector('#maplegend') || {}).textContent || '';
+              return {win3: st.win3, month: st.month, dimmed: off,
+                      totalDimmed: totalOff, cap: cap};
+            }""")
+            print("the three-month window:", win3["win3"],
+                  "month", win3["month"],
+                  "| dimmed", win3["dimmed"], "of which the run total",
+                  win3["totalDimmed"])
+            print("   the caption names the window:",
+                  "NDJ" in win3["cap"])
+            print("   FAIL: the window switch did not move onto a month"
+                  if not (win3["win3"] and win3["month"] >= 0 and
+                          "NDJ" in win3["cap"]) else "   ok")
+            pg.query_selector('#snowwindow button[data-window="1"]').click()
+            pg.wait_for_timeout(1200)
 
             # is anything actually painted on the canvas?
             # the canvas is drawn on the GPU now, so it is read with
