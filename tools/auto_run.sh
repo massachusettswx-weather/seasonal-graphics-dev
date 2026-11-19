@@ -130,7 +130,12 @@ fi
 #                    environment variable does not, so without the file
 #                    the next rebuild would start publishing again.
 #   neither        -> the publisher runs as it always did
-if [ -n "${NO_PUBLISH:-}" ] || [ -f data/.no_publish ]; then
+# SITE_NO_PUBLISH is the name the encrypted secret store uses, and the
+# environment variable does not survive a wipe - so it has to be read
+# here too, or the publisher would come back on its own after a
+# rebuild and start publishing again.
+if [ -n "${NO_PUBLISH:-}" ] || [ -n "${SITE_NO_PUBLISH:-}" ] || \
+   [ -f data/.no_publish ]; then
     log "the publisher stays stopped (the posts are off) - nothing is published"
 elif ! running "auto_publish.sh"; then
     log "starting the publisher"

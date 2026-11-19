@@ -77,3 +77,7 @@ data/.no_publish
 
 # the tests' own backups never belong in the published data directory
 docs/data/*.bak
+
+# the queue's live bookkeeping: it changes with every request
+data/daily_jobs.json
+data/nov_pending.json
