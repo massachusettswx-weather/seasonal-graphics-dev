@@ -42,6 +42,7 @@ usage:  python3 export_snow_map.py
 import os
 import sys
 import json
+import warnings
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -475,6 +476,36 @@ def main():
         masks = [c < PSM.ANOM_MASK_CLIM for c in clim_in]
         mask = total_clim < PSM.ANOM_MASK_CLIM
 
+        # ---- the THREE-MONTH WINDOWS ----
+        # The house already publishes these: the overlapping three-month
+        # windows of the run, named for their three months (NDJ, DJF,
+        # JFM, FMA), and the anomaly in them is the MEAN per month - the
+        # panels say "in w.e. 3-month mean", because an anomaly summed
+        # over three months is unreadable.  The map did not carry them.
+        #
+        # The window is centred on the month it belongs to, which is how
+        # the house's four windows sit: December's window is Nov-Dec-Jan.
+        # The first and last month of a run have no full window, so they
+        # get the two months they have, and the caption says so.
+        win3 = []
+        for k in range(len(yms)):
+            j0 = max(0, k - 1)
+            j1 = min(len(yms) - 1, k + 1)
+            win = list(range(j0, j1 + 1))
+            avg3_total = np.sum(np.array([monthly_in[j] for j in win]), axis=0)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                avg3_anom = np.nanmean(np.array([anom_in[j] for j in win]),
+                                       axis=0)
+                avg3_clim = np.nanmean(np.array([clim_in[j] for j in win]),
+                                       axis=0)
+            # the label names the window: the two months it covers at
+            # each end, the way the house names them (NDJ, DJF, JFM, FMA)
+            win3.append({"total": avg3_total, "anom": avg3_anom,
+                         "clim": avg3_clim,
+                         "label": "%s - %s" % (labels[win[0]], labels[win[-1]]),
+                         "months": len(win)})
+
         # ---- write the rasters ----
         files = []
         for k, lab in enumerate(labels):
@@ -485,11 +516,23 @@ def main():
             a = np.array(anom_in[k], dtype=float)
             a[masks[k]] = np.nan
             write_png(os.path.join(OUT, fn_a), quantise_anom(a, scale))
+            # THE THREE-MONTH PAIR: the window's accumulation and the
+            # window's anomaly as a mean per month
+            fn_3t = "snowmap_%s_m%02d_avg3_total.png" % (tag, k + 1)
+            fn_3a = "snowmap_%s_m%02d_avg3_anom.png" % (tag, k + 1)
+            write_png(os.path.join(OUT, fn_3t),
+                      quantise_total(win3[k]["total"], levels))
+            a3 = np.array(win3[k]["anom"], dtype=float)
+            a3[win3[k]["clim"] < PSM.ANOM_MASK_CLIM] = np.nan
+            write_png(os.path.join(OUT, fn_3a), quantise_anom(a3, scale))
             # THIS lead month's own key - the outer loop's ym is the LAST
             # month of the model, so every entry of the list used to carry
             # the same one and the manifest said the wrong thing
             files.append({"ym": "%04d-%02d" % yms[k], "label": lab,
-                          "total": fn_t, "anom": fn_a})
+                          "total": fn_t, "anom": fn_a,
+                          "avg3_total": fn_3t, "avg3_anom": fn_3a,
+                          "avg3_label": win3[k]["label"],
+                          "avg3_months": win3[k]["months"]})
         fn_t = "snowmap_%s_m00_total.png" % tag
         fn_a = "snowmap_%s_m00_anom.png" % tag
         write_png(os.path.join(OUT, fn_t), quantise_total(total_in, levels))
@@ -567,19 +610,27 @@ def main():
             idx = {t: [exported[t]["months_ym"].index(ym)
                        for ym in common]
                    for t in MULTI_MEMBERS}
-            monthly = [np.mean([exported[t]["monthly_in"][k]
-                                for t, k in zip(MULTI_MEMBERS,
-                                                idx[t])], axis=0)
+            # THE MONTH INDEX MUST NOT BE SHADOWED.  This used to be
+            #     [exported[t]["monthly_in"][k]
+            #      for t, k in zip(MULTI_MEMBERS, idx[t])]
+            # and the inner `for t, k in ...` binds ITS OWN k - so every
+            # month got the same six fields: November's ECMWF, December's
+            # UKMO, January's METFR and so on.  The six monthly rasters
+            # came out byte-identical, and the run total was six times
+            # that same blend.  The member's own index for THIS month is
+            # idx[t][k], and nothing else.
+            monthly = [np.mean([exported[t]["monthly_in"][idx[t][k]]
+                                for t in MULTI_MEMBERS], axis=0)
                        for k in range(len(common))]
             total = np.sum(np.array(monthly), axis=0)
             # the mean of the members' anomalies: a member that is masked
             # (no snow expected) must not take the mean down with it
-            import warnings
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", RuntimeWarning)
-                anoms = [np.nanmean([exported[t]["anom_in"][k]
-                                     for t, k in zip(MULTI_MEMBERS,
-                                                     idx[t])], axis=0)
+                # the same shadowing, and the same fix: the member's own
+                # index for this month is idx[t][k]
+                anoms = [np.nanmean([exported[t]["anom_in"][idx[t][k]]
+                                     for t in MULTI_MEMBERS], axis=0)
                          for k in range(len(common))]
                 total_anom = np.nanmean([exported[t]["total_anom"]
                                          for t in MULTI_MEMBERS], axis=0)
@@ -626,8 +677,48 @@ def main():
                 fn_a = "snowmap_%s_m%02d_anom.png" % (tag, k + 1)
                 write_png(os.path.join(OUT, fn_t), quantise_total(monthly[k], levels))
                 write_png(os.path.join(OUT, fn_a), quantise_anom(anoms[k], scale))
+                # THE THREE-MONTH PAIR, on the same terms as every other
+                # model: the window's accumulation, and the window's
+                # anomaly as a mean per month (the house's own 3-month
+                # panels are "in w.e. 3-month mean")
+                j0 = max(0, k - 1)
+                j1 = min(len(common) - 1, k + 1)
+                win = list(range(j0, j1 + 1))
+                avg3_total = np.sum(np.array([monthly[j] for j in win]), axis=0)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    avg3_anom = np.nanmean(np.array([anoms[j] for j in win]),
+                                           axis=0)
+                    avg3_clim = np.nanmean(np.array([clim_in[j] for j in win]),
+                                           axis=0)
+                fn_3t = "snowmap_%s_m%02d_avg3_total.png" % (tag, k + 1)
+                fn_3a = "snowmap_%s_m%02d_avg3_anom.png" % (tag, k + 1)
+                write_png(os.path.join(OUT, fn_3t),
+                          quantise_total(avg3_total, levels))
+                a3 = np.array(avg3_anom, dtype=float)
+                a3[avg3_clim < PSM.ANOM_MASK_CLIM] = np.nan
+                write_png(os.path.join(OUT, fn_3a), quantise_anom(a3, scale))
+                wlab = None
+                for t in MULTI_MEMBERS:
+                    for f in exported[t]["months"]:
+                        if f["ym"] == common[win[0]]:
+                            wlab = f["label"]
+                            break
+                    if wlab:
+                        break
+                wlab1 = None
+                for t in MULTI_MEMBERS:
+                    for f in exported[t]["months"]:
+                        if f["ym"] == common[win[-1]]:
+                            wlab1 = f["label"]
+                            break
+                    if wlab1:
+                        break
                 files.append({"ym": ym, "label": lab,
-                              "total": fn_t, "anom": fn_a})
+                              "total": fn_t, "anom": fn_a,
+                              "avg3_total": fn_3t, "avg3_anom": fn_3a,
+                              "avg3_label": "%s - %s" % (wlab, wlab1),
+                              "avg3_months": len(win)})
             fn_t = "snowmap_%s_m00_total.png" % tag
             fn_a = "snowmap_%s_m00_anom.png" % tag
             write_png(os.path.join(OUT, fn_t), quantise_total(total, levels))

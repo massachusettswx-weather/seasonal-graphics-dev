@@ -274,6 +274,7 @@ a{color:#1c4b8a}
   cursor:pointer; color:#fff; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.22);
   border-radius:6px}
 .mapctl button:hover{background:rgba(255,255,255,.22)}
+.mapctl button.on{background:rgba(120,170,220,.55); border-color:rgba(190,220,255,.55)}
 .mapctl .zlabel{font-size:11.5px; color:#e8eef5; min-width:44px; text-align:center;
   font-variant-numeric:tabular-nums}
 /* the maps page: the sky is on a canvas of its own, the map (the earth
@@ -1214,10 +1215,12 @@ def build_maps_page(reg):
   seasonal snowfall painted on it, drawn from Natural Earth 1:50m data.
   The field is the model's own output - every grid cell the model came on,
   nothing resampled - and it can be read as the accumulated snowfall or as
-  the anomaly against that model's own hindcast climate. The map can be
+  the anomaly against that model's own hindcast climate, either for one
+  month or for the three-month window centred on it. The map can be
   the flat world on an equirectangular grid or the globe you can spin. Zoom in
   and out with the buttons on the map, with the scroll wheel or with the
-  keyboard, and drag the flat map to pan it.</p>
+  keyboard, drag the flat map to pan it, and press the turn button to
+  turn the earth on the map or to tip the globe over.</p>
   <div class="mapviews" id="mapviews">
     <button data-view="flat">2D Map</button>
     <button data-view="globe" class="active">3D Globe</button>
@@ -1228,6 +1231,10 @@ def build_maps_page(reg):
     <div class="seg" id="snowfield">
       <button class="segbtn ghost on" data-field="total">Snowfall</button>
       <button class="segbtn ghost" data-field="anom">Anomaly vs the model's own climate</button>
+    </div>
+    <div class="seg" id="snowwindow">
+      <button class="segbtn ghost on" data-window="1">Month</button>
+      <button class="segbtn ghost" data-window="3">3-month</button>
     </div>
   </div>
   <div class="maplegend" id="maplegend"></div>

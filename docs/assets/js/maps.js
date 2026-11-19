@@ -46,7 +46,11 @@
      d3's rotate() puts (-lambda, -phi) at the centre */
   var GLOBE_ROT = [95, -35];
 
-  var state = {view: "globe", rot: GLOBE_ROT.slice(),
+  var state = {view: "globe", rot: GLOBE_ROT.slice(), win3: false,
+               /* THE TURN: the flat map turns on the screen, and the
+                  globe's axis tips over.  Both are in degrees here and
+                  radians in the projection. */
+               turn: 0, tilt: 0, turnMode: false,
                drag: null, zoom: 1,
                pan: [0, 0], field: "total", month: -1, tag: null,
                manifest: null, raster: null, index: null,
@@ -234,7 +238,21 @@
       .on("drag", function (ev) {
         var p = d3.pointer(ev, this);
         var dx = p[0] - state.drag[0], dy = p[1] - state.drag[1];
-        if (state.view === "flat") {
+        if (state.turnMode) {
+          /* THE EARTH IS TURNED: the flat map turns on the screen, and
+             the globe's axis tips over.  The gain is the same as the
+             drag's, so the earth moves at the same rate as the hand. */
+          if (state.view === "flat") {
+            state.turn = (state.turn + dx * DRAG_GAIN.flat) % 360;
+          } else {
+            /* the tip: the north pole leans toward the viewer.  The
+               horizontal part of the drag still spins the globe, so the
+               earth can be turned on its side AND round its axis. */
+            state.tilt = Math.max(-75, Math.min(75,
+                state.tilt + dy * DRAG_GAIN.globe / state.zoom));
+            state.rot[0] += dx * DRAG_GAIN.globe / state.zoom;
+          }
+        } else if (state.view === "flat") {
           state.pan[0] += dx * DRAG_GAIN.flat;
           state.pan[1] += dy * DRAG_GAIN.flat;
         } else {
@@ -254,13 +272,18 @@
   }
 
   function viewNote() {
+    var turn = state.turnMode
+      ? (state.view === "flat"
+         ? " The turn is on: drag to turn the map on the screen."
+         : " The turn is on: drag down to tip the globe over, sideways to " +
+           "spin it.") : "";
     if (state.view === "flat") {
       note("The whole world on an equirectangular grid. Drag it to pan, " +
            "scroll or use the buttons to zoom. The equirectangular " +
-           "projection squeezes the polar regions.");
+           "projection squeezes the polar regions." + turn);
     } else {
       note("The same world on an orthographic globe - drag it to spin, scroll " +
-           "or use the buttons to zoom.");
+           "or use the buttons to zoom." + turn);
     }
   }
 
@@ -313,6 +336,9 @@
     state.zoom = 1;
     state.pan = [0, 0];
     state.rot = GLOBE_ROT.slice();
+    /* the earth goes back the way it was: no turn, no tilt */
+    state.turn = 0;
+    state.tilt = 0;
     requestDraw();
   }
 
@@ -325,6 +351,8 @@
       '<button type="button" data-z="out" title="zoom out">−</button>' +
       '<span class="zlabel">100%</span>' +
       '<button type="button" data-z="in" title="zoom in">+</button>' +
+      '<button type="button" data-z="turn" title="turn the earth: drag to ' +
+      'turn the map, or to tip the globe over">↻</button>' +
       '<button type="button" data-z="reset" title="reset the view">⟲</button>';
     box.appendChild(c);
     c.addEventListener("click", function (ev) {
@@ -335,6 +363,11 @@
       var z = b.getAttribute("data-z");
       if (z === "in") { setZoom(state.zoom * ZOOM_STEP); }
       else if (z === "out") { setZoom(state.zoom / ZOOM_STEP); }
+      else if (z === "turn") {
+        state.turnMode = !state.turnMode;
+        b.classList.toggle("on", state.turnMode);
+        viewNote();
+      }
       else { resetView(); }
     });
     c.addEventListener("wheel", function (ev) { ev.stopPropagation(); },
@@ -357,9 +390,31 @@
     var man = state.manifest;
     if (!man) { return null; }
     var f = state.field === "anom" ? "anom" : "total";
+    /* THE THREE-MONTH WINDOW: the house publishes the overlapping
+       three-month windows of the run (NDJ, DJF, JFM, FMA) and the
+       anomaly in them is the mean per month.  The map carries the same
+       thing: the window's accumulation for the snowfall, and the
+       window's mean per month for the anomaly. */
+    if (state.win3) {
+      var g = state.field === "anom" ? "avg3_anom" : "avg3_total";
+      if (state.month < 0) { return null; }
+      var mw = man.months[state.month];
+      return mw ? (mw[g] || null) : null;
+    }
     if (state.month < 0) { return man.total[f]; }
     var m = man.months[state.month];
     return m ? m[f] : null;
+  }
+
+  /* the window the map is showing: one month, or the three months
+     centred on it */
+  function windowLabel() {
+    var man = state.manifest;
+    if (!man || state.month < 0) { return null; }
+    var m = man.months[state.month];
+    if (!m) { return null; }
+    if (!state.win3) { return null; }
+    return m.avg3_label || null;
   }
 
   function loadField() {
@@ -536,7 +591,8 @@
       hi.textContent = "+" + s + " in";
       cap.textContent = "Snowfall anomaly against the model's own hindcast " +
         "climate (" + man.name + "), inches - brown is less " +
-        "snow than the model expects, teal is more";
+        "snow than the model expects, teal is more" +
+        (windowLabel() ? " - " + windowLabel() + ", the 3-month mean" : "");
     } else {
       /* the bar: the ladder's intervals, the same boundaries the static
          panels' colour bar is drawn on, and the keys on those boundaries.
@@ -554,7 +610,8 @@
       cap.textContent = "Accumulated snowfall, inches (" +
         man.name + ", " + man.members + " members" +
         (man.init ? ", " + man.init + " init" : "") +
-        ") on the published 0-300 in scale";
+        ") on the published 0-300 in scale" +
+        (windowLabel() ? " - " + windowLabel() + ", 3-month total" : "");
       /* THE KEYS: the ladder's own levels, every other one - the same set
          the static panels' colour bar carries, on the same boundaries. */
       var keys = document.createElement("div");
@@ -645,6 +702,9 @@
     }
     return {view: state.view, lam0: lam0, phi0: phi0,
             k: b.k * state.zoom,
+            /* THE TURN AND THE TILT, in radians for the renderer */
+            turn: state.turn * Math.PI / 180,
+            tilt: state.tilt * Math.PI / 180,
             x0: b.t[0] + state.pan[0],
             y0: b.t[1] + state.pan[1]};
   }
@@ -884,6 +944,9 @@
   function setView(v) {
     state.view = v;
     state.pan = [0, 0];
+    /* the turn and the tilt belong to the view they were made in */
+    state.turn = 0;
+    state.tilt = 0;
     state.hover = -1;
     var btns = document.querySelectorAll("#mapviews button");
     Array.prototype.forEach.call(btns, function (b) {
@@ -957,6 +1020,22 @@
     var fbtns = document.querySelectorAll("#snowfield button");
     Array.prototype.forEach.call(fbtns, function (b) {
       b.addEventListener("click", function () { setField(b.dataset.field); });
+    });
+    /* THE THREE-MONTH WINDOW: the house publishes the overlapping
+       three-month windows of the run (NDJ, DJF, JFM, FMA) and the
+       anomaly in them is the mean per month, so the map carries the same
+       thing. */
+    var wbtns = document.querySelectorAll("#snowwindow button");
+    Array.prototype.forEach.call(wbtns, function (b) {
+      b.addEventListener("click", function () {
+        state.win3 = (b.dataset.window === "3");
+        Array.prototype.forEach.call(wbtns, function (o) {
+          o.classList.toggle("on", o === b);
+        });
+        loadField();
+        drawLegend();
+        draw();
+      });
     });
     window.addEventListener("resize", function () {
       state.baseKey = null;

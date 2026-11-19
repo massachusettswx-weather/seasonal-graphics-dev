@@ -197,6 +197,14 @@ COLOUR_JS = r"""
       want = col;
     }
     var got = at(x, y);
+    /* Under the software renderer the drawing buffer can come back
+       empty if the browser got between the render and the read - the
+       read stalls the GPU and the frame can be lost.  Draw again and
+       read once more before calling a pixel wrong. */
+    if (got[3] === 0) {
+      st.gl.render();
+      got = at(x, y);
+    }
     checked++;
     var e = Math.max(Math.abs(got[0] - want[0]),
                      Math.abs(got[1] - want[1]),
