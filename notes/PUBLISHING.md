@@ -78,6 +78,44 @@ The older token belonged to `Matthew22-cmd`, which could create the
 development repository under its own account and was a write
 collaborator on the operational one.
 
+## The narrow path: ONE product on the operational site (20 Nov 2026)
+
+The general publisher is stopped (`SITE_NO_PUBLISH=1`), and it must stay
+stopped: it would carry the whole development site to the live one.  But
+the **daily GEFSv12 sub-seasonal panel** has to keep moving there - it is
+the only product on the live site that changes every day.
+
+So the live site gets its own path, **`tools/publish_polar_subseasonal.py`**,
+which carries **one product, two pictures, one registry entry** and never
+rebuilds the site:
+
+    python3 tools/publish_polar_subseasonal.py --repo /workspace/repo
+        plan only: what would change, nothing is written
+    python3 tools/publish_polar_subseasonal.py --repo /workspace/repo --apply
+        the seven files are written into the operational clone
+    python3 tools/publish_polar_subseasonal.py --repo /workspace/repo \
+        --apply --push --prod --approved
+        ... and it is committed and pushed
+
+The seven files are the two GEFSv12 charts, `docs/data/models.json`,
+`docs/data/models_public.json`, and the registry inlined in
+`docs/model.html`, `docs/snow.html` and `docs/spv.html`.  **Nothing else
+on the operational site changes** - its pages, CSS and every other model
+stay byte for byte as they are.
+
+* the product is selected by a **constant** (`MODEL_ID = "gefsv12"`), never
+  from a file an earlier run wrote;
+* **nothing is published when the update is missing** (exit 2), and the
+  live site is never put back to an older cycle;
+* **the push fails loudly** (exit 3) when the repository cannot be
+  reached: the commit stays local and the site keeps the old cycle;
+* the operational destination needs **`--prod --approved`**, like
+  `push_to_github.sh`; without them the script refuses to push, whatever
+  the remote says.
+
+It is not wired into the daily run yet - the owner's word is the only
+thing missing.
+
 ## The approval gate (16 Nov 2026)
 
 The user: *"DO NOT PUT ANYTHING NOT APPROVED ON THE SITE W/O MY APPROVAL."*
