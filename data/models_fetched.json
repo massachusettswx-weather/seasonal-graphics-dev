@@ -348,5 +348,13 @@
     816
    ]
   }
+ },
+ "synthetic-test": {
+  "name": "SYNTHETIC TEST",
+  "init": "2026-11",
+  "members": 7,
+  "centre": "test",
+  "system": "1",
+  "leads": 3
  }
 }

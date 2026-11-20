@@ -650,5 +650,9 @@
  "snow_c3s-multi_month05_in.png": {
   "label": "April 2027",
   "lead": 5
+ },
+ "snow_c3s-multi_month06_in.png": {
+  "label": "May 2027",
+  "lead": 6
  }
 }
