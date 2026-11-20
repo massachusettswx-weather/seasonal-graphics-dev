@@ -154,9 +154,9 @@ the newest complete one.  The fetcher says so itself: *"the cycle
 ## The daily job that runs it (22 Nov 2026)
 
 `tools/gefs_subs_disseminate.sh` is that job, and one scheduled task
-(`seasonal-gefs-subs`, 05:00 America/New_York = 10:00 UTC - NCEP's 00Z
-cycle carries its full 35-day range by about 09:05 UTC, measured on the
-20261120 cycle) runs it in its own conversation.
+(`seasonal-gefs-subs`, **03:00 UTC** every night) runs it in its own
+conversation.  It is a WATCHER: it checks until the cycle is there, and
+then it stops - the next night is the next run.
 
 It does, in order:
 
@@ -167,12 +167,13 @@ It does, in order:
 2. **pulls the day's data** - the observed SST, the NOAA models, CORe,
    and the C3S centres that are not on disk (**download only**: the
    recovery never re-submits a request);
-3. **fetches the newest COMPLETE 00Z GEFS cycle** in the foreground, so
-   "the run has finished" is an answer and not a hope - and it commits
-   the fetch state, which is in git, so a rebuild does not download the
-   same hour twice;
+3. **watches for the newest COMPLETE 00Z GEFS cycle** and fetches it in
+   the foreground, so "the run has finished" is an answer and not a hope
+   - and it commits the fetch state, which is in git, so a rebuild does
+   not download the same hour twice;
 4. **publishes** the narrow path to the development copy and to the
-   operational site.
+   operational site, and **stops** - the cycle's own date is the test,
+   never the clock (`WATCH_HOURS`, 12 by default, is the backstop).
 
 **THE TRIGGER IS THE RUN, NOT A CLOCK.**  The panel goes out when the
 newest 00Z cycle has finished downloading.

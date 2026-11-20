@@ -42,11 +42,13 @@ need the conversation.
 * They run in `/workspace/devrepo`: the CDS request pool and the polar
   puller.  The sandbox is rebuilt every hour, which kills them.
 * **There is ONE scheduled task** (22 Nov 2026), `seasonal-gefs-subs`
-  (`465527736623226`), at **05:00 America/New_York** (= 10:00 UTC).  The
+  (`465527736623226`), at **03:00 UTC** every night.  It is a WATCHER: it
+  keeps checking until the newest COMPLETE 00Z cycle has been fetched and
+  published, and then it **stops** - the next night is the next run.  The
   00Z cycle is only COMPLETE about 24 hours after its init - NCEP uploads
-  the members in four batches, the last one at ~00:40 UTC the next day
-  - so 10:00 UTC always finds the previous day's cycle as the newest
-  complete one.  It
+  the members in four batches, the last one at ~00:40 UTC the next day -
+  so the cycle for a given day appears at an uncertain hour, and the
+  watcher's test is the cycle's own date, never the clock.  It
   runs in its own throwaway conversation, and it does ONE thing:
   `tools/gefs_subs_disseminate.sh`.
 * **The 20-minute keepalive is GONE** (deleted 22 Nov 2026 at the owner's
@@ -116,13 +118,17 @@ python3 tools/publish_polar_subseasonal.py --repo /workspace/repo \
   and it gives the git identity on the command line, because a clone that
   has never committed has none.
 
-**`tools/gefs_subs_disseminate.sh`** is the job that runs it once a day:
-it puts the pipeline back (it clones the tree if a rebuild took it), pulls
-the day's data, fetches the **newest complete 00Z cycle** in the
-foreground - so "the run has finished" is an answer and not a hope -
-commits the fetch state (it is in git, so a rebuild does not download an
-hour again), and publishes to the development copy and to the operational
-site.  **The trigger is the RUN, not a clock.**
+**`tools/gefs_subs_disseminate.sh`** is the job that runs it, once a
+night: it puts the pipeline back (it clones the tree if a rebuild took
+it), pulls the day's data, and then **watches** - fetching the newest
+complete 00Z cycle in the foreground (so "the run has finished" is an
+answer and not a hope), committing the fetch state (it is in git, so a
+rebuild does not download an hour again), and publishing to the
+development copy and to the operational site.  **The trigger is the RUN,
+not a clock**, and the watcher stops as soon as the cycle is on the site
+(`WATCH_HOURS`, 12 by default, is the backstop for a night when NCEP is
+late).  The narrow path's exit codes are what the watcher reads: 0
+published, 4 already current, 2 nothing to publish, 3 the push failed.
 
 ## Still open
 

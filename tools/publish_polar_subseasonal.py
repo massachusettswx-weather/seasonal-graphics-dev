@@ -338,7 +338,9 @@ def main():
     if old_init == series["init"] and not args.force and not stranded:
         say("   the target already carries the %s cycle - nothing to do"
             % old_init)
-        return 0
+        # 4 = "already current", so the watcher knows the difference
+        # between "published" (0) and "there was nothing to publish" (4)
+        return 4
     if stranded:
         say("   the target's working tree holds a change that was never"
             " committed - it is finished and pushed now")
@@ -466,13 +468,19 @@ def main():
         # the identity is given here, not taken from the machine: a clone
         # that has never committed anything has no user.name, and the
         # commit would fail with "Author identity unknown"
-        c = git(target, "-c", "user.name=MCode", "-c", "user.email=mcode@local",
-                "commit", "-m", msg)
-        if c.returncode != 0:
-            say("   the commit failed:")
-            say("   %s" % (c.stderr or c.stdout).strip()[:400])
-            return 2
-        say("   committed: %s" % msg.split("\n")[0])
+        staged = git(target, "diff", "--cached", "--quiet")
+        if staged.returncode == 0:
+            # nothing to commit: the change is already in the tree's HEAD
+            # (a run that was interrupted after the commit)
+            say("   the change is already committed")
+        else:
+            c = git(target, "-c", "user.name=MCode", "-c", "user.email=mcode@local",
+                    "commit", "-m", msg)
+            if c.returncode != 0:
+                say("   the commit failed:")
+                say("   %s" % (c.stderr or c.stdout).strip()[:400])
+                return 2
+            say("   committed: %s" % msg.split("\n")[0])
 
         if not args.push:
             say("   (not pushed - add --push, with the destination gate)")
