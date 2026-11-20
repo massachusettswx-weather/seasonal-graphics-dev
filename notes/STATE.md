@@ -901,3 +901,57 @@ re-run.  It has, and the map's ECCC entry now has seven months.
 The extension's `ndays` (31 for May) is the number of days of
 accumulation, not the number of members - the exporter's "at least 20
 days" rule is a completeness test, not a member count.
+
+## The polar cap page had no daily pull, and the December gate was blind (20 Nov 2026)
+
+**THE OWNER'S NOTE: "GEFSv12 guidance hasn't updated on the polar cap page
+which is concerning for future seasonal models coming in in December on
+time/automatically."**  It was worse than a stale panel.  Two separate
+faults, both of which would have hit the December rollover.
+
+**1. THE GEFSv12 WAS NEVER WIRED TO ANYTHING.**  `fetch_polar_gefs.py`
+exists and works - it finds the newest cycle that carries the whole
+extended range, downloads the 35 daily leads for the members that carry
+all of them, and writes the series into the shared cache.  But **no
+script called it**.  The panel could only be refreshed by hand, which is
+why it sat on the 14 Nov run while the 19 Nov run was there to be had.
+The CORe reanalysis half (`fetch_polar_core.py`) was the same.
+
+`tools/daily_refresh.sh` now pulls all of it - the observed SST, the NOAA
+models, the GEFS and the CORe - and it is all from public sources, no key
+and no queue.  Both the publisher and the keepalive call it, so the data
+keeps moving even when the publisher is stopped.  The GEFS's decoded
+series is tracked in git as well: an hour of downloading to rebuild, and
+a sandbox rebuild takes `data/` with it.
+
+**2. THE MIXED-INIT GATE WAS WATCHING ONE CENTRE.**  The December risk
+is a split: the ECMWF publishes on the 6th and the other centres on the
+10th, so for four days the site would show two months at once.  The
+audit's gate exists to stop that - and it read its list of centres from
+`data/multi_members.json`, which the multi-model's renderer writes from
+**"the systems that happened to have data when this ran"**.  After a
+rebuild, when only the ECCC was on disk, that file listed ONE member and
+the model's card said "Mean of 1 seasonal systems (ECCC canSIPS)".
+
+So the gate was watching the ECCC alone and would have let a mixed
+December through.  The membership is now a constant
+(`init_info.MULTI_MODEL` - the six systems, the ECCC counted once as the
+pooled canSIPS); the audit reads it, the exporter reads it, and the
+renderer still records what actually went into the graphic, which is the
+honest count for the card and the title.
+
+`test_december_transition.py` now passes completely, including the check
+that the refusal says WHY it refused.
+
+**3. THE ORDER OF THE BUILD MATTERS.**  `build_registry.py` copies the
+drawn charts into `docs/assets/polar/`, so it has to run AFTER
+`build_polar_charts.py`.  The publisher's chain does that; a manual run
+that does it the other way round publishes the previous chart (which is
+exactly what happened the first time here).
+
+**WHAT IS STILL NOT AUTOMATIC, and what the owner has to decide**: the
+December *fetch* is automatic (the queue follows the C3S release
+calendar), but the *render* and the *publish* live inside the publisher,
+which is stopped, and the keepalive cron - the thing that restarts the
+workers after the sandbox rebuilds - is parked with it.  The workers were
+found dead this morning for exactly that reason.
