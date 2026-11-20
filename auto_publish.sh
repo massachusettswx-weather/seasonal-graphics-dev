@@ -78,15 +78,10 @@ while true; do
     # Without this the December run would never be picked up for the NOAA
     # models, and the plume's observed line would stop at the day the
     # series was last built.
-    MARK="data/.daily_fetch_$(date -u +%Y-%m-%d)"
-    if [ ! -f "$MARK" ]; then
-        log "the daily refresh"
-        touch "$MARK"
-        python3 -u fetch_oisst.py    >> logs_auto_publish.log 2>&1
-        python3 -u fetch_sfs.py      >> logs_auto_publish.log 2>&1
-        python3 -u fetch_cfsv2.py    >> logs_auto_publish.log 2>&1
-        python3 -u fetch_enso_noaa.py >> logs_auto_publish.log 2>&1
-    fi
+    # The daily refresh lives in its own script now, so the keepalive can
+    # do it too - the polar cap page needs the GEFS and the CORe, and
+    # nothing else was ever going to fetch them.
+    bash tools/daily_refresh.sh >> logs_auto_publish.log 2>&1
     cur=$(fingerprint)
     if [ -n "$cur" ] && [ "$cur" != "$prev" ]; then
         if [ -z "$prev" ]; then

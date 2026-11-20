@@ -44,6 +44,7 @@ import sys
 import json
 import warnings
 import numpy as np
+import init_info
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data")
@@ -55,8 +56,9 @@ POOLED_INTO = {"eccc-canesm5": "eccc-cansips", "eccc-gem5": "eccc-cansips"}
 
 # the C3S systems that go into the multi-model mean (the ECCC counts ONCE,
 # as the pooled canSIPS)
-MULTI_MEMBERS = ["ecmwf-seas5", "ukmo-gloseas6", "meteo-france-s9",
-                  "eccc-cansips", "cmcc-sps4", "dwd-gcfs2"]
+# the mean is over these six systems - the same canonical list the audit
+# reads (init_info.MULTI_MODEL), so there is one membership and not two
+MULTI_MEMBERS = list(init_info.MULTI_MODEL)
 
 # the byte that means "nothing to show here": for the totals it is the top
 # of the ladder (over 300 in), for the anomalies it is the mask

@@ -99,6 +99,18 @@ elif [ -n "${SITE_PASSWORD:-}" ]; then
 fi
 
 # ------------------------------------------------------------------
+# 2b. the daily pull
+# The products that move every day - the observed SST, the NOAA models,
+# the GEFSv12's 35-day range and NOAA's CORe reanalysis.  It is done
+# here as well as in the publisher, because the publisher can be stopped
+# (the posts are off) while the DATA still has to keep moving: a seasonal
+# model that moves to a new init must be drawn and published, and the
+# polar cap page must not sit on a week-old GEFS run.
+if [ -f tools/daily_refresh.sh ]; then
+    bash tools/daily_refresh.sh >> logs_daily_refresh.log 2>&1
+fi
+
+# ------------------------------------------------------------------
 # 3. the workers
 # pgrep also matches the zombies of an earlier run, so the check looks at
 # the process state and ignores the dead ones.

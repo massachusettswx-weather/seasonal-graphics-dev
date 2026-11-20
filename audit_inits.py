@@ -116,18 +116,12 @@ def c3s_centres(inits):
     pooled ECCC card (canSIPS) is counted once and the two systems it is
     built from are not counted twice.
     """
-    mm = os.path.join(DATA, "multi_members.json")
-    if os.path.exists(mm):
-        try:
-            d = json.load(open(mm))
-            for m in d.get("models", []):
-                tag = m.get("tag")
-                if tag and tag in inits:
-                    yield tag, inits[tag]
-            return
-        except Exception:
-            pass
-    for tag in init_info.CENTRES:
+    # THE CANONICAL LIST, not the file.  The file on disk records what
+    # went into the LAST drawing, and after a rebuild that can be one
+    # centre - the gate would then watch one centre and let a mixed
+    # December through.  (The file is still written; it is the record of
+    # the graphic, not the list the gate reads.)
+    for tag in init_info.MULTI_MODEL:
         if tag in inits:
             yield tag, inits[tag]
 

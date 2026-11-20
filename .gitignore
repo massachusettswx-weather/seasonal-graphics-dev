@@ -62,7 +62,10 @@ data/era5_polarcap_profiles.npz
 data/polar_cap_recent.npz
 data/polar_model_z.json
 data/polar_aifs.json
-data/polar_gefs_jobs.json
+# the GEFSv12's decoded 35-day series IS tracked now: it is the only
+# record of a fetch that takes an hour to redo, and a sandbox rebuild
+# takes data/ with it.  The file is small (35 leads) and it is what
+# lets the fetcher put the series back without downloading it again.
 data/polar_ec46_jobs.json
 data/polar_ec46_z.json
 data/_aifs.lock

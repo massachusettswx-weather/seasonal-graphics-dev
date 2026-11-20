@@ -22,6 +22,22 @@ RELEASE_DAY = {"ecmwf": 6}
 DEFAULT_RELEASE_DAY = 10
 
 # tag -> (centre, system) for the C3S centres
+# THE C3S MULTI-MODEL MEAN'S MEMBERSHIP - the canonical list.
+#
+# It is a CONSTANT and not "the systems that happened to have data when
+# the panel was last drawn".  That distinction matters twice:
+#
+#   * the audit's mixed-init gate has to watch EVERY member, and a
+#     membership file written from whatever was on disk shrinks to one
+#     centre after a rebuild - the gate then goes blind exactly when it
+#     is needed, in the middle of a December rollover, when the ECMWF
+#     moves to the new init on the 6th and the other centres on the
+#     10th;
+#   * the ECCC is counted ONCE, as the pooled canSIPS, and not twice as
+#     the two systems it is built from.
+MULTI_MODEL = ("ecmwf-seas5", "ukmo-gloseas6", "meteo-france-s9",
+                "eccc-cansips", "cmcc-sps4", "dwd-gcfs2")
+
 CENTRES = {
     "ecmwf-seas5": ("ecmwf", "51"),
     "ukmo-gloseas6": ("ukmo", "610"),

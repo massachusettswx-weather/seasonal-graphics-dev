@@ -152,9 +152,19 @@ def main():
     # card can say the same thing as the graphic
     try:
         with open(os.path.join(DATA, "multi_members.json"), "w") as fh:
-            json.dump({"models": [{"tag": t, "name": n} for t, n in zip(
-                [m[0] for m in MODELS if m[0] in fields], used)],
+            json.dump({
+                # WHAT WENT INTO THIS GRAPHIC - the honest count for the
+                # card and the title.
+                "models": [{"tag": t, "name": n} for t, n in zip(
+                    [m[0] for m in MODELS if m[0] in fields], used)],
                 "count": len(fields),
+                # THE CANONICAL MEMBERSHIP - the six systems the mean is
+                # over whether or not their data is on disk this minute.
+                # The audit's mixed-init gate reads THIS, so a rebuild
+                # that leaves one centre on disk cannot make the gate
+                # blind.
+                "members": list(init_info.MULTI_MODEL),
+                "member_count": len(init_info.MULTI_MODEL),
                 "window": ["%04d-%02d" % ym for ym in WINDOW]}, fh, indent=1)
     except Exception as e:
         print("   (could not record the contributors: %s)" % str(e)[:80])
