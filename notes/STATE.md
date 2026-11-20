@@ -42,9 +42,11 @@ need the conversation.
 * They run in `/workspace/devrepo`: the CDS request pool and the polar
   puller.  The sandbox is rebuilt every hour, which kills them.
 * **There is ONE scheduled task** (22 Nov 2026), `seasonal-gefs-subs`
-  (`465527736623226`), at **05:00 America/New_York** (= 10:00 UTC, about
-  an hour after NCEP's 00Z cycle carries its full 35-day range - measured:
-  the last lead of the 20261120 00Z cycle landed at **09:04 UTC**).  It
+  (`465527736623226`), at **05:00 America/New_York** (= 10:00 UTC).  The
+  00Z cycle is only COMPLETE about 24 hours after its init - NCEP uploads
+  the members in four batches, the last one at ~00:40 UTC the next day
+  - so 10:00 UTC always finds the previous day's cycle as the newest
+  complete one.  It
   runs in its own throwaway conversation, and it does ONE thing:
   `tools/gefs_subs_disseminate.sh`.
 * **The 20-minute keepalive is GONE** (deleted 22 Nov 2026 at the owner's
@@ -109,6 +111,10 @@ python3 tools/publish_polar_subseasonal.py --repo /workspace/repo \
 * It stages **only its own seven files**, so the development copy's busy
   working tree is never carried into a commit, and the token never goes
   on a command line (it lives in a credential file for the push only).
+* It finishes a change that was written but never committed (a run that
+  was interrupted between the write and the commit leaves exactly that),
+  and it gives the git identity on the command line, because a clone that
+  has never committed has none.
 
 **`tools/gefs_subs_disseminate.sh`** is the job that runs it once a day:
 it puts the pipeline back (it clones the tree if a rebuild took it), pulls

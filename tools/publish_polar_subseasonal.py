@@ -69,6 +69,12 @@ MODEL_ID = "gefsv12"
 LABEL = "NOAA GEFSv12 (35-day extended)"
 # the two pictures that make up the product
 CHARTS = ("polar_cap_gefsv12.png", "polar_sectors_gefsv12.png")
+# the seven files the product is carried in
+FILES = ("docs/assets/polar/polar_cap_gefsv12.png",
+         "docs/assets/polar/polar_sectors_gefsv12.png",
+         "docs/data/models.json",
+         "docs/data/models_public.json",
+         "docs/model.html", "docs/snow.html", "docs/spv.html")
 # the live site: a push to it needs the approval flags
 OPERATIONAL_MARK = "github.com/massachusettswx-weather/seasonal-graphics"
 # the GEFSv12's 00Z cycle carries 35 days (f012 to f840).  The fetcher writes
@@ -310,10 +316,20 @@ def main():
         say("   NOTHING IS CHANGED.")
         return 2
     old_init = entry.get("init")
-    if old_init == series["init"] and not args.force:
+    # A CHANGE THAT WAS WRITTEN BUT NEVER COMMITTED IS NOT "ALREADY
+    # THERE".  The working tree can carry a cycle that never reached the
+    # server - a run that was interrupted between the write and the commit
+    # leaves exactly that - so the check has to look at the files, not
+    # only at the registry.
+    stranded = bool(git(target, "status", "--porcelain", "--", *FILES)
+                    .stdout.strip())
+    if old_init == series["init"] and not args.force and not stranded:
         say("   the target already carries the %s cycle - nothing to do"
             % old_init)
         return 0
+    if stranded:
+        say("   the target's working tree holds a change that was never"
+            " committed - it is finished and pushed now")
     if old_init and old_init > series["init"] and not args.force:
         say("   the target carries %s, which is NEWER than the update (%s)."
             % (old_init, series["init"]))
@@ -384,18 +400,18 @@ def main():
         written.append(os.path.join("docs", "data", "models_public.json"))
         written.extend(os.path.join("docs", f) for f in hits)
 
-        # the target's working tree: the operational clone must be clean (a
-        # dirty tree there means somebody else's work is in it), while the
-        # development copy is busy all the time - there only OUR files must
-        # be untouched, or we would overwrite somebody's change.
+        # the target's working tree: somebody else's work in it means no.
+        # The operational clone must be clean of anything else; the
+        # development copy is busy all the time, so there only the files
+        # that are NOT ours must be untouched.
         st = git(target, "status", "--porcelain")
         dirty = [l for l in st.stdout.strip().split("\n") if l.strip()]
-        ours = [l for l in dirty
-                if any(l[3:].strip().strip('"') == w for w in written)]
-        if dirty and (is_operational or ours):
-            say("   the target's working tree is not clean - refusing to")
-            say("   mix this change with somebody else's:")
-            for line in (ours or dirty)[:10]:
+        others = [l for l in dirty
+                  if not any(l[3:].strip().strip('"') == w for w in FILES)]
+        if others:
+            say("   the target's working tree has changes that are not ours -")
+            say("   refusing to mix them with this update:")
+            for line in others[:10]:
                 say("     %s" % line)
             return 2
 
@@ -434,7 +450,11 @@ def main():
         msg = args.message or ("The daily %s sub-seasonal update: the %s cycle"
                                 % (MODEL_ID, series["init"]))
         git(target, "add", "--", *written)
-        c = git(target, "commit", "-m", msg)
+        # the identity is given here, not taken from the machine: a clone
+        # that has never committed anything has no user.name, and the
+        # commit would fail with "Author identity unknown"
+        c = git(target, "-c", "user.name=MCode", "-c", "user.email=mcode@local",
+                "commit", "-m", msg)
         if c.returncode != 0:
             say("   the commit failed:")
             say("   %s" % (c.stderr or c.stdout).strip()[:400])

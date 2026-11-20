@@ -116,6 +116,35 @@ stay byte for byte as they are.
 It is not wired into the daily run yet - the owner's word is the only
 thing missing.
 
+**WHEN THE 00Z CYCLE IS COMPLETE (measured 20 Nov 2026).**  NCEP uploads
+the members of the 00Z cycle in FOUR BATCHES, and the cycle is only usable
+when the last member is there at every lead:
+
+| members | landed (UTC) |
+|---|---|
+| gep01 - gep08 | ~06:40 |
+| gep09 - gep16 | ~12:40 |
+| gep17 - gep24 | ~18:40 |
+| gep25 - gep30 | ~00:40 **the next day** |
+
+So the newest COMPLETE cycle is about **24 hours old** at any moment, and
+the daily job at 10:00 UTC always finds the previous day's 00Z cycle as
+the newest complete one.  The fetcher says so itself: *"the cycle
+20261120 00Z is incomplete: the lead f396 carries 16 members"*.
+
+**TWO TRAPS THIS PATH FOUND ON ITS FIRST RUN.**
+
+* **A CHANGE THAT WAS WRITTEN BUT NEVER COMMITTED IS NOT "ALREADY
+  THERE".**  The first run wrote the files and then failed at the commit,
+  so the working tree carried the new cycle while the server still had
+  the old one - and the next run called it "already published" and did
+  nothing.  The check now looks at the FILES as well as at the registry:
+  a change of ours that is not committed is finished and pushed.
+* **A CLONE THAT HAS NEVER COMMITTED HAS NO `user.name`.**  The commit
+  failed with *"Author identity unknown"*.  The identity is now given on
+  the command line (`-c user.name -c user.email`), the way
+  `push_to_github.sh` does it.
+
 ## The daily job that runs it (22 Nov 2026)
 
 `tools/gefs_subs_disseminate.sh` is that job, and one scheduled task
