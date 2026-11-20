@@ -22,6 +22,8 @@ Usage:
     python3 tools/recover_jobs.py                 # every entry
     python3 tools/recover_jobs.py ecmwf-seas5     # one model
     python3 tools/recover_jobs.py --dry-run       # report only
+    python3 tools/recover_jobs.py --no-request    # download only, ask for
+                                                   # nothing (the keepalive)
 """
 import os
 import sys
@@ -47,6 +49,14 @@ def load():
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     dry = "--dry-run" in sys.argv
+    # --no-request: download the results that are still on the store and
+    # ask for NOTHING.  The archive's queue is slow and shared with every
+    # other user, and the seasonal fetch needs the queue slots; the
+    # re-submission belongs to run_nov_queue.py, which knows which init a
+    # centre is really on.  A keepalive that re-asks for the archive's
+    # old probe requests every twenty minutes puts junk in the queue and
+    # competes with the December rollover.
+    no_request = "--no-request" in sys.argv
 
     jobs = load()
     if args:
@@ -82,7 +92,7 @@ def main():
         else:
             missing.append(label)
 
-        if dry or not j.get("request"):
+        if dry or no_request or not j.get("request"):
             continue
 
         # the job is gone: ask the store again, one at a time
