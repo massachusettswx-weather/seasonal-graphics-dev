@@ -76,7 +76,7 @@ FILES = ("docs/assets/polar/polar_cap_gefsv12.png",
          "docs/data/models_public.json",
          "docs/model.html", "docs/snow.html", "docs/spv.html")
 # the live site: a push to it needs the approval flags
-OPERATIONAL_MARK = "github.com/massachusettswx-weather/seasonal-graphics"
+OPERATIONAL_REPO = ("massachusettswx-weather", "seasonal-graphics")
 # the GEFSv12's 00Z cycle carries 35 days (f012 to f840).  The fetcher writes
 # the series into the cache after EVERY lead, so a series that is still being
 # downloaded is on disk and is SHORTER than this.  A partial series is never
@@ -223,6 +223,18 @@ def remote_url(repo):
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
+def remote_repo(url):
+    """(owner, repository) of a GitHub remote, or ("", "").
+
+    The development copy is named `seasonal-graphics-dev`, so a plain
+    substring test for `seasonal-graphics` says the DEV repository is the
+    operational one - and then the operational rules are applied to the
+    wrong tree.  The path is compared exactly instead.
+    """
+    m = re.search(r"github\.com[:/]([^/]+)/([^/\s]+?)(?:\.git)?\s*$", url or "")
+    return (m.group(1), m.group(2)) if m else ("", "")
+
+
 def token_for(repo):
     """The GitHub token: the file first, then the environment."""
     for p in (os.path.join(repo, "data", ".github_token"),
@@ -286,7 +298,7 @@ def main():
     target = os.path.abspath(args.repo)
     # the operational site is the one whose remote says so - the gate is on
     # the DESTINATION, not on a flag
-    is_operational = OPERATIONAL_MARK in remote_url(target)
+    is_operational = remote_repo(remote_url(target)) == OPERATIONAL_REPO
 
     say("== the narrow path: the daily %s update ==" % MODEL_ID)
 
@@ -400,15 +412,16 @@ def main():
         written.append(os.path.join("docs", "data", "models_public.json"))
         written.extend(os.path.join("docs", f) for f in hits)
 
-        # the target's working tree: somebody else's work in it means no.
-        # The operational clone must be clean of anything else; the
-        # development copy is busy all the time, so there only the files
-        # that are NOT ours must be untouched.
+        # the target's working tree: the OPERATIONAL clone is curated, so
+        # anything else in it is somebody else's work and this change is
+        # refused.  The development copy is busy all the time - the
+        # workers are always writing - so there the rule is the opposite:
+        # only our seven files are touched, and they are staged alone.
         st = git(target, "status", "--porcelain")
         dirty = [l for l in st.stdout.strip().split("\n") if l.strip()]
         others = [l for l in dirty
                   if not any(l[3:].strip().strip('"') == w for w in FILES)]
-        if others:
+        if others and is_operational:
             say("   the target's working tree has changes that are not ours -")
             say("   refusing to mix them with this update:")
             for line in others[:10]:
@@ -467,11 +480,11 @@ def main():
 
         # 7. the gate: the operational site needs the owner's approval
         url = remote_url(target)
-        if OPERATIONAL_MARK in url and not (args.prod and args.approved):
+        if remote_repo(url) == OPERATIONAL_REPO and not (args.prod and args.approved):
             say("   %s IS THE OPERATIONAL SITE." % url)
             say("   It is not published: it needs --prod --approved.")
             return 2
-        if args.prod and OPERATIONAL_MARK not in url:
+        if args.prod and remote_repo(url) != OPERATIONAL_REPO:
             say("   the remote is %s, which is not the operational site." % url)
             return 2
         token = token_for(target)

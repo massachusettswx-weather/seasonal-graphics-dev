@@ -144,6 +144,12 @@ the newest complete one.  The fetcher says so itself: *"the cycle
   failed with *"Author identity unknown"*.  The identity is now given on
   the command line (`-c user.name -c user.email`), the way
   `push_to_github.sh` does it.
+* **THE DEVELOPMENT COPY IS NAMED AFTER THE OPERATIONAL ONE.**  A test
+  for the remote that looks for `seasonal-graphics` finds
+  `seasonal-graphics-dev` as well, so the operational rules - the clean
+  tree, the approval gate - were applied to the wrong repository.  The
+  remote's path is now compared exactly: the operational repository is
+  `massachusettswx-weather/seasonal-graphics` and nothing else.
 
 ## The daily job that runs it (22 Nov 2026)
 
