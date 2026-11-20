@@ -53,6 +53,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -70,6 +71,11 @@ LABEL = "NOAA GEFSv12 (35-day extended)"
 CHARTS = ("polar_cap_gefsv12.png", "polar_sectors_gefsv12.png")
 # the live site: a push to it needs the approval flags
 OPERATIONAL_MARK = "github.com/massachusettswx-weather/seasonal-graphics"
+# the GEFSv12's 00Z cycle carries 35 days (f012 to f840).  The fetcher writes
+# the series into the cache after EVERY lead, so a series that is still being
+# downloaded is on disk and is SHORTER than this.  A partial series is never
+# published: the panel would show half a season.
+EXPECTED_DAYS = 35
 
 
 def say(msg):
@@ -103,8 +109,13 @@ def load_series(src):
     init = "%s-%s-%s" % (run[0:4], run[4:6], run[6:8]) if len(run) >= 8 else ""
     if len(init) != 10:
         init = str(times[0])[:10]
+    if len(times) < EXPECTED_DAYS:
+        # the series is still being downloaded - the fetcher writes it after
+        # every lead, so a short one is a half-downloaded run
+        return {"run": run, "init": init, "days": len(times),
+                "members": g.get("members"), "complete": False}
     return {"run": run, "init": init, "days": len(times),
-            "members": g.get("members")}
+            "members": g.get("members"), "complete": True}
 
 
 def render(src, stage):
@@ -206,6 +217,45 @@ def remote_url(repo):
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
+def token_for(repo):
+    """The GitHub token: the file first, then the environment."""
+    for p in (os.path.join(repo, "data", ".github_token"),
+              os.path.join(SRC_DEFAULT, "data", ".github_token")):
+        if os.path.exists(p):
+            t = open(p).read().strip()
+            if t:
+                return t
+    return (os.environ.get("GITHUB_TOKEN") or "").strip()
+
+
+def push(repo, url, token):
+    """Push to the remote, with the token never on the command line.
+
+    The token is written to a credential file that only exists while the
+    push runs, and the file is removed afterwards - so a bare `git push`
+    can never reach the live site with a credential in it, and the token
+    is never visible in the process list.
+    """
+    if "github.com" not in url or not token:
+        return git(repo, "push", "origin", "HEAD")
+    cred = os.path.join(repo, ".git", "gh_cred")
+    with open(cred, "w") as f:
+        f.write("https://x-access-token:%s@github.com\n" % token)
+    os.chmod(cred, 0o600)
+    env = dict(os.environ)
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    try:
+        return subprocess.run(
+            ["git", "-c", "credential.helper=store --file=%s" % cred,
+             "push", "origin", "HEAD"],
+            cwd=repo, capture_output=True, text=True, env=env)
+    finally:
+        try:
+            os.remove(cred)
+        except OSError:
+            pass
+
+
 # --------------------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
@@ -228,6 +278,9 @@ def main():
 
     src = os.path.abspath(args.src)
     target = os.path.abspath(args.repo)
+    # the operational site is the one whose remote says so - the gate is on
+    # the DESTINATION, not on a flag
+    is_operational = OPERATIONAL_MARK in remote_url(target)
 
     say("== the narrow path: the daily %s update ==" % MODEL_ID)
 
@@ -240,6 +293,11 @@ def main():
         return 2
     say("   the update: the %s run, %d days, %s members"
         % (series["run"], series["days"], series["members"]))
+    if not series["complete"]:
+        say("   the series is only %d of %d days - the run is still being"
+            % (series["days"], EXPECTED_DAYS))
+        say("   downloaded.  NOTHING IS CHANGED: a half season is not a season.")
+        return 2
 
     regp = os.path.join(target, "docs", "data", "models.json")
     if not os.path.exists(regp):
@@ -317,17 +375,33 @@ def main():
             say("   (plan only - add --apply to write it)")
             return 0
 
-        # 4. write it
+        # 4. the files this run would write
+        written = []
+        for p in drawn:
+            written.append(os.path.join("docs", "assets", "polar",
+                                        os.path.basename(p)))
+        written.append(os.path.join("docs", "data", "models.json"))
+        written.append(os.path.join("docs", "data", "models_public.json"))
+        written.extend(os.path.join("docs", f) for f in hits)
+
+        # the target's working tree: the operational clone must be clean (a
+        # dirty tree there means somebody else's work is in it), while the
+        # development copy is busy all the time - there only OUR files must
+        # be untouched, or we would overwrite somebody's change.
         st = git(target, "status", "--porcelain")
-        if st.stdout.strip():
+        dirty = [l for l in st.stdout.strip().split("\n") if l.strip()]
+        ours = [l for l in dirty
+                if any(l[3:].strip().strip('"') == w for w in written)]
+        if dirty and (is_operational or ours):
             say("   the target's working tree is not clean - refusing to")
             say("   mix this change with somebody else's:")
-            for line in st.stdout.strip().split("\n")[:10]:
+            for line in (ours or dirty)[:10]:
                 say("     %s" % line)
             return 2
+
         for p in drawn:
-            shutil.copyfile(p, os.path.join(docs, "assets", "polar",
-                                           os.path.basename(p)))
+            shutil.copyfile(p, os.path.join(target, os.path.join(
+                "docs", "assets", "polar", os.path.basename(p))))
         json.dump(new_reg, open(regp, "w"), indent=1)
         pub = {"models": []}
         for m in new_reg["models"]:
@@ -354,10 +428,12 @@ def main():
         say("   written and checked: init=%s, both charts byte for byte."
             % series["init"])
 
-        # 6. commit
+        # 6. commit - ONLY the files this script wrote.  The development
+        # copy's tree is busy all the time, and a `git add -A` there would
+        # carry whatever the workers happened to be writing.
         msg = args.message or ("The daily %s sub-seasonal update: the %s cycle"
                                 % (MODEL_ID, series["init"]))
-        git(target, "add", "-A")
+        git(target, "add", "--", *written)
         c = git(target, "commit", "-m", msg)
         if c.returncode != 0:
             say("   the commit failed:")
@@ -378,13 +454,18 @@ def main():
         if args.prod and OPERATIONAL_MARK not in url:
             say("   the remote is %s, which is not the operational site." % url)
             return 2
+        token = token_for(target)
+        if "github.com" in url and not token:
+            say("   there is no GitHub token - nothing is pushed.")
+            say("   the commit stays local; the site keeps the old cycle.")
+            return 3
         ls = git(target, "ls-remote", "origin")
         if ls.returncode != 0:
             say("   the repository cannot be reached:")
             say("   %s" % (ls.stderr or ls.stdout).strip()[:400])
             say("   the commit stays local; the site keeps the old cycle.")
             return 3
-        p = git(target, "push", "origin", "HEAD")
+        p = push(target, url, token)
         if p.returncode != 0:
             say("   the PUSH FAILED:")
             say("   %s" % (p.stderr or p.stdout).strip()[:400])

@@ -41,14 +41,20 @@ need the conversation.
 
 * They run in `/workspace/devrepo`: the CDS request pool and the polar
   puller.  The sandbox is rebuilt every hour, which kills them.
-* The **keepalive** (task `464432350077090`, every 20 minutes) restores
-  them after a rebuild.  It now runs in **its own conversation**, not the
-  owner's, and its prompt is rewritten: the publisher stays off, the
-  operational site is never touched, the recovery is `--no-request` for
-  the eight C3S centres.
-* The daily pull is `tools/daily_refresh.sh` (OISST, NOAA ENSO, CFSv2 in
-  the foreground; SFS, CORe and the GEFS detached, because the GEFS takes
-  about an hour for a new cycle).
+* **There is ONE scheduled task** (22 Nov 2026), `seasonal-gefs-subs`
+  (`465527736623226`), at **05:00 America/New_York** (= 10:00 UTC, about
+  an hour after NCEP's 00Z cycle carries its full 35-day range - measured:
+  the last lead of the 20261120 00Z cycle landed at **09:04 UTC**).  It
+  runs in its own throwaway conversation, and it does ONE thing:
+  `tools/gefs_subs_disseminate.sh`.
+* **The 20-minute keepalive is GONE** (deleted 22 Nov 2026 at the owner's
+  instruction).  It was the thing that flooded the chat and it published
+  nothing; the daily task replaces it.
+* **The general publisher stays OFF** (`SITE_NO_PUBLISH=1`).  The only
+  thing that goes out is the GEFSv12 sub-seasonal panel, and only through
+  the narrow path.
+* The daily pull for the other products is `tools/daily_refresh.sh` (OISST,
+  NOAA ENSO, CFSv2 in the foreground; SFS and CORe detached).
 
 ## The December rollover
 
@@ -64,12 +70,14 @@ need the conversation.
   `run_nov_queue.py`.
 * Still in the queue: `ext:jma-jra3` and `ext:bom-access-s2`.
 
-## The narrow path to the operational site (new, 20 Nov 2026)
+## The narrow path to the operational site (20-22 Nov 2026)
 
 The owner's request: *"Stop the scheduled updates.. we need to extend the
-daily GEFSv12 SUBS update to the live site as well"*.
+daily GEFSv12 SUBS update to the live site as well"*, and on 22 Nov: *"fix
+the dissemination of 00z GEFSv12 SUBS to update daily after the latest
+model run finishes"*.
 
-**`tools/publish_polar_subseasonal.py`** is that narrow path.  It carries
+**`tools/publish_polar_subseasonal.py`** is the narrow path.  It carries
 **one product, two pictures, one registry entry** and never rebuilds the
 site:
 
@@ -88,14 +96,27 @@ python3 tools/publish_polar_subseasonal.py --repo /workspace/repo \
   registry inlined in `docs/model.html`, `docs/snow.html`, `docs/spv.html`.
 * It selects them by a **constant** (`MODEL_ID = "gefsv12"`), never from
   a file a previous run wrote.
-* **Nothing is published when the update is missing** (exit 2) and the
-  live site is never put back to an older cycle.
+* It rebuilds the inlined registry with the **TARGET's own**
+  `build_site.py` (the `ok` flags come from the files that are really
+  there) and refuses if that blob is not in the pages.
+* **Nothing is published when the update is missing** (exit 2) - and a
+  series that is still being downloaded (fewer than 35 days) counts as
+  missing: a half season is not a season.
 * **The push fails loudly** (exit 3) if the repository cannot be reached:
   the commit stays local and the site keeps the old cycle.
 * The operational destination needs `--prod --approved`; without them the
   script refuses to push, whatever the remote says.
-* It is **not** wired into the daily run yet.  The owner's word is the
-  only thing missing: one line in `tools/daily_refresh.sh` turns it on.
+* It stages **only its own seven files**, so the development copy's busy
+  working tree is never carried into a commit, and the token never goes
+  on a command line (it lives in a credential file for the push only).
+
+**`tools/gefs_subs_disseminate.sh`** is the job that runs it once a day:
+it puts the pipeline back (it clones the tree if a rebuild took it), pulls
+the day's data, fetches the **newest complete 00Z cycle** in the
+foreground - so "the run has finished" is an answer and not a hope -
+commits the fetch state (it is in git, so a rebuild does not download an
+hour again), and publishes to the development copy and to the operational
+site.  **The trigger is the RUN, not a clock.**
 
 ## Still open
 
@@ -105,11 +126,19 @@ python3 tools/publish_polar_subseasonal.py --repo /workspace/repo \
    drag returns to panning on the flat map.  Then rebuild, test the round
    trip (d3 cannot express a tilt) and publish to the **development**
    copy.
-2. **The operational push of the daily GEFSv12 update** - ready, proven on
-   a local clone, waiting for the owner's word.
-3. **`notes/EXPANSION.md`** - six questions for the owner; the expansion
+2. **The operational push of the daily GEFSv12 update** - DONE: the narrow
+   path is live, the daily job runs it, and the live site carries the
+   2026-11-19 cycle (22 Nov 2026).
+3. **The December cadence**: the CDS request pool is now started **once a
+   day** by the daily job, not every twenty minutes.  A sandbox rebuild
+   kills it every hour, so the queue is only alive for the first hour
+   after the job runs - the requests it submits still go to the archive,
+   but the results are picked up by the next run.  If the December
+   rollover needs the queue to be alive continuously, the cadence has to
+   come back: that is the owner's call, not a detail.
+4. **`notes/EXPANSION.md`** - six questions for the owner; the expansion
    must not be rebuilt before they are answered.
-4. The **`thinking_content` masks** (a platform defect, not ours): see
+5. The **`thinking_content` masks** (a platform defect, not ours): see
    `notes/THINKING_MASKS_BUG.md`, audit with `tools/transcript_doctor.py`.
 
 ## The rules that are not negotiable

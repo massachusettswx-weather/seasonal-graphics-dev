@@ -66,7 +66,17 @@ for f in fetch_oisst.py fetch_enso_noaa.py fetch_cfsv2.py; do
 done
 
 # in the background: slow, and nothing waits on them
-for f in fetch_sfs.py fetch_polar_core.py fetch_polar_gefs.py; do
+#
+# THE GEFS FETCH CAN BE HANDED TO SOMEONE ELSE.  Set SKIP_GEFS=1 and the
+# GEFSv12 is not started here: tools/gefs_subs_disseminate.sh owns it,
+# because the trigger for publishing is the RUN FINISHING and not the
+# pull's start - so the fetch must be in the foreground of the job that
+# waits for it.
+SLOW="fetch_sfs.py fetch_polar_core.py"
+if [ "${SKIP_GEFS:-}" != "1" ]; then
+    SLOW="$SLOW fetch_polar_gefs.py"
+fi
+for f in $SLOW; do
     if [ ! -f "$f" ]; then
         say "  $f is not here - skipped"
         continue
