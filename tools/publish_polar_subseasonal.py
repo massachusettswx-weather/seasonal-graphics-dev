@@ -158,28 +158,69 @@ def public_map(reg):
     return out
 
 
-def target_build_site(target):
-    """The TARGET's own build_site.py, loaded from its own path.
+def inline_registry(text):
+    """The registry the page carries: (start, end, object), or None.
 
-    The pages were written by that file, and its `load_registry()` adds the
-    "ok" flags by looking at the files that are actually there.  The blob
-    that is inlined in the pages is therefore that file's output, and only
-    that file can reproduce it.  A copy of the rule in this script would
-    drift from the pages the moment the rule changed.
+    The pages inline it as `const MODELS={...};`.  The blob is read out
+    of the PAGE, not computed from the tree: a fresh clone is missing
+    build artifacts that the pages were built with (the April-2027
+    anomaly maps of five centres are never committed), so the tree's own
+    registry can never match the pages' - and the entry we are here to
+    change lives in the page.
     """
-    import importlib.util
-    p = os.path.join(target, "build_site.py")
-    if not os.path.exists(p):
+    i = text.find("const MODELS=")
+    if i < 0:
         return None
-    spec = importlib.util.spec_from_file_location("target_build_site", p)
-    mod = importlib.util.module_from_spec(spec)
-    sys.path.insert(0, target)
-    try:
-        spec.loader.exec_module(mod)
-    finally:
-        if sys.path and sys.path[0] == target:
-            sys.path.pop(0)
-    return mod
+    j = text.find("{", i)
+    if j < 0:
+        return None
+    depth = 0
+    in_str = False
+    esc = False
+    for k in range(j, len(text)):
+        c = text[k]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            in_str = True
+        elif c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    obj = json.loads(text[j:k + 1])
+                except ValueError:
+                    return None
+                return (j, k + 1, obj)
+    return None
+
+
+def patch_inline(text, init, version):
+    """The page's own registry, with the GEFSv12 entry brought forward.
+
+    Only THAT entry is touched: the other models' availability flags are
+    the page's own, and they are not ours to change.
+    """
+    got = inline_registry(text)
+    if got is None:
+        return None
+    start, end, obj = got
+    entry = obj.get(MODEL_ID)
+    if not isinstance(entry, dict):
+        return None
+    entry["init"] = init
+    for key, fn in (("polar", "polar_cap_gefsv12.png"),
+                    ("polar_sectors", "polar_sectors_gefsv12.png")):
+        if isinstance(entry.get(key), dict):
+            entry[key]["file"] = "assets/polar/%s?v=%s" % (fn, version)
+    return text[:start] + json.dumps(obj) + text[end:]
 
 
 def entry_of(reg):
@@ -368,25 +409,29 @@ def main():
         version = new_version(oldver)
         new_reg = patched_registry(reg, series["init"], version)
 
-        # the blob the pages carry is the TARGET's own builder's output: its
-        # load_registry() adds the "ok" flags from the files that are really
-        # there, so only the target's own code can reproduce it.
-        bs = target_build_site(target)
-        if bs is not None:
-            old_blob = json.dumps(bs.public_map(bs.load_registry()))
-        else:
-            old_blob = json.dumps(public_map(reg))
-
+        # THE PAGES ARE PATCHED IN THEIR OWN INLINED REGISTRY.  The blob
+        # in a page was written when the page was built, and a fresh clone
+        # does not hold the build artifacts that were there then (the
+        # April-2027 anomaly maps of five centres are never committed),
+        # so the tree's own registry can never match it.  What matters is
+        # the ONE entry this product owns - so that entry is read out of
+        # the page and written back, and nothing else in the page moves.
         docs = os.path.join(target, "docs")
         html_files = sorted(f for f in os.listdir(docs) if f.endswith(".html"))
         hits = []
         for f in html_files:
             t = open(os.path.join(docs, f), encoding="utf-8").read()
-            if old_blob in t:
+            got = inline_registry(t)
+            if got is None:
+                continue
+            entry_in_page = got[2].get(MODEL_ID)
+            if isinstance(entry_in_page, dict) and isinstance(
+                    entry_in_page.get("polar"), dict):
                 hits.append(f)
         if not hits:
-            say("   the target's pages were not built from its own registry,")
-            say("   so they cannot be patched safely - NOTHING IS CHANGED.")
+            say("   none of the target's pages carries the %s entry -"
+                % MODEL_ID)
+            say("   NOTHING IS CHANGED.")
             return 2
 
         say("   it would put on the target:")
@@ -439,15 +484,14 @@ def main():
             pub["models"].append(dict(m))
         json.dump(pub, open(os.path.join(docs, "data", "models_public.json"),
                             "w"), indent=1)
-        if bs is not None:
-            new_blob = json.dumps(bs.public_map(bs.load_registry()))
-        else:
-            new_blob = json.dumps(public_map(new_reg))
         for f in hits:
             p = os.path.join(docs, f)
             t = open(p, encoding="utf-8").read()
-            t = t.replace(old_blob, new_blob)
-            open(p, "w", encoding="utf-8").write(t)
+            t2 = patch_inline(t, series["init"], version)
+            if t2 is None:
+                say("   %s could not be patched - NOTHING IS CHANGED." % f)
+                return 2
+            open(p, "w", encoding="utf-8").write(t2)
 
         # 5. check what was written
         back = json.load(open(regp))
@@ -456,8 +500,15 @@ def main():
         for p in drawn:
             q = os.path.join(docs, "assets", "polar", os.path.basename(p))
             assert md5(q) == md5(p), "the chart did not land"
-        say("   written and checked: init=%s, both charts byte for byte."
+        for f in hits:
+            t = open(os.path.join(docs, f), encoding="utf-8").read()
+            got = inline_registry(t)
+            assert got is not None, "the registry left %s" % f
+            assert got[2][MODEL_ID]["init"] == series["init"], \
+                "the init did not land in %s" % f
+        say("   written and checked: init=%s, both charts byte for byte,"
             % series["init"])
+        say("   and the pages carry the same cycle.")
 
         # 6. commit - ONLY the files this script wrote.  The development
         # copy's tree is busy all the time, and a `git add -A` there would

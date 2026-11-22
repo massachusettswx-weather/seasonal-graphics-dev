@@ -43,6 +43,12 @@ MODELS = [
     ("ec46", "ECMWF EC46"),
 ]
 
+# The section opens on the GEFSv12: it is the sub-seasonal panel, the one
+# that changes every day, and the owner asked for it to be the default
+# (22 Nov 2026).  A CONSTANT, not "the first one in the list" - the list
+# follows the registry, and the registry's order is not a choice.
+DEFAULT = "gefsv12"
+
 def available(reg=None):
     """-> [(id, name)] for the models the registry says have a section."""
     if reg is None:
@@ -97,7 +103,7 @@ def polar_block(reg=None):
         return ""
     secs = {i["id"]: i for i in sector_items(reg)}
 
-    default = its[0]["id"]
+    default = DEFAULT if any(i["id"] == DEFAULT for i in its) else its[0]["id"]
     sel = "".join('<option value="%s"%s>%s</option>'
                   % (i["id"], " selected" if i["id"] == default else "",
                      i["name"]) for i in its)
