@@ -288,6 +288,70 @@ def main():
             pg.query_selector('#snowwindow button[data-window="1"]').click()
             pg.wait_for_timeout(1200)
 
+            # THE GLOBE'S TILT ALONE (the owner's choice, 22 Nov 2026).
+            # The flat map pans and does not turn on the screen, and the
+            # tilt button belongs to the globe alone.
+            pg.query_selector_all("#mapviews button")[1].click()
+            pg.wait_for_timeout(1800)
+            tilt = pg.evaluate("""() => {
+              var st = window.__maps;
+              var b = document.querySelector(".mapctl [data-z='tilt']");
+              var vis = b ? (b.offsetParent !== null || b.style.display !== 'none')
+                          : false;
+              return {has: !!b, vis: vis, mode: st ? !!st.tiltMode : null,
+                      tilt: st ? st.tilt : null,
+                      hasTurn: st ? ('turn' in st) : null};
+            }""")
+            print("the tilt on the globe:", tilt)
+            if not (tilt["has"] and tilt["vis"]):
+                print("   FAIL: the globe must offer the tilt")
+                errors.append("the globe has no tilt button")
+            elif tilt["hasTurn"]:
+                print("   FAIL: the flat turn is still in the state")
+                errors.append("the flat turn is still in the state")
+            else:
+                print("   ok")
+            if tilt["has"]:
+                pg.query_selector(".mapctl [data-z='tilt']").click()
+                pg.wait_for_timeout(600)
+                on = pg.evaluate("""() => {
+                  var st = window.__maps;
+                  return {mode: st ? !!st.tiltMode : null,
+                          note: (document.querySelector('#mapnote') ||
+                                 {textContent: ''}).textContent};
+                }""")
+                print("the tilt switched on:", on)
+                if not on["mode"]:
+                    print("   FAIL: the tilt button does not switch the tilt on")
+                    errors.append("the tilt button does nothing")
+                elif "tilt is on" not in on["note"]:
+                    print("   FAIL: the note does not say the tilt is on")
+                    errors.append("the note does not mention the tilt")
+                else:
+                    print("   ok")
+                pg.query_selector(".mapctl [data-z='tilt']").click()
+                pg.wait_for_timeout(400)
+            # and on the flat map there is no tilt button at all
+            pg.query_selector_all("#mapviews button")[0].click()
+            pg.wait_for_timeout(1500)
+            flat = pg.evaluate("""() => {
+              var b = document.querySelector(".mapctl [data-z='tilt']");
+              var st = window.__maps;
+              return {hidden: b ? (b.style.display === 'none' ||
+                                    b.offsetParent === null) : true,
+                      tilt: st ? st.tilt : null,
+                      pan: st ? st.pan.slice() : null};
+            }""")
+            print("the flat map:", flat)
+            if not flat["hidden"]:
+                print("   FAIL: the flat map must not offer the tilt")
+                errors.append("the flat map offers the tilt button")
+            elif flat["tilt"]:
+                print("   FAIL: the flat map carries a tilt")
+                errors.append("the flat map carries a tilt")
+            else:
+                print("   ok")
+
             # is anything actually painted on the canvas?
             # the canvas is drawn on the GPU now, so it is read with
             # readPixels, a pixel at a time: a read of the whole canvas

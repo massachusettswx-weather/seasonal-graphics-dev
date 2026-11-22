@@ -47,10 +47,11 @@
   var GLOBE_ROT = [95, -35];
 
   var state = {view: "globe", rot: GLOBE_ROT.slice(), win3: false,
-               /* THE TURN: the flat map turns on the screen, and the
-                  globe's axis tips over.  Both are in degrees here and
-                  radians in the projection. */
-               turn: 0, tilt: 0, turnMode: false,
+               /* THE GLOBE'S TILT: the axis tips over toward the viewer.
+                  The owner asked for the tilt alone (22 Nov 2026) - the
+                  flat map pans, it does not turn on the screen.  The
+                  angle is in degrees here and radians in the projection. */
+               tilt: 0, tiltMode: false,
                drag: null, zoom: 1,
                pan: [0, 0], field: "total", month: -1, tag: null,
                manifest: null, raster: null, index: null,
@@ -238,20 +239,15 @@
       .on("drag", function (ev) {
         var p = d3.pointer(ev, this);
         var dx = p[0] - state.drag[0], dy = p[1] - state.drag[1];
-        if (state.turnMode) {
-          /* THE EARTH IS TURNED: the flat map turns on the screen, and
-             the globe's axis tips over.  The gain is the same as the
-             drag's, so the earth moves at the same rate as the hand. */
-          if (state.view === "flat") {
-            state.turn = (state.turn + dx * DRAG_GAIN.flat) % 360;
-          } else {
-            /* the tip: the north pole leans toward the viewer.  The
-               horizontal part of the drag still spins the globe, so the
-               earth can be turned on its side AND round its axis. */
-            state.tilt = Math.max(-75, Math.min(75,
-                state.tilt + dy * DRAG_GAIN.globe / state.zoom));
-            state.rot[0] += dx * DRAG_GAIN.globe / state.zoom;
-          }
+        if (state.tiltMode && state.view === "globe") {
+          /* THE GLOBE IS TIPPED OVER: the north pole leans toward the
+             viewer.  The horizontal part of the drag still spins the
+             globe, so the earth can be turned on its side AND round its
+             axis.  The flat map is not turned - it pans, and it always
+             has. */
+          state.tilt = Math.max(-75, Math.min(75,
+              state.tilt + dy * DRAG_GAIN.globe / state.zoom));
+          state.rot[0] += dx * DRAG_GAIN.globe / state.zoom;
         } else if (state.view === "flat") {
           state.pan[0] += dx * DRAG_GAIN.flat;
           state.pan[1] += dy * DRAG_GAIN.flat;
@@ -272,18 +268,16 @@
   }
 
   function viewNote() {
-    var turn = state.turnMode
-      ? (state.view === "flat"
-         ? " The turn is on: drag to turn the map on the screen."
-         : " The turn is on: drag down to tip the globe over, sideways to " +
-           "spin it.") : "";
+    var tilt = (state.tiltMode && state.view === "globe")
+      ? " The tilt is on: drag down to tip the globe over, sideways to " +
+        "spin it." : "";
     if (state.view === "flat") {
       note("The whole world on an equirectangular grid. Drag it to pan, " +
            "scroll or use the buttons to zoom. The equirectangular " +
-           "projection squeezes the polar regions." + turn);
+           "projection squeezes the polar regions.");
     } else {
       note("The same world on an orthographic globe - drag it to spin, scroll " +
-           "or use the buttons to zoom." + turn);
+           "or use the buttons to zoom." + tilt);
     }
   }
 
@@ -336,8 +330,7 @@
     state.zoom = 1;
     state.pan = [0, 0];
     state.rot = GLOBE_ROT.slice();
-    /* the earth goes back the way it was: no turn, no tilt */
-    state.turn = 0;
+    /* the earth goes back the way it was: no tilt */
     state.tilt = 0;
     requestDraw();
   }
@@ -351,8 +344,8 @@
       '<button type="button" data-z="out" title="zoom out">−</button>' +
       '<span class="zlabel">100%</span>' +
       '<button type="button" data-z="in" title="zoom in">+</button>' +
-      '<button type="button" data-z="turn" title="turn the earth: drag to ' +
-      'turn the map, or to tip the globe over">↻</button>' +
+      '<button type="button" data-z="tilt" title="tip the globe over: drag ' +
+      'down to tip it, sideways to spin it">↻</button>' +
       '<button type="button" data-z="reset" title="reset the view">⟲</button>';
     box.appendChild(c);
     c.addEventListener("click", function (ev) {
@@ -363,15 +356,18 @@
       var z = b.getAttribute("data-z");
       if (z === "in") { setZoom(state.zoom * ZOOM_STEP); }
       else if (z === "out") { setZoom(state.zoom / ZOOM_STEP); }
-      else if (z === "turn") {
-        state.turnMode = !state.turnMode;
-        b.classList.toggle("on", state.turnMode);
+      else if (z === "tilt") {
+        state.tiltMode = !state.tiltMode;
+        b.classList.toggle("on", state.tiltMode);
         viewNote();
       }
       else { resetView(); }
     });
     c.addEventListener("wheel", function (ev) { ev.stopPropagation(); },
                       {passive: true});
+    /* the tilt is the globe's: the button is not offered on the flat map */
+    var tb = c.querySelector("[data-z='tilt']");
+    if (tb) { tb.style.display = state.view === "globe" ? "" : "none"; }
   }
 
   function updateZoomLabel() {
@@ -739,8 +735,7 @@
     }
     return {view: state.view, lam0: lam0, phi0: phi0,
             k: b.k * state.zoom,
-            /* THE TURN AND THE TILT, in radians for the renderer */
-            turn: state.turn * Math.PI / 180,
+            /* THE TILT, in radians for the renderer */
             tilt: state.tilt * Math.PI / 180,
             x0: b.t[0] + state.pan[0],
             y0: b.t[1] + state.pan[1]};
@@ -981,14 +976,19 @@
   function setView(v) {
     state.view = v;
     state.pan = [0, 0];
-    /* the turn and the tilt belong to the view they were made in */
-    state.turn = 0;
+    /* the tilt belongs to the globe it was made in */
     state.tilt = 0;
+    state.tiltMode = false;
     state.hover = -1;
     var btns = document.querySelectorAll("#mapviews button");
     Array.prototype.forEach.call(btns, function (b) {
       b.classList.toggle("active", b.dataset.view === v);
     });
+    var tb = document.querySelector(".mapctl [data-z='tilt']");
+    if (tb) {
+      tb.style.display = v === "globe" ? "" : "none";
+      tb.classList.remove("on");
+    }
     var box = el("mapbox");
     if (box) { box.className = "mapbox " + v; }
     var svg = d3.select("#mapsvg");

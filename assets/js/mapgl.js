@@ -65,10 +65,11 @@
     var Z = sl0 * sp + cl0 * cp * cd;
     var px, py;
     if (p.view === "flat") {
-      /* the turned map */
-      var ct = Math.cos(p.turn || 0), st = Math.sin(p.turn || 0);
-      px = lam * ct - phi * st;
-      py = lam * st + phi * ct;
+      /* the flat map: the plain equirectangular grid.  It pans; it does
+         not turn on the screen (the owner asked for the globe's tilt
+         alone, 22 Nov 2026). */
+      px = lam;
+      py = phi;
       Z = 1;
     } else {
       /* the tilted globe */
@@ -88,12 +89,7 @@
     var px = (x - p.x0) / p.k;
     var py = (p.y0 - y) / p.k;
     if (p.view === "flat") {
-      /* the turned map: the field under the pixel comes from the place
-         the map has been turned FROM */
-      var ct = Math.cos(p.turn || 0), st = Math.sin(p.turn || 0);
-      var qx = px * ct + py * st;
-      var qy = -px * st + py * ct;
-      return {lon: qx / DEG, lat: qy / DEG};
+      return {lon: px / DEG, lat: py / DEG};
     }
     var z2 = px * px + py * py;
     /* off the globe there is no point to invert: the far side of the
@@ -159,7 +155,6 @@ uniform vec4  u_grid2;       /* nlat, nlon, isGlobal, span */
 uniform vec3  u_ocean;
 uniform vec3  u_land;
 uniform float u_atmos;       /* the atmosphere's radius in px, 0 = none */
-uniform float u_turn;        /* the flat map's turn, radians */
 uniform float u_tilt;        /* the globe's tilt, radians */
 
 out vec4 frag;
@@ -177,12 +172,9 @@ const float DEGR = 0.017453292519943;
 vec2 invert(vec2 sp) {
   vec2 p = vec2((sp.x - u_trans.x) / u_k, (u_trans.y - sp.y) / u_k);
   if (u_view == 0) {
-    /* THE TURNED MAP: the flat world can be turned on the screen, so the
-       field under a pixel comes from the place the map has been turned
-       FROM.  The turn is the other way round - the map is turned, the
-       data is not. */
-    float c = cos(u_turn), s = sin(u_turn);
-    return vec2(p.x * c + p.y * s, -p.x * s + p.y * c);
+    /* THE FLAT MAP: the plain equirectangular grid.  It pans; it does
+       not turn on the screen. */
+    return vec2(p.x, p.y);
   }
   float sl0 = sin(u_centre.x), cl0 = cos(u_centre.x);
   float sp0 = sin(u_centre.y), cp0 = cos(u_centre.y);
@@ -335,7 +327,6 @@ uniform vec2  u_centre;
 uniform float u_k;
 uniform vec2  u_trans;
 uniform float u_width;
-uniform float u_turn;        /* the flat map's turn, radians */
 uniform float u_tilt;        /* the globe's tilt, radians */
 
 out float v_cross;
@@ -355,9 +346,8 @@ vec3 forward(vec2 ll) {
   float Z = sl0 * sp + cl0 * cp * cd;
   vec2 pr;
   if (u_view == 0) {
-    /* the turned map: the flat world turns on the screen */
-    float c = cos(u_turn), s = sin(u_turn);
-    pr = vec2(lam * c - phi * s, lam * s + phi * c);
+    /* the flat map: the plain equirectangular grid */
+    pr = vec2(lam, phi);
     Z = 1.0;
   } else {
     /* the tilted globe: the same rotation the earth shader inverts */
@@ -1005,7 +995,6 @@ void main() {
     gl.uniform2f(E.u.u_centre, p.lam0, p.phi0);
     gl.uniform1f(E.u.u_k, p.k);
     gl.uniform2f(E.u.u_trans, p.x0, p.y0);
-    gl.uniform1f(E.u.u_turn, p.turn || 0);
     gl.uniform1f(E.u.u_tilt, p.tilt || 0);
     gl.uniform1i(E.u.u_mode, this.mode);
     /* the colours are turned into 0..1 once, not on every frame */
@@ -1060,7 +1049,6 @@ void main() {
     gl.uniform2f(L.u.u_centre, p.lam0, p.phi0);
     gl.uniform1f(L.u.u_k, p.k);
     gl.uniform2f(L.u.u_trans, p.x0, p.y0);
-    gl.uniform1f(L.u.u_turn, p.turn || 0);
     gl.uniform1f(L.u.u_tilt, p.tilt || 0);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
