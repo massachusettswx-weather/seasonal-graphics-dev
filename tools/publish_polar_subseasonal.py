@@ -242,6 +242,120 @@ def set_polar_default(text):
     return new, what
 
 
+def commit_files(target, written, msg):
+    """Commit ONLY the files this run wrote, and say what happened."""
+    git(target, "add", "--", *written)
+    # the identity is given here, not taken from the machine: a clone that
+    # has never committed anything has no user.name, and the commit would
+    # fail with "Author identity unknown"
+    staged = git(target, "diff", "--cached", "--quiet")
+    if staged.returncode == 0:
+        # nothing to commit: the change is already in the tree's HEAD
+        # (a run that was interrupted after the commit)
+        say("   the change is already committed")
+        return 0
+    c = git(target, "-c", "user.name=MCode", "-c", "user.email=mcode@local",
+            "commit", "-m", msg)
+    if c.returncode != 0:
+        say("   the commit failed:")
+        say("   %s" % (c.stderr or c.stdout).strip()[:400])
+        return 2
+    say("   committed: %s" % msg.split("\n")[0])
+    return 0
+
+
+def push_to(target, args):
+    """The gate is on the DESTINATION, not on a flag."""
+    url = remote_url(target)
+    if remote_repo(url) == OPERATIONAL_REPO and not (args.prod and args.approved):
+        say("   %s IS THE OPERATIONAL SITE." % url)
+        say("   It is not published: it needs --prod --approved.")
+        return 2
+    if args.prod and remote_repo(url) != OPERATIONAL_REPO:
+        say("   the remote is %s, which is not the operational site." % url)
+        return 2
+    token = token_for(target)
+    if "github.com" in url and not token:
+        say("   there is no GitHub token - nothing is pushed.")
+        say("   the commit stays local; the site keeps the old cycle.")
+        return 3
+    ls = git(target, "ls-remote", "origin")
+    if ls.returncode != 0:
+        say("   the repository cannot be reached:")
+        say("   %s" % (ls.stderr or ls.stdout).strip()[:400])
+        say("   the commit stays local; the site keeps the old cycle.")
+        return 3
+    p = push(target, url, token)
+    if p.returncode != 0:
+        say("   the PUSH FAILED:")
+        say("   %s" % (p.stderr or p.stdout).strip()[:400])
+        say("   the commit stays local; the site keeps the old cycle.")
+        return 3
+    say("   pushed to %s" % url)
+    return 0
+
+
+def publish_default_only(target, args):
+    """ONLY the polar-cap section's default.
+
+    The charts are already the newest cycle's - and redrawing them here
+    would replace them with a copy drawn from THIS machine's own
+    reanalysis file, which is a day older than the one the cycle was
+    published with.  So this mode touches the PICKER and nothing else.
+    """
+    docs = os.path.join(target, "docs")
+    if not os.path.isdir(docs):
+        say("   %s has no site to publish into" % target)
+        return 2
+    # the operational clone is curated: anything else in it is somebody
+    # else's work, and this change is not mixed with it
+    if remote_repo(remote_url(target)) == OPERATIONAL_REPO:
+        st = git(target, "status", "--porcelain")
+        dirty = [l for l in st.stdout.strip().split("\n") if l.strip()]
+        others = [l for l in dirty
+                  if not any(l[3:].strip().strip('"').endswith(
+                      os.path.join("docs", f)) for f in ("spv.html",))]
+        if others:
+            say("   the target's working tree has changes that are not ours -")
+            say("   refusing to mix them with this one:")
+            for line in others[:10]:
+                say("     %s" % line)
+            return 2
+    written = []
+    for f in sorted(x for x in os.listdir(docs) if x.endswith(".html")):
+        p = os.path.join(docs, f)
+        t = open(p, encoding="utf-8").read()
+        t2, what = set_polar_default(t)
+        if t2 is None:
+            continue
+        if t2 == t:
+            say("   docs/%-22s %s" % (f, what))
+            continue
+        if not args.apply:
+            say("   it would set on the target:")
+            say("     docs/%-22s %s" % (f, what))
+            written.append(os.path.join("docs", f))
+            continue
+        open(p, "w", encoding="utf-8").write(t2)
+        say("     docs/%-22s %s" % (f, what))
+        written.append(os.path.join("docs", f))
+    if not written:
+        say("   the polar section already opens on the %s - nothing to do"
+            % MODEL_ID)
+        return 4
+    if not args.apply:
+        say("   (plan only - add --apply to write it)")
+        return 0
+    msg = args.message or ("The polar-cap section opens on the %s" % MODEL_ID)
+    rc = commit_files(target, written, msg)
+    if rc:
+        return rc
+    if not args.push:
+        say("   (not pushed - add --push, with the destination gate)")
+        return 0
+    return push_to(target, args)
+
+
 def entry_of(reg):
     for m in reg.get("models", []):
         if m.get("id") == MODEL_ID:
@@ -352,6 +466,8 @@ def main():
     ap.add_argument("--message", default=None, help="the commit message")
     ap.add_argument("--force", action="store_true",
                     help="publish even if the target already has this cycle")
+    ap.add_argument("--default-only", action="store_true",
+                    help="only open the polar-cap section on the %s" % MODEL_ID)
     args = ap.parse_args()
 
     src = os.path.abspath(args.src)
@@ -361,6 +477,10 @@ def main():
     is_operational = remote_repo(remote_url(target)) == OPERATIONAL_REPO
 
     say("== the narrow path: the daily %s update ==" % MODEL_ID)
+
+    if args.default_only:
+        say("   the polar-cap section's default only - no chart is redrawn")
+        return publish_default_only(target, args)
 
     # 1. is there an update at all?
     series = load_series(src)
@@ -536,56 +656,14 @@ def main():
         # carry whatever the workers happened to be writing.
         msg = args.message or ("The daily %s sub-seasonal update: the %s cycle"
                                 % (MODEL_ID, series["init"]))
-        git(target, "add", "--", *written)
-        # the identity is given here, not taken from the machine: a clone
-        # that has never committed anything has no user.name, and the
-        # commit would fail with "Author identity unknown"
-        staged = git(target, "diff", "--cached", "--quiet")
-        if staged.returncode == 0:
-            # nothing to commit: the change is already in the tree's HEAD
-            # (a run that was interrupted after the commit)
-            say("   the change is already committed")
-        else:
-            c = git(target, "-c", "user.name=MCode", "-c", "user.email=mcode@local",
-                    "commit", "-m", msg)
-            if c.returncode != 0:
-                say("   the commit failed:")
-                say("   %s" % (c.stderr or c.stdout).strip()[:400])
-                return 2
-            say("   committed: %s" % msg.split("\n")[0])
+        rc = commit_files(target, written, msg)
+        if rc:
+            return rc
 
         if not args.push:
             say("   (not pushed - add --push, with the destination gate)")
             return 0
-
-        # 7. the gate: the operational site needs the owner's approval
-        url = remote_url(target)
-        if remote_repo(url) == OPERATIONAL_REPO and not (args.prod and args.approved):
-            say("   %s IS THE OPERATIONAL SITE." % url)
-            say("   It is not published: it needs --prod --approved.")
-            return 2
-        if args.prod and remote_repo(url) != OPERATIONAL_REPO:
-            say("   the remote is %s, which is not the operational site." % url)
-            return 2
-        token = token_for(target)
-        if "github.com" in url and not token:
-            say("   there is no GitHub token - nothing is pushed.")
-            say("   the commit stays local; the site keeps the old cycle.")
-            return 3
-        ls = git(target, "ls-remote", "origin")
-        if ls.returncode != 0:
-            say("   the repository cannot be reached:")
-            say("   %s" % (ls.stderr or ls.stdout).strip()[:400])
-            say("   the commit stays local; the site keeps the old cycle.")
-            return 3
-        p = push(target, url, token)
-        if p.returncode != 0:
-            say("   the PUSH FAILED:")
-            say("   %s" % (p.stderr or p.stdout).strip()[:400])
-            say("   the commit stays local; the site keeps the old cycle.")
-            return 3
-        say("   pushed to %s" % url)
-        return 0
+        return push_to(target, args)
     finally:
         shutil.rmtree(stage, ignore_errors=True)
 
