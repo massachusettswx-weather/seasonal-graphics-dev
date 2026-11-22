@@ -146,6 +146,26 @@ not a clock**, and the watcher stops as soon as the cycle is on the site
 late).  The narrow path's exit codes are what the watcher reads: 0
 published, 4 already current, 2 nothing to publish, 3 the push failed.
 
+## The EC46 (the ECMWF's 46-day extended range) - 22 Nov 2026
+
+* **The fetcher existed and nothing called it.**  `fetch_polar_ec46.py` is
+  written and works, but no script ever ran it, so the section was never
+  published ("no series for ec46 yet").  It is now wired into
+  `tools/daily_refresh.sh`.
+* **The request must NOT carry `system: 46`.**  The store answers 201 and
+  then the job FAILS; the same request without the field succeeds.  The
+  46-day system is picked by the RUN DATE.
+* **The runs are the MONDAY and THURSDAY 00Z cycles** (the other days carry
+  the 15-day ensemble, which stops at lead 360 h), and the store holds a
+  run about two days after its init.  `--run-for-today` works the run out
+  from the calendar, because the probe is itself a job and the account's
+  queue holds two.
+* **The owner's schedule: Monday, Thursday and Saturday** (`EC46_DAYS`),
+  with a run that is already on disk left alone.
+* **One chunk at a time.**  The store's admission is stricter than its own
+  listing: a dismissed job still counts for a while.
+* The 20261119 00Z run was being pulled on the evening of 22 Nov 2026.
+
 ## Still open
 
 1. **The December cadence**: the CDS request pool is now started **once a
