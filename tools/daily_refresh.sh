@@ -86,29 +86,22 @@ for f in $SLOW; do
     sleep 1
 done
 
-# THE EC46 IS A WEEKLY PRODUCT, NOT A DAILY ONE.  The ECMWF's 46-day
-# extended range runs on the MONDAY and THURSDAY 00Z cycles only - on the
-# other days the archive serves the 15-day ensemble, which stops at lead
-# 360 h - and the store holds a run about two days after its init.  The
-# owner's days (22 Nov 2026) are Monday, Thursday and Saturday; the run
-# is worked out from the CALENDAR and not probed for, because the probe is
-# itself a job and the account's queue holds two, and the seasonal
-# requests want those slots in December.  A run that is already on disk is
-# not asked for again, so of the three days two are a real pull.
+# THE EC46 IS PULLED ON THREE DAYS A WEEK, NOT SEVEN.  The owner's days
+# (22 Nov 2026) are Monday, Thursday and Saturday.  The reason is the
+# queue, not the product: the extended range runs EVERY day (measured 22
+# Nov 2026 - the Saturdays and the Sundays carry the 46 days too), and
+# each pull asks the store for nine chunks, and the account may hold two
+# jobs at once, and the seasonal requests want those slots in December.
+# The run is the NEWEST one the store has, found by probing for the 46-day
+# window, and a run that is already on disk is not asked for again.
 EC46_DAYS="${EC46_DAYS:-1 4 6}"     # date +%u: 1 = Monday ... 6 = Saturday
 if [ -f fetch_polar_ec46.py ]; then
     today_u=$(date -u +%u)
     case " $EC46_DAYS " in
         *" $today_u "*)
-            ec46_run=$(python3 fetch_polar_ec46.py --run-for-today 2>/dev/null)
-            if [ -n "$ec46_run" ]; then
-                say "  fetch_polar_ec46.py (in the background) - the $ec46_run run"
-                setsid nohup python3 -u fetch_polar_ec46.py --run "$ec46_run 00:00" \
-                    >> "logs_fetch_polar_ec46.py.log" 2>&1 < /dev/null &
-                sleep 1
-            else
-                say "  fetch_polar_ec46.py - the store holds no extended-range run yet"
-            fi
+            setsid nohup python3 -u fetch_polar_ec46.py \
+                >> "logs_fetch_polar_ec46.py.log" 2>&1 < /dev/null &
+            sleep 1
             ;;
         *)
             say "  fetch_polar_ec46.py - not one of the EC46 days (Mon/Thu/Sat)"

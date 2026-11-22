@@ -155,16 +155,24 @@ published, 4 already current, 2 nothing to publish, 3 the push failed.
 * **The request must NOT carry `system: 46`.**  The store answers 201 and
   then the job FAILS; the same request without the field succeeds.  The
   46-day system is picked by the RUN DATE.
-* **The runs are the MONDAY and THURSDAY 00Z cycles** (the other days carry
-  the 15-day ensemble, which stops at lead 360 h), and the store holds a
-  run about two days after its init.  `--run-for-today` works the run out
-  from the calendar, because the probe is itself a job and the account's
-  queue holds two.
+* **The runs are DAILY, and the archive holds one about two days late.**
+  The old note ("only the Monday and Thursday 00Z cycles carry the 46
+  days") was **wrong** - it came from probes that carried the `system`
+  field, so every probe failed and the failures were read as "this run has
+  no 46 days".  Measured 22 Nov 2026: every run from 10 to 21 November
+  served the 46-day window; the 20 November run served the whole window
+  with the full member set while the 21 and 22 November runs did not.
+* **The run probe must ask for what the chart needs**: a control-only,
+  one-level probe was answered "successful" for a run whose full request
+  (control AND perturbed) failed every time.
 * **The owner's schedule: Monday, Thursday and Saturday** (`EC46_DAYS`),
-  with a run that is already on disk left alone.
-* **One chunk at a time.**  The store's admission is stricter than its own
-  listing: a dismissed job still counts for a while.
-* The 20261119 00Z run was being pulled on the evening of 22 Nov 2026.
+  with a run that is already on disk left alone.  The reason is the queue,
+  not the product.
+* **The state must say which run a chunk came from** - it used to record
+  the chunk and nothing else, so the next run found every chunk "already
+  decoded" and fetched nothing while the chart kept a stale cycle.
+* One chunk at a time.
+* The 20261120 00Z run was being pulled on the afternoon of 22 Nov 2026.
 
 ## Still open
 

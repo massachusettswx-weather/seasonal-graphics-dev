@@ -105,8 +105,13 @@ WEEKLY = ["%d_%d" % (h, h + 24) for h in range(24, 1081, 24)]
 # asking for a lead window that only an extended-range run has.
 EXTENDED_ONLY = ["1080_1104"]
 
-# The S2S archive holds the run with about a two-day delay, so the run that
-# can be had is the one from roughly 48 hours ago.
+# The archive holds the run about TWO DAYS late (measured 22 Nov 2026: the
+# 20 November run serves the whole 46-day window with the full member set,
+# the 21 and 22 November runs do not).  The older note of a two-day delay
+# was right; the note that said the extended range runs only on Mondays and
+# Thursdays was wrong - it came from probes that carried the `system` field,
+# so every probe failed and the failures were read as "this run has no 46
+# days".
 DELAY_HOURS = 48
 
 LICENCE_URL = ("https://ecds.ecmwf.int/datasets/s2s-forecasts"
@@ -539,42 +544,26 @@ def download(s, jid, path):
     os.replace(path + ".part", path)
 
 
-def extended_run(today=None):
-    """-> the extended-range run the store holds today (a date), or None
-    when the store holds nothing new.
+def newest_run(s):
+    """-> the run the store has, as a date, or None.
 
-    THE 46-DAY RUNS ARE THE MONDAY AND THURSDAY 00Z CYCLES (the other
-    days carry the 15-day ensemble, which stops at lead 360 h), and the
-    store holds a run about two days after its init.  So the newest
-    extended-range run available on a Wednesday is the Monday one, and on
-    a Saturday it is the Thursday one.
-
-    The run is therefore worked out from the CALENDAR and not probed for:
-    the probe is itself a job, and the account's queue is small (two), and
-    the seasonal requests want those slots in December.
+    THE EXTENDED RANGE IS DAILY (measured 22 Nov 2026: every run from 10 to
+    21 November served the 46-day window, the Saturdays and the Sundays
+    included).  The run is therefore found by PROBING for the lead window at
+    the far end of the extended range - one small job - and not from a
+    calendar.
     """
-    now = today or datetime.datetime.utcnow()
-    d = now.date() if isinstance(now, datetime.datetime) else now
-    for back in range(0, 10):
-        cand = d - datetime.timedelta(days=back)
-        # Monday and Thursday, and old enough for the store to hold it
-        if cand.weekday() not in (0, 3):
-            continue
-        init = datetime.datetime(cand.year, cand.month, cand.day)
-        if now - init < datetime.timedelta(hours=DELAY_HOURS):
-            continue
-        return cand
-    return None
+    d, t = latest_run(s)
+    if d is None:
+        return None
+    return d
 
 
 def main():
     if "--run-for-today" in sys.argv:
-        # what the CALENDAR says the store holds, and nothing else: the
-        # run is worked out from the days the 46-day cycles fall on, so no
-        # probe (a probe is a job) is needed to find it.  It is a calendar
-        # sum, so it is answered before the licence is even looked at.
-        r = extended_run()
-        print(r.isoformat() if r else "")
+        # the run the store has, found by probing for the 46-day window
+        d, t = latest_run(session())
+        print(d.isoformat() if d else "")
         return
     s = session()
     # the licence first: a request that is refused for want of it says
@@ -659,11 +648,17 @@ def main():
                                         % (c, adopted[c][:8])
                                         for c in sorted(adopted))), flush=True)
 
+    want_run = "%s %sZ" % (run_date, run_time[:2])
     pending = []
     for i in range(0, len(WEEKLY), CHUNK):
         weeks = WEEKLY[i:i + CHUNK]
+        # A CHUNK THAT IS DECODED IS ONLY DONE FOR THE RUN IT CAME FROM.
+        # The state used to record the chunk and nothing else, so the run
+        # after the run after this one found every chunk "already decoded"
+        # and fetched nothing at all.
         done = [j for j in st["jobs"]
-                if j.get("chunk") == i and j.get("status") == "decoded"]
+                if j.get("chunk") == i and j.get("status") == "decoded"
+                and j.get("run") == want_run]
         if done:
             continue
         pending.append((i, weeks))
@@ -688,7 +683,7 @@ def main():
                 # finished.  A job that is live in the store but not in the
                 # state file cannot be adopted after a restart, and the
                 # chunk would be asked for a second time.
-                st["jobs"].append({"chunk": i, "job": jid,
+                st["jobs"].append({"chunk": i, "job": jid, "run": want_run,
                                    "status": "submitted"})
                 save_state(st)
             last = jid
@@ -736,7 +731,8 @@ def main():
 
     for i, jid, got in results:
         if got is None:
-            st["jobs"].append({"chunk": i, "job": jid, "status": "failed"})
+            st["jobs"].append({"chunk": i, "job": jid, "run": want_run,
+                               "status": "failed"})
             save_state(st)
             continue
         vals, svals, nmem = got
