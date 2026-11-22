@@ -158,17 +158,23 @@ def public_map(reg):
     return out
 
 
-def inline_registry(text):
+def inline_registry(text, name="MODELS"):
     """The registry the page carries: (start, end, object), or None.
 
-    The pages inline it as `const MODELS={...};`.  The blob is read out
-    of the PAGE, not computed from the tree: a fresh clone is missing
-    build artifacts that the pages were built with (the April-2027
-    anomaly maps of five centres are never committed), so the tree's own
-    registry can never match the pages' - and the entry we are here to
-    change lives in the page.
+    The pages inline it as `const MODELS={...};` - and the stratosphere
+    page carries TWO more, the polar block's own: `POLARMODELS` (the cap
+    chart) and `POLARSECTORS` (the by-sector chart).  The chart URLs
+    live in all three, and the ?v= on them is what busts the browser's
+    cache: patch only the first and the picture on the page stays the
+    old one.
+
+    The blob is read out of the PAGE, not computed from the tree: a fresh
+    clone is missing build artifacts that the pages were built with (the
+    April-2027 anomaly maps of five centres are never committed), so the
+    tree's own registry can never match the pages' - and the entry we
+    are here to change lives in the page.
     """
-    i = text.find("const MODELS=")
+    i = text.find("const %s=" % name)
     if i < 0:
         return None
     j = text.find("{", i)
@@ -203,24 +209,36 @@ def inline_registry(text):
 
 
 def patch_inline(text, init, version):
-    """The page's own registry, with the GEFSv12 entry brought forward.
+    """The page's own registries, with the GEFSv12 entry brought forward.
 
     Only THAT entry is touched: the other models' availability flags are
-    the page's own, and they are not ours to change.
+    the page's own, and they are not ours to change.  All THREE blobs
+    are patched - the main registry and the polar block's two - because
+    the ?v= that busts the browser's cache is on the chart URL in each
+    of them.
     """
-    got = inline_registry(text)
-    if got is None:
-        return None
-    start, end, obj = got
-    entry = obj.get(MODEL_ID)
-    if not isinstance(entry, dict):
-        return None
-    entry["init"] = init
-    for key, fn in (("polar", "polar_cap_gefsv12.png"),
-                    ("polar_sectors", "polar_sectors_gefsv12.png")):
-        if isinstance(entry.get(key), dict):
-            entry[key]["file"] = "assets/polar/%s?v=%s" % (fn, version)
-    return text[:start] + json.dumps(obj) + text[end:]
+    out = text
+    for name in ("MODELS", "POLARMODELS", "POLARSECTORS"):
+        got = inline_registry(out, name)
+        if got is None:
+            continue
+        start, end, obj = got
+        entry = obj.get(MODEL_ID)
+        if not isinstance(entry, dict):
+            continue
+        if name == "MODELS":
+            entry["init"] = init
+            for key, fn in (("polar", "polar_cap_gefsv12.png"),
+                            ("polar_sectors", "polar_sectors_gefsv12.png")):
+                if isinstance(entry.get(key), dict):
+                    entry[key]["file"] = "assets/polar/%s?v=%s" % (fn, version)
+        else:
+            fn = ("polar_cap_gefsv12.png" if name == "POLARMODELS"
+                  else "polar_sectors_gefsv12.png")
+            if "file" in entry:
+                entry["file"] = "assets/polar/%s?v=%s" % (fn, version)
+        out = out[:start] + json.dumps(obj) + out[end:]
+    return out
 
 
 def set_polar_default(text):
@@ -647,6 +665,16 @@ def main():
             assert got is not None, "the registry left %s" % f
             assert got[2][MODEL_ID]["init"] == series["init"], \
                 "the init did not land in %s" % f
+            # and the polar block's own URLs: the ?v= is what makes the
+            # browser fetch the NEW picture instead of the cached one
+            for name in ("POLARMODELS", "POLARSECTORS"):
+                g = inline_registry(t, name)
+                if g is None:
+                    continue
+                f2 = g[2].get(MODEL_ID, {}).get("file", "")
+                assert ("?v=%s" % version) in f2, \
+                    "the %s chart URL in %s still carries the old version" \
+                    % (name, f)
         say("   written and checked: init=%s, both charts byte for byte,"
             % series["init"])
         say("   and the pages carry the same cycle.")
