@@ -55,6 +55,7 @@ and on the ECDS; only the store's base URL differs.
 Until the licence is accepted this script reports the refusal and writes
 NOTHING: a chart must never be published without real data behind it.
 """
+import datetime
 import json
 import os
 import sys
@@ -217,7 +218,12 @@ MAX_LIVE_JOBS = 2
 # How many times one chunk is asked for again when the store fails the
 # job.  On 15 Nov 2026 the store failed a job that had been queued for
 # more than nine hours, and the chunk was lost with it.
-RETRIES = 3
+# The store REJECTS a job now and then (measured 22 Nov 2026: six in a row
+# for the same request, and the very same request successful minutes
+# later), so the chunk is asked for again - with a pause, because the
+# store's patience is not the fetcher's to spend.
+RETRIES = 8
+RETRY_PAUSE = 30
 
 
 def wait_for_queue(s, room, tries=180):
@@ -449,15 +455,12 @@ def submit(s, run_date, run_time, weeks):
                                   "outputs": {"asset": {"value": {"type": "file"}}}},
                       timeout=300)
 
-    req = dict(base)
-    req["system"] = SYSTEM
-    r = post(req)
-    if r.status_code == 403:
-        raise SystemExit(licence_refusal(r))
-    if r.status_code == 400:
-        # the schema does not know the `system` field: the same request goes
-        # out without it
-        r = post(base)
+    # THE CATALOGUE HAS NO `system` FIELD (measured 22 Nov 2026).  A request
+    # that carries one is ACCEPTED by the endpoint (HTTP 201) and then
+    # FAILS in the job - the 46-day system is picked by the RUN DATE, and
+    # the store will not serve the long leads of a run that does not have
+    # them.  The same request without the field comes back "successful".
+    r = post(base)
     if r.status_code == 403:
         raise SystemExit(licence_refusal(r))
     if r.status_code >= 400:
@@ -536,7 +539,43 @@ def download(s, jid, path):
     os.replace(path + ".part", path)
 
 
+def extended_run(today=None):
+    """-> the extended-range run the store holds today (a date), or None
+    when the store holds nothing new.
+
+    THE 46-DAY RUNS ARE THE MONDAY AND THURSDAY 00Z CYCLES (the other
+    days carry the 15-day ensemble, which stops at lead 360 h), and the
+    store holds a run about two days after its init.  So the newest
+    extended-range run available on a Wednesday is the Monday one, and on
+    a Saturday it is the Thursday one.
+
+    The run is therefore worked out from the CALENDAR and not probed for:
+    the probe is itself a job, and the account's queue is small (two), and
+    the seasonal requests want those slots in December.
+    """
+    now = today or datetime.datetime.utcnow()
+    d = now.date() if isinstance(now, datetime.datetime) else now
+    for back in range(0, 10):
+        cand = d - datetime.timedelta(days=back)
+        # Monday and Thursday, and old enough for the store to hold it
+        if cand.weekday() not in (0, 3):
+            continue
+        init = datetime.datetime(cand.year, cand.month, cand.day)
+        if now - init < datetime.timedelta(hours=DELAY_HOURS):
+            continue
+        return cand
+    return None
+
+
 def main():
+    if "--run-for-today" in sys.argv:
+        # what the CALENDAR says the store holds, and nothing else: the
+        # run is worked out from the days the 46-day cycles fall on, so no
+        # probe (a probe is a job) is needed to find it.  It is a calendar
+        # sum, so it is answered before the licence is even looked at.
+        r = extended_run()
+        print(r.isoformat() if r else "")
+        return
     s = session()
     # the licence first: a request that is refused for want of it says
     # nothing about the data, and the acceptance is an API call
@@ -566,6 +605,18 @@ def main():
     st = json.load(open(STATE)) if os.path.exists(STATE) else {"jobs": []}
     out = json.load(open(OUT)) if os.path.exists(OUT) else {}
 
+    # A RUN WE ALREADY HAVE IS NOT FETCHED AGAIN.  The weekly schedule
+    # asks on three days and the store answers with the same run on two of
+    # them; a second request for it would take one of the account's two
+    # queue slots away from the seasonal requests (the December rollover
+    # wants them).  A field that is already on disk is not re-queued.
+    have = (out.get(TAG) or {}).get("run")
+    want = "%s %sZ" % (run_date, run_time[:2])
+    if have == want and not forced:
+        print("   the %s run is already on disk - nothing is asked of the "
+              "archive" % want)
+        return
+
     # The weekly windows in chunks: the archive caps the RESPONSE SIZE, and
     # a chunk that carries fewer members than the model has is a broken
     # answer.  The chunk size can be set on the command line: one big request
@@ -582,7 +633,13 @@ def main():
     CHUNK = 5
     if "--chunk-size" in sys.argv:
         CHUNK = int(sys.argv[sys.argv.index("--chunk-size") + 1])
-    PARALLEL = 2
+    # ONE CHUNK AT A TIME (22 Nov 2026).  The account may hold two jobs and
+    # the store's admission is stricter than its own listing: a job that has
+    # just been dismissed still counts for a while, so a second submission
+    # is refused while the first is still counted.  Two at a time therefore
+    # ends in a rejection - and a rejected chunk that is asked for again
+    # takes more room than the one it was holding.
+    PARALLEL = 1
     if "--parallel" in sys.argv:
         PARALLEL = int(sys.argv[sys.argv.index("--parallel") + 1])
 
@@ -649,6 +706,11 @@ def main():
             if attempt < RETRIES:
                 print("   the chunk is asked for again (attempt %d of %d)"
                       % (attempt + 1, RETRIES), flush=True)
+                # a dismissal is not free at once: the store still counts
+                # the job for a while, and the next attempt is refused
+                # while it is counted
+                wait_for_queue(s, 1)
+                time.sleep(RETRY_PAUSE)
         else:
             return i, last, None
         path = os.path.join(DATA, "_ec46_%d.grib" % i)

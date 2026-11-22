@@ -86,6 +86,38 @@ for f in $SLOW; do
     sleep 1
 done
 
+# THE EC46 IS A WEEKLY PRODUCT, NOT A DAILY ONE.  The ECMWF's 46-day
+# extended range runs on the MONDAY and THURSDAY 00Z cycles only - on the
+# other days the archive serves the 15-day ensemble, which stops at lead
+# 360 h - and the store holds a run about two days after its init.  The
+# owner's days (22 Nov 2026) are Monday, Thursday and Saturday; the run
+# is worked out from the CALENDAR and not probed for, because the probe is
+# itself a job and the account's queue holds two, and the seasonal
+# requests want those slots in December.  A run that is already on disk is
+# not asked for again, so of the three days two are a real pull.
+EC46_DAYS="${EC46_DAYS:-1 4 6}"     # date +%u: 1 = Monday ... 6 = Saturday
+if [ -f fetch_polar_ec46.py ]; then
+    today_u=$(date -u +%u)
+    case " $EC46_DAYS " in
+        *" $today_u "*)
+            ec46_run=$(python3 fetch_polar_ec46.py --run-for-today 2>/dev/null)
+            if [ -n "$ec46_run" ]; then
+                say "  fetch_polar_ec46.py (in the background) - the $ec46_run run"
+                setsid nohup python3 -u fetch_polar_ec46.py --run "$ec46_run 00:00" \
+                    >> "logs_fetch_polar_ec46.py.log" 2>&1 < /dev/null &
+                sleep 1
+            else
+                say "  fetch_polar_ec46.py - the store holds no extended-range run yet"
+            fi
+            ;;
+        *)
+            say "  fetch_polar_ec46.py - not one of the EC46 days (Mon/Thu/Sat)"
+            ;;
+    esac
+else
+    say "  fetch_polar_ec46.py is not here - skipped"
+fi
+
 if [ "$FAILED" != "0" ]; then
     rm -f "$MARK"
     say "a step failed - the mark is cleared so the next run finishes the job"
