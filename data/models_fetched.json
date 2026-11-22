@@ -13,11 +13,11 @@
   "note": "mean of the 6 C3S seasonal systems; ECMWF SEAS5 on the 1 Nov 2026 init, the rest on 1 Oct 2026"
  },
  "cfsv2": {
-  "name": "NOAA CFSv2",
   "init": "2026-12",
+  "leads": 6,
   "members": 40,
-  "source": "NCEP CPC",
-  "leads": 6
+  "name": "NOAA CFSv2",
+  "source": "NCEP CPC"
  },
  "cmcc-sps4": {
   "centre": "cmcc",
@@ -304,6 +304,14 @@
   "name": "NOAA SFSv1",
   "source": "NOAA NODD"
  },
+ "synthetic-test": {
+  "centre": "test",
+  "init": "2026-11",
+  "leads": 3,
+  "members": 7,
+  "name": "SYNTHETIC TEST",
+  "system": "1"
+ },
  "ukmo-gloseas6": {
   "centre": "ukmo",
   "clim": {
@@ -348,13 +356,5 @@
     816
    ]
   }
- },
- "synthetic-test": {
-  "name": "SYNTHETIC TEST",
-  "init": "2026-11",
-  "members": 7,
-  "centre": "test",
-  "system": "1",
-  "leads": 3
  }
 }

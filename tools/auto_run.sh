@@ -146,7 +146,18 @@ fi
 # environment variable does not survive a wipe - so it has to be read
 # here too, or the publisher would come back on its own after a
 # rebuild and start publishing again.
-if [ -n "${NO_PUBLISH:-}" ] || [ -n "${SITE_NO_PUBLISH:-}" ] || \
+#
+# THE SWITCH IS "1" or "true" TO BE ON.  "0" and "false" mean the posts
+# are wanted again (the owner changed their mind on 20 Nov 2026 and the
+# development site now follows the data), so the switch reads the value
+# and not merely its presence.
+publish_off() {
+    case "${1:-}" in
+        1|true|TRUE|yes|YES) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+if publish_off "${NO_PUBLISH:-}" || publish_off "${SITE_NO_PUBLISH:-}" || \
    [ -f data/.no_publish ]; then
     log "the publisher stays stopped (the posts are off) - nothing is published"
 elif ! running "auto_publish.sh"; then

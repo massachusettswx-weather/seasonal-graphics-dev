@@ -1,10 +1,10 @@
 {
  "ecmwf-seas5": "daily",
- "cmcc-sps4": "daily",
- "dwd-gcfs2": "daily",
+ "cmcc-sps4": "monthly",
+ "dwd-gcfs2": "monthly",
  "ukmo-gloseas6": "daily",
  "meteo-france-s9": "daily",
  "eccc-cansips": "daily",
- "bom-access-s2": "daily",
- "jma-jra3": "daily"
+ "bom-access-s2": "monthly",
+ "jma-jra3": "monthly"
 }

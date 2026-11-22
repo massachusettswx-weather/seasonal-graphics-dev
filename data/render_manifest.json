@@ -631,6 +631,34 @@
   "label": "May 2027",
   "lead": 6
  },
+ "SNOW_CMCC-SPS4_April2027_anom_in.png": {
+  "label": "April 2027",
+  "lead": 6
+ },
+ "SNOW_DWD-GCFS2_April2027_anom_in.png": {
+  "label": "April 2027",
+  "lead": 6
+ },
+ "snow_eccc-cansips_month07_in.png": {
+  "label": "May 2027",
+  "lead": 7
+ },
+ "SNOW_ECCC-CANSIPS_April2027_anom_in.png": {
+  "label": "April 2027",
+  "lead": 6
+ },
+ "snow_meteo-france-s9_month07_in.png": {
+  "label": "May 2027",
+  "lead": 7
+ },
+ "SNOW_METEO-FRANCE-S9_April2027_anom_in.png": {
+  "label": "April 2027",
+  "lead": 6
+ },
+ "SNOW_UKMO-GLOSEAS6_April2027_anom_in.png": {
+  "label": "April 2027",
+  "lead": 6
+ },
  "snow_c3s-multi_month01_in.png": {
   "label": "December 2026",
   "lead": 1
