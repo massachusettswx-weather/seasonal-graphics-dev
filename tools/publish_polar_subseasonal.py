@@ -223,6 +223,25 @@ def patch_inline(text, init, version):
     return text[:start] + json.dumps(obj) + text[end:]
 
 
+def set_polar_default(text):
+    """The polar-cap section opens on the GEFSv12 (the owner's choice).
+
+    The section's picker is in the built page, and the page that was built
+    before the source changed still has the seasonal run selected.  The
+    stratosphere page's OTHER picker - the 10 hPa wind - is a different
+    product and is left alone.
+    """
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    try:
+        import set_polar_default as helper
+    finally:
+        sys.path.pop(0)
+    new, what = helper.set_default(text)
+    if new is None:
+        return text, what
+    return new, what
+
+
 def entry_of(reg):
     for m in reg.get("models", []):
         if m.get("id") == MODEL_ID:
@@ -491,6 +510,8 @@ def main():
             if t2 is None:
                 say("   %s could not be patched - NOTHING IS CHANGED." % f)
                 return 2
+            t2, what = set_polar_default(t2)
+            say("     docs/%-22s %s" % (f, what))
             open(p, "w", encoding="utf-8").write(t2)
 
         # 5. check what was written
