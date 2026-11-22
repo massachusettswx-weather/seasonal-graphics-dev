@@ -27,6 +27,18 @@ MONTH_ABBR = {"Jan": "January", "Feb": "February", "Mar": "March",
               "Nov": "November", "Dec": "December"}
 
 
+def init_of_run(z):
+    """The run's own date, from a run written as 20261121 00Z or as
+    2026-11-20 00Z.  A run is the model's init; the first valid time is a
+    forecast's first step and can be a day later."""
+    run = str(z.get("run") or "")
+    m = re.match(r"(\d{4})-?(\d{2})-?(\d{2})", run)
+    if m:
+        return "%s-%s-%s" % m.groups()
+    t = z.get("times") or []
+    return str(t[0])[:10] if t else ""
+
+
 def init_text(init):
     """'1 Nov 2026' for an init like '2026-11'.
 
@@ -436,10 +448,10 @@ def main():
                 if not z:
                     continue
                 nmem = z.get("members", "?")
-                init = z.get("run") or init
-                t = z.get("times") or []
-                if t:
-                    init = str(t[0])[:10]
+                # The INIT is the run's own date, not the first valid time:
+                # the EC46's first plotted point is a day after its run and
+                # the card used to say the day after the run.
+                init = init_of_run(z) or init
                 break
             reg["models"].append({
                 "id": tag,
