@@ -1,4 +1,4 @@
-# The state of the project - 20 Nov 2026, 22:40 UTC
+# The state of the project - 22 Nov 2026, 04:20 UTC
 
 Short and factual.  The long history of how it got here is in
 `notes/STATE_LOG.md`; the rules that are not negotiable are in
@@ -10,13 +10,15 @@ need the conversation.
 
 | | repository | address | state |
 |---|---|---|---|
-| **operational** | `massachusettswx-weather/seasonal-graphics` | `https://massachusettswx-weather.github.io/seasonal-graphics/` | published at `0f33e70`, HTTP 200, untouched by the pipeline |
-| **development** | `massachusettswx-weather/seasonal-graphics-dev` | `https://massachusettswx-weather.github.io/seasonal-graphics-dev/` | published at `e455654`, open (no password) |
+| **operational** | `massachusettswx-weather/seasonal-graphics` | `https://massachusettswx-weather.github.io/seasonal-graphics/` | the GEFSv12 sub-seasonal panel is published **nightly**; the rest of the site is curated |
+| **development** | `massachusettswx-weather/seasonal-graphics-dev` | `https://massachusettswx-weather.github.io/seasonal-graphics-dev/` | everything: the panels, the pages, the polar cap section, the interactive world map (`maps.html`) - open, no password |
 
 * The development copy is the working copy: everything new is built and
-  shown there first.
+  shown there first.  **The owner works on the development copy** - the
+  operational site has no map page at all.
 * The operational site is **curated**.  Nothing reaches it without the
-  owner's word.
+  owner's word; the one exception is the daily GEFSv12 sub-seasonal
+  update, which was approved for it.
 * The general publisher is **OFF**: `SITE_NO_PUBLISH=1` in the encrypted
   secret store.  `tools/auto_run.sh` honours the switch.  **Stopping the
   posts must never stop the workers** - the cron is what puts the workers
@@ -30,12 +32,13 @@ need the conversation.
   grid, with the anomalies against each model's own hindcast climate, the
   three-month windows (NDJ, DJF, JFM, FMA) and the `@Massachusettswx`
   watermark.
-* **The operational site carries the older site**: the panels, the pages,
-  the polar cap section with the **GEFSv12 panel still on the 2026-11-14
-  cycle**.  It has no map page.
-* The GEFSv12 sub-seasonal series is at the **20261119 00Z** cycle in the
-  working tree (35 days, 31 members, 12 levels) and is on the development
-  copy.
+* **The polar-cap section opens on the NOAA GEFSv12** (the owner's choice,
+  22 Nov 2026) on both sites - it is the sub-seasonal panel, the one that
+  changes every day.  The 10 hPa wind picker on the same page is a
+  different product and still opens on the ECMWF SEAS5 (the GEFSv12 has no
+  wind panel).
+* The GEFSv12 sub-seasonal series is at the **20261121 00Z** cycle (35
+  days, 31 members, 12 levels) and is on **both** sites.
 
 ## The workers
 
@@ -100,9 +103,22 @@ python3 tools/publish_polar_subseasonal.py --repo /workspace/repo \
   registry inlined in `docs/model.html`, `docs/snow.html`, `docs/spv.html`.
 * It selects them by a **constant** (`MODEL_ID = "gefsv12"`), never from
   a file a previous run wrote.
-* It rebuilds the inlined registry with the **TARGET's own**
-  `build_site.py` (the `ok` flags come from the files that are really
-  there) and refuses if that blob is not in the pages.
+* **THE PAGES ARE PATCHED IN THEIR OWN INLINED REGISTRY** (22 Nov 2026).
+  The blob in a page was written when the page was built, and a fresh
+  clone does not hold the build artifacts that were there then (the
+  April-2027 anomaly maps of five centres are never committed), so the
+  tree's own registry can never match it.  The script reads the blob out
+  of the page and writes back the ONE entry this product owns.
+* **THERE ARE THREE BLOBS, NOT ONE** (22 Nov 2026): `MODELS`, and - on
+  the stratosphere page - `POLARMODELS` (the cap chart) and
+  `POLARSECTORS` (the by-sector chart).  The chart URL's `?v=` is the
+  cache-buster, and it lives in all three: patch only the first and the
+  browser keeps serving the OLD picture, which is exactly what the owner
+  reported as "I don't see the latest runs".
+* `--default-only` sets the polar-cap section's default on its own,
+  **without redrawing a chart** (the charts on the target are already the
+  newest cycle's, and redrawing them here would replace them with a copy
+  drawn from this machine's own reanalysis file).
 * **Nothing is published when the update is missing** (exit 2) - and a
   series that is still being downloaded (fewer than 35 days) counts as
   missing: a half season is not a season.
@@ -132,26 +148,56 @@ published, 4 already current, 2 nothing to publish, 3 the push failed.
 
 ## Still open
 
-1. **The globe's tilt only** (the owner's answer `o3`, 20 Nov).  The flat
-   map's turn has to go: the ↻ button becomes globe-only, `state.turn`
-   and the `u_turn` branch in `assets/js/mapgl.js` come out, and the
-   drag returns to panning on the flat map.  Then rebuild, test the round
-   trip (d3 cannot express a tilt) and publish to the **development**
-   copy.
-2. **The operational push of the daily GEFSv12 update** - DONE: the narrow
-   path is live, the daily job runs it, and the live site carries the
-   2026-11-19 cycle (22 Nov 2026).
-3. **The December cadence**: the CDS request pool is now started **once a
+1. **The December cadence**: the CDS request pool is now started **once a
    day** by the daily job, not every twenty minutes.  A sandbox rebuild
    kills it every hour, so the queue is only alive for the first hour
    after the job runs - the requests it submits still go to the archive,
    but the results are picked up by the next run.  If the December
    rollover needs the queue to be alive continuously, the cadence has to
    come back: that is the owner's call, not a detail.
-4. **`notes/EXPANSION.md`** - six questions for the owner; the expansion
+2. **`notes/EXPANSION.md`** - six questions for the owner; the expansion
    must not be rebuilt before they are answered.
-5. The **`thinking_content` masks** (a platform defect, not ours): see
+3. The **`thinking_content` masks** (a platform defect, not ours): see
    `notes/THINKING_MASKS_BUG.md`, audit with `tools/transcript_doctor.py`.
+4. The operational site has **no favicon** (a 404 on every page).  The
+   development copy has one (`assets/favicon.ico`, copied by
+   `copy_favicon()`).  Putting one on the operational site needs the
+   owner's word.
+
+## Done on 22 Nov 2026
+
+* **The globe's tilt alone** (the owner's answer `o3`): the flat map
+  pans and no longer turns on the screen, the ↻ button is the globe's
+  alone, `state.turn` and the `u_turn` branch in `assets/js/mapgl.js`
+  are out, and the projection still agrees with d3 to 1.1e-12 px (the
+  flat view included - the suite checks both views).
+* **The polar-cap section opens on the NOAA GEFSv12** on both sites
+  (`build_polar_page.py`'s `DEFAULT`, plus the narrow path's
+  `--default-only`).
+* **The 20261121 00Z cycle is on both sites** (35 days, 31 members).
+
+## The traps of this morning
+
+* **THE CHART BUILDER MUST RUN BEFORE THE REGISTRY BUILD.**  The build
+  copies the drawn charts out of `output/polar_cap/` - so if the charts
+  are not redrawn first, the build publishes the OLD ones again, and the
+  site carries a new cycle's date over an old cycle's picture.
+* **THE CORe FILE MUST BE FRESH.**  The chart's reanalysis half is drawn
+  from `data/polar_core_recent.npz`; a file that is a day old moves the
+  reanalysis window, and the chart differs from the published one by
+  ~8% of its pixels.  `python3 fetch_polar_core.py` first, then draw.
+* **THE STATE FILE IS NOT THE SERIES.**  `data/polar_gefs_jobs.json`
+  holds the decoded LEADS; the series is `data/polar_model_z.json`.  A
+  rebuild from the state (`fetch_polar_gefs.py --from-state`) writes the
+  cache - but only the leads the state holds, so a state that is still
+  being filled gives a SHORT series (22 of 35 days) and the publisher
+  refuses it (a half season is not a season).
+* **THE WATCHER AND THE DEV COPY.**  The watcher's own tree is built by
+  the general build, so its pages carry the blob its tree holds and the
+  narrow path can patch it; a tree that was only partly rebuilt cannot.
+* A local clone of the operational repository can be **behind the
+  server** without noticing: `git pull` failed silently once - check
+  `git ls-remote` before publishing into it.
 
 ## The rules that are not negotiable
 
