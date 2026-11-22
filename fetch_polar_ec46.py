@@ -736,8 +736,16 @@ def main():
             save_state(st)
             continue
         vals, svals, nmem = got
-        rec = out.setdefault(TAG, {"times": [], "values": [],
-                                   "sectors": {}, "levels": list(LEVELS)})
+        # A NEW RUN REPLACES THE SERIES; it does not join it.  The record
+        # used to be appended to whatever was there, so the second run
+        # after this one left 90 days in the file - the old run's days and
+        # the new one's, indistinguishable.
+        run_name = "%s %sZ" % (run_date, run_time[:2])
+        rec = out.get(TAG)
+        if not isinstance(rec, dict) or rec.get("run") != run_name:
+            rec = {"times": [], "values": [], "sectors": {},
+                   "levels": list(LEVELS)}
+            out[TAG] = rec
         # only the times that carry every level of BOTH the cap and the two
         # sectors are kept, so the times and the sector rows stay in step
         # (a sector row that was short would put the two out of line and
@@ -764,7 +772,7 @@ def main():
             rec["values"].append(row)
             for name, srow in srows.items():
                 rec.setdefault("sectors", {}).setdefault(name, []).append(srow)
-        rec["run"] = "%s %sZ" % (run_date, run_time[:2])
+        rec["run"] = run_name
         # the ECMWF's sub-seasonal set is a DAILY run with a 48-hour delay:
         # the chart says so, because a reader comparing it with a 35-day
         # GEFS needs to know it
