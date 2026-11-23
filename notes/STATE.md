@@ -440,6 +440,48 @@ the seam joins the CORe's 20 Nov day's MEAN with the forecast's 21 Nov 12Z
 colour band is **+-0.2 sigma**, so a 0.18 sigma difference cannot change a
 pixel.
 
+## What the reference site does about the seam (23 Nov 2026, gathering only)
+
+The owner pointed at **hebweather.net/stratosphere** ("how does this site
+do it?? DO NOT COPY ANYTHING, JUST GATHERING MORE INFO").  The site's own
+method is written out in its page - the "About these products" panel - so
+the facts can be read off it rather than guessed:
+
+* **Data:** ERA5 reanalysis (CDS, 2.5 deg, pressure levels 1000-1 hPa,
+  daily 00 UTC) is the history **and** the climatology (1991-2020 ERA5).
+  The models are sampled onto a common **1.0 deg** grid: GFS 1.0 (NOMADS,
+  +24 to +384 h), GEFS 0.5 ensemble mean, IFS 0.25 (00Z/12Z, 15 d),
+  AIFS single 0.25.  Their notice: "zonal means, anomalies relative to the
+  1991-2020 ERA5 climatology, vertical interpolation, plotting".
+* **The seam, in their words:** *"a dashed vertical line marks the boundary
+  between ERA5 reanalysis (left, solid shading) and the model data (right,
+  lighter shading)"*, and *"ERA5 ends a few days behind real time.  When
+  the gap is more than one day, a second dashed line marks the current
+  date.  Between the last ERA5 day and that line the chart shows the
+  selected model's own 1-day forecasts from the previous days' runs (Past
+  Days), which stand in for the analysis until ERA5 catches up.  The
+  forecast itself (Forecast) is to the right of the line."*
+* **So they do NOT join the reanalysis to the model's first forecast
+  point either.**  Three segments: the reanalysis up to ITS last day, then
+  the MODEL's own past days, then the forecast; the model's side is
+  lighter, and every seam is a dashed line with a label.
+* Their GPH anomaly product: the daily polar-cap mean (60-90N, all
+  longitudes) in sigma against the 1991-2020 ERA5 climatology; the chart's
+  own label reads "Zonal Mean (65-90N)"; the sector products are 65-90N
+  over a 120 deg sector.
+* "Same history: everything left of the dashed seam is identical in all
+  sets, so the models can be compared directly."
+* Their forecast is 16 days (GFS/GEFS) or 15 (IFS/AIFS); ours is the
+  GEFSv12's 35.
+
+**WHAT IT MEANS FOR US (nothing built, nothing copied):** the device that
+shows a reader where the reanalysis ends and the model begins is the
+**"Past Days" segment** - the model's own values standing in for the
+analysis while the reanalysis catches up.  We have the same thing and
+better: the GEFS's **f000 analysis** and the **3-hourly CORe** let us draw
+the model's own analysis against the reanalysis's analysis at the same
+instant, which is what the owner asked for on 23 Nov.
+
 ## The rules that are not negotiable
 
 * Our own graphics; a climatology from the same product as the data it
