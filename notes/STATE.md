@@ -39,6 +39,13 @@ need the conversation.
   wind panel).
 * The GEFSv12 sub-seasonal series is at the **20261121 00Z** cycle (35
   days, 31 members, 12 levels) and is on **both** sites.
+* **The EC46 polar-cap section is on BOTH sites** (the owner's approval,
+  22 Nov 2026): the **20261120 00Z** run, 45 days, 101 members, published
+  with `tools/publish_polar_ec46.py`.
+* **The dark mode is on the operational site** (the owner's approval,
+  22 Nov 2026): every page carries the button, the theme is read back
+  before anything is drawn, and the browser remembers it.  Published with
+  `tools/publish_dark_mode.py`.
 
 ## The workers
 
@@ -146,6 +153,47 @@ not a clock**, and the watcher stops as soon as the cycle is on the site
 late).  The narrow path's exit codes are what the watcher reads: 0
 published, 4 already current, 2 nothing to publish, 3 the push failed.
 
+### Two more narrow paths (22 Nov 2026, the owner's approval)
+
+The owner: *"push this and dark mode to the ops site"* - and **ONLY** those
+two things.  So there are two more narrow paths, each carrying one product
+and nothing else:
+
+**`tools/publish_polar_ec46.py`** carries the **EC46 polar-cap section**:
+the picture, the registry entry (`docs/data/models.json`,
+`docs/data/models_public.json`), the registry inlined in `docs/model.html`
+and `docs/spv.html`, the polar block's own registry and the picker's new
+option in `docs/spv.html`, and the model's card in `docs/index.html`.
+* The entry is **taken from the source tree's own built registry**, so the
+  wording is the builder's wording.
+* The picture is **copied byte for byte** from the source tree's build, not
+  redrawn: redrawing would replace it with a chart made from this machine's
+  reanalysis file, which is a day older.
+* **Only `model.html` and `spv.html` carry the inlined registry** - the
+  operational site's snowfall page reads it out of `models.json`, and its
+  home page carries the cards baked in.
+* The EC46 has **no by-sector chart**, so `POLARSECTORS` is not touched.
+
+**`tools/publish_dark_mode.py`** carries the **dark mode**: the theme's
+rules in `docs/assets/css/style.css`, and on all five pages the script that
+reads the theme back before anything is drawn, the button in the header, and
+the script that runs it.  All three pieces are **taken from the source
+tree's own build**, and the stylesheet's `?v=` is bumped on every page -
+without that the browser would keep serving the old stylesheet and the dark
+theme would never arrive.
+
+**BOTH SHARE THE GEFSv12 SCRIPT'S MACHINERY BY IMPORTING IT**
+(`git`, `push_to`, `commit_files`, `inline_registry`, ...).  The GEFSv12
+script runs nightly and must never be edited; importing it is not editing
+it.  Every new path is proved on a **copy** of the operational clone
+before it is allowed near the live site.
+
+* **THE TRAP THAT COST THE MOST**: a regex patch that replaced the group
+  and then jumped to the end of the NEXT group dropped the `</select>` -
+  which swallowed the rest of the page and left the picker dead.  The
+  page's own JavaScript then failed on a null element.  **A page patch
+  that is not opened in a browser is not a page patch.**
+
 ## The EC46 (the ECMWF's 46-day extended range) - 22 Nov 2026
 
 * **The fetcher existed and nothing called it.**  `fetch_polar_ec46.py` is
@@ -172,7 +220,26 @@ published, 4 already current, 2 nothing to publish, 3 the push failed.
   the chunk and nothing else, so the next run found every chunk "already
   decoded" and fetched nothing while the chart kept a stale cycle.
 * One chunk at a time.
-* The 20261120 00Z run was being pulled on the afternoon of 22 Nov 2026.
+* **A NEW RUN REPLACES THE SERIES; it does not join it.**  The record was
+  appended to whatever was there, so the run after the run after this one
+  left **90 days** in the file - the old run's days and the new one's,
+  indistinguishable.  A run whose date differs starts a fresh record.
+* **The card's INIT is the run's own date**, not the first valid time: the
+  EC46's first plotted point is a day after its run and the card used to
+  say the day after the run (`init_of_run()` in `build_registry.py`).
+* **The seam between the reanalysis and the forecast.**  At 10 hPa over the
+  polar cap, 20 Nov 2026: the CORe reanalysis (the day's mean, ending at
+  21 Nov 00Z) **292,646.1** = **+1.28 sigma**; the EC46's first point
+  (21 Nov 00Z, a 24-hour forecast) **292,692.2** = **+1.31 sigma**; the
+  difference **46.2 m2/s2 = 0.03 sigma** - the same colour band, so they
+  look identical.  They agree because at the seam they are **the same
+  instant** (the reanalysis's last daily mean ends where the forecast's
+  first point begins), one observed and one forecast.  They diverge after
+  that: the reanalysis fell ~550-690 m2/s2 a day, the forecast only
+  ~120-260, so the pulse fades towards the climatology.
+* The 20261120 00Z run (45 days, 101 members) is published on **both
+  sites** - the card reads init 2026-11-20 and the chart's caption reads
+  "2026-11-20 00Z run".  The 21 November run is not in the archive yet.
 
 ## Still open
 
