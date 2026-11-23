@@ -1640,13 +1640,13 @@
    "name": "NOAA GEFSv12",
    "note": "NOAA GEFS v12 sub-seasonal ensemble \u00b7 35 days, from the 00Z cycle, which is the one that carries the extended range \u00b7 the ensemble mean of all 31 members (the control and the thirty perturbations), which the archive serves at every one of those 35 days, so the mean does not change membership half way through the chart \u00b7 the polar cap's geopotential height anomaly on the same scale as the reanalysis",
    "members": 31,
-   "init": "2026-11-21",
+   "init": "2026-11-22",
    "polar": {
-    "file": "assets/polar/polar_cap_gefsv12.png?v=20261122181541",
+    "file": "assets/polar/polar_cap_gefsv12.png?v=20261123045138",
     "caption": "Polar cap (60-90N) geopotential height anomaly - NOAA GEFSv12."
    },
    "polar_sectors": {
-    "file": "assets/polar/polar_sectors_gefsv12.png?v=20261122181541",
+    "file": "assets/polar/polar_sectors_gefsv12.png?v=20261123045138",
     "caption": "North Pacific and North Atlantic (60-90N) geopotential height anomaly - NOAA GEFSv12."
    }
   }
