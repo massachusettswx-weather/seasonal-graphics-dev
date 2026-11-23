@@ -348,6 +348,47 @@ analysis of said model making it seem like there's no differences"**
   different reanalysis on the left (ERA5 is ~600 m2/s2 colder over the
   cap in ARCO's store and mutes the SSW - it would show a false step).
 
+* **AND THE DIFFERENCES ARE THERE - the chart's seam is drawn at the WRONG
+  INSTANT.**  The CORe's daily file is a day's MEAN (stepRange 0-21,
+  centred near 10.5Z) and the site's file labels those points "12Z".  The
+  chart's analysis half therefore ends with 20 Nov's day's mean while the
+  forecast half starts at 21 Nov 12Z - **25.5 h apart**, while the
+  stratosphere was falling **409 m2/s2 that day**.  Measured at the SAME
+  instant on 21 Nov (the CORe for 21 Nov = 292,237.4, read from NOAA's own
+  GRIB; the day's mean interpolated to 00Z and 12Z):
+
+  | | the forecast | the analysis, same instant | difference |
+  |---|---|---|---|
+  | GEFSv12, 21 Nov 12Z (f012) | 292,500.6 | 292,211.9 | **+288.8 = +0.146 sigma** |
+  | EC46, 21 Nov 00Z (f024) | 292,692.2 | 292,416.2 | **+276.0 = +0.140 sigma** |
+
+  The chart draws **-145.4 m2/s2 (-0.028 sigma)** at that seam - an
+  artefact of the timing, not the model's behaviour.  (The same-instant
+  numbers carry about +-180 m2/s2 of interpolation uncertainty, because
+  the daily product is a day's mean.)
+* **THE TWO CENTRES AGREE WITH EACH OTHER, NOT WITH THE REANALYSIS.**
+  At 21 Nov 00Z the GEFS (brought back 12 h on its OWN rate) and the EC46
+  differ by **128.8 m2/s2 = 0.065 sigma** - and both sit about +280 above
+  the CORe.  So the gap is between the reanalysis and the analysis the
+  models start from, not between the two centres' forecasts.  The likely
+  reason: **CORe assimilates no satellite radiances** (conventional
+  observations only) while the GFS's own analysis uses them, and 10 hPa is
+  exactly where that difference lives.
+* **THE TWO CENTRES DIVERGE WITH LEAD TIME**: the GEFS minus the EC46,
+  day by day against the same climate - 0.07 sigma on day 1, 0.13 on day 6,
+  **0.40 on 1 December**, 0.26 on day 35.  **This is the picture that
+  answers "there should be differences", and both series are already on
+  disk - no reanalysis needed.**
+* **THE TENDENCIES DIFFER**: the analysis fell 409 m2/s2 on 21 Nov; the
+  GEFS's forecast falls ~126 a day and the EC46's ~198 - the forecasts
+  decay the pulse more slowly than the analysis did, so the
+  forecast-minus-analysis gap compounds with lead.
+* **THE COLOUR LADDER CANNOT SHOW A 0.14 SIGMA STEP** (the first band is
+  +-0.2 sigma), so even a corrected seam stays inside the white centre.
+* The CORe's 22 November file is **not published yet** (the bucket's last
+  file is 21 Nov), so the site's analysis half is a day behind what NOAA
+  has, and the day-2 check lands when it appears.
+
 ## The rules that are not negotiable
 
 * Our own graphics; a climatology from the same product as the data it
