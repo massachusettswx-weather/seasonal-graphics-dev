@@ -389,6 +389,57 @@ analysis of said model making it seem like there's no differences"**
   file is 21 Nov), so the site's analysis half is a day behind what NOAA
   has, and the day-2 check lands when it appears.
 
+## The owner's answer, and the 3-hourly CORe (23 Nov 2026)
+
+**THE OWNER:** *"just need the past 6hr CORe analysis to differ from GEFSv12,
+SEAS5, EC46 analyses if they do because it looks like one continuous forecast
+from reanalysis to model forecasts"*.  So: the reanalysis's analysis against
+each model's own analysis, at the SAME instant.
+
+**THE NEW ROUTE - THE BUCKET'S 3-HOURLY TREE.**
+`https://storage.googleapis.com/noaa-nws-ncep-core/grib/3hour/pgb/YYYY/MM/pgb.YYYYMMDDHH.grb`
+(+ `.idx`), an analysis at every three hours, current to the present hour
+(the 22 Nov 00Z file was there on the 23rd).  **IT IS THE SAME PRODUCT AS
+THE DAILY FILE**: the daily file's day's mean is the MEAN OF THE DAY'S EIGHT
+3-HOURLY ANALYSES, to **0.0 m2/s2** on 1, 2 and 20 November.  The tool is
+`fetch_polar_core_3hourly.py`; it writes `data/polar_core_3hourly.json`.
+(Not the CPC clone tree: `CORe/CDAS_clone_temporary/6hr/` holds only two
+stamps of January 2026 - it is a temporary clone, not a live feed.)
+
+**THE ANSWER: YES, THEY DIFFER - by about 350 m2/s2, or 0.18 sigma**, at
+10 hPa over the polar cap, at the SAME instant:
+
+| what | the day | the model | the CORe | difference | sigma |
+|---|---|---|---|---|---|
+| GEFSv12's OWN analysis (f000, 31 members) | 21 Nov 00Z | 292,685.0 | 292,335.2 | **+349.8** | **+0.177** |
+| GEFSv12 day 1 (f012) | 21 Nov 12Z | 292,500.6 | 292,346.4 | +154.3 | +0.078 |
+| EC46 day 1 (f024) | 21 Nov 00Z | 292,692.2 | 292,335.2 | +357.1 | +0.181 |
+| SEAS5 day 1 | 2 Nov 12Z | 297,698.8 | 298,090.4 | **-391.7** | -0.317 |
+
+* The GEFS's own analysis is the 31-member mean of lead **f000**, fetched
+  by `tools/fetch_gefs_analysis.py` (it imports the running fetcher's
+  machinery; the fetcher itself is not edited).  The spread across the 31
+  members is **42.7 m2/s2**, so the analysis is tight.
+* The ECMWF's 24-hour forecast for 21 Nov 00Z lands within **7 m2/s2** of
+  NOAA's own analysis for that instant - the two centres agree with each
+  other, and both sit ~350 above the CORe.  **So the gap is between the
+  reanalysis and the models' analysis, not between the centres.**  The
+  likely reason: **CORe assimilates no satellite radiances** (conventional
+  observations only) while the GFS's own analysis uses them, and 10 hPa is
+  exactly where that difference lives.
+* The SEAS5's first point sits **392 BELOW** the CORe's analysis - which is
+  the ECMWF's colder mean state (its own climate is -641 in November).
+* **THE EC46's OWN ANALYSIS IS NOT SERVED**: a probe for leadtime_hour
+  "0_24" (20 Nov, one level, control only) came back **rejected**.  The
+  EC46's row therefore uses its first forecast point.
+* `tools/compare_core_models.py` prints the table.
+
+**WHY THE CHART STILL SHOWS NOTHING.**  Two things, and both are known:
+the seam joins the CORe's 20 Nov day's MEAN with the forecast's 21 Nov 12Z
+- **25.5 hours apart** on a day the stratosphere fell 409 - and the first
+colour band is **+-0.2 sigma**, so a 0.18 sigma difference cannot change a
+pixel.
+
 ## The rules that are not negotiable
 
 * Our own graphics; a climatology from the same product as the data it

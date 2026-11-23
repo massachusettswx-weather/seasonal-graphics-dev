@@ -87,3 +87,8 @@ docs/data/*.bak
 # the queue's live bookkeeping: it changes with every request
 data/daily_jobs.json
 data/nov_pending.json
+
+# the 3-hourly CORe and the GEFS's own analysis: re-fetchable in seconds
+# (no key, no queue), so they are working data, not state
+data/polar_core_3hourly.json
+data/polar_gefs_f000.json
