@@ -294,6 +294,60 @@ before it is allowed near the live site.
   server** without noticing: `git pull` failed silently once - check
   `git ls-remote` before publishing into it.
 
+## The owner's CORe question, answered with measurements (22 Nov 2026)
+
+**"still don't think CORe Reanalysis is correct as it blends right into the
+analysis of said model making it seem like there's no differences"**
+
+* **The CORe data IS correct.**  Read straight out of NOAA's own GRIB
+  (byte ranges from the `.idx`, the cap mean computed by hand): 292,646.1
+  m2/s2 at 10 hPa for 20 Nov 2026 - the value the site stores, to the last
+  decimal.  13 Nov reads 296,256.6, the number an earlier session measured
+  independently.
+* **WHY IT BLENDS IN ON THE GEFS CHART: the two halves are ONE MODEL.**
+  CORe is NOAA CPC's Conventional Observational Reanalysis built on the
+  **FV3-GFS**, and the GEFSv12 **IS** the FV3-GFS.  So the left half is
+  the FV3-GFS's analysis and the right half is the FV3-GFS's forecast,
+  joined at their own init.  A model joined to itself is smooth by
+  construction - the GEFS chart is INCAPABLE of showing a discrepancy, so
+  its smoothness is a tautology, not a validation.
+* **They are not the same numbers** (measured on the chart's own path -
+  the CORe climate, the same join, the same normalisation):
+  CORe's last drawn day (20 Nov) 292,646.1 = +1.335 sigma, the GEFS's
+  first day (21 Nov) 292,500.6 = +1.271 sigma; the seam step is
+  **-145.4 m2/s2 = -0.028 sigma** (the chart's own daily sigma is
+  1975.7 m2/s2).  The analysis was falling **-515.8 m2/s2 a day** over
+  its last eight days; the forecast falls **-96.8** and the EC46
+  **-197.8**.  The forecast flattens out where the analysis was plunging.
+* **WHY IT LOOKS IDENTICAL ON SCREEN: the colour ladder.**  The chart's
+  breaks are -0.2 / 0 / +0.2 sigma at the centre, so a step of 0.03 sigma
+  cannot change a single pixel's colour.  It is a coarse ruler over a fine
+  difference.
+* **THE CROSS-MODEL TEST IS THE EC46 CHART** (ECMWF against NOAA): the
+  seam there is **+46.2 m2/s2 = +0.069 sigma**, and the EC46's forecast
+  then falls steadily away from the analysis.
+* **THE REBASE GATE (a code fact).**  `polar_rebase.climate_matches()`
+  only lets a chart be re-based when the chart's RUN is the climate's own
+  init.  `polar_model_clim.json` carries `init = 2026-11-01` (the SEAS5's
+  own), so: the SEAS5 **is** re-based (its run string is empty, the gate
+  cannot refuse); the GEFS is not (20261121 != 20261101) and must not be;
+  **the EC46 is not either** (2026-11-20 00Z != 2026-11-01) - by design,
+  because that correction is the SEAS5's own bias and nobody else's.  The
+  consequence is that the EC46's forecast half sits on the OBSERVED climate
+  and carries the ECMWF mean-state offset (Nov -641 m2/s2, measured;
+  about -0.3 sigma) - so the EC46's anomalies are NOT "vs its own
+  hindcast climate" the way the SEAS5's are.  Its caption says so
+  ("CORe 1991-2020 climatology").
+* **The SEAS5 chart DOES show a seam** (+1.0 sigma at the dashed line,
+  from the rebase) - so the machinery that makes a difference visible
+  exists and works.
+* **NOTHING WAS CHANGED.**  The remedies are the owner's call (see the
+  chat): say in the chart's own descriptor that the GEFS's two halves are
+  one model with itself; or draw the 31-member spread as a fan (the cache
+  keeps only the mean - the fetchers must keep the members); or put a
+  different reanalysis on the left (ERA5 is ~600 m2/s2 colder over the
+  cap in ARCO's store and mutes the SSW - it would show a false step).
+
 ## The rules that are not negotiable
 
 * Our own graphics; a climatology from the same product as the data it
