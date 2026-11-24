@@ -37,10 +37,8 @@ need the conversation.
   changes every day.  The 10 hPa wind picker on the same page is a
   different product and still opens on the ECMWF SEAS5 (the GEFSv12 has no
   wind panel).
-* The GEFSv12 sub-seasonal series is at the **20261122 00Z** cycle (35
-  days, 31 members, 12 levels) on the operational site; the development
-  copy is being brought back to it with the new chart (see "The seam,
-  rebuilt").
+* The GEFSv12 sub-seasonal series is at the **20261123 00Z** cycle (35
+  days, 31 members, 12 levels) on **both** sites (24 Nov 2026).
 * **The EC46 polar-cap section is on BOTH sites** (the owner's approval,
   22 Nov 2026): the **20261120 00Z** run, 45 days, 101 members, published
   with `tools/publish_polar_ec46.py`.
@@ -543,6 +541,33 @@ server's HEAD and nothing was pushed there.  **Two rules from that:**
 `--force` is for a redraw of the SAME cycle, never for an older one; and
 the publisher's **default target is the OPERATIONAL clone** (`/workspace/repo`)
 - always pass `--repo`.
+
+**WHERE THE THREE CHARTS ARE NOW (24 Nov 2026, 04:00 UTC).**
+
+* The **development copy** carries all three with the new device: the
+  GEFSv12 at the **20261123 00Z** cycle (35 days, 31 members, the newest
+  complete cycle), the EC46 at the 20261120 00Z run, the SEAS5 on its own
+  monthly product.  The SEAS5 went out through **a new narrow path**,
+  `tools/publish_polar_seas5.py` - it is one of the site's own models, so
+  it used to go out with the general build, and the general build is off.
+* The **operational site** carries the GEFSv12 at the 20261123 cycle, drawn
+  by the **nightly watcher** at 03:43 UTC (its own clone, taken at 03:00
+  UTC).  That chart has the model's own analysis but **not** the seam note
+  and **not** the short names, so its two panel labels run into each
+  other.  The fixes are committed; the next watcher run redraws the chart
+  with them.  **Nothing was pushed there by hand** - the owner's word for
+  this work was not to touch the operational site.
+
+**AND TWO MORE THINGS THE NIGHT TAUGHT:**
+
+* **THE SHORT NAME MUST BE A CONSTANT** (`plot_polar_cap.SHORT_NAME`).
+  The narrow publisher draws the GEFSv12 with the long product name and no
+  short one, so the panel labels ran into each other on the site.
+* **A REDRAW OF THE SAME RUN HAS TO MOVE THE `?v=`.**  The EC46's path only
+  ever ADDED its entry, so a redrawn chart could not reach the reader: the
+  browser kept serving the old picture.  Both narrow paths now bring the
+  chart URL forward, and both skip the copy when the source tree IS the
+  target (the development copy is its own source).
 
 ## The rules that are not negotiable
 
