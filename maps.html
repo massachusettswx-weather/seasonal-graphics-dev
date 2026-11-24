@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maps &middot; Seasonal Forecast Graphics</title>
+<link rel="canonical" href="https://massachusettswx-weather.github.io/seasonal-graphics/maps.html">
+<link rel="stylesheet" href="assets/css/style.css?v=20261124185328"><link rel="icon" href="favicon.ico">
+
+<script>
+/* the theme is read back before anything is drawn, so a dark screen never
+   flashes white */
+(function(){
+  try{var t=localStorage.getItem('theme');
+    if(t){document.documentElement.setAttribute('data-theme',t);}}catch(e){}
+})();
+</script>
+<header class="top">
+  <h1><a href="https://massachusettswx-weather.github.io/seasonal-graphics/">Seasonal Forecast Graphics</a></h1>
+  <span class="sub">ECMWF SEAS5 &amp; C3S seasonal systems</span>
+  <span class="spacer"></span>
+  <button class="themebtn" id="themebtn" type="button">Dark</button>
+  <a href="https://github.com/massachusettswx-weather/seasonal-graphics" target="_blank"
+     rel="noopener">GitHub</a>
+</header>
+<nav class="tabs"><a href="https://massachusettswx-weather.github.io/seasonal-graphics/">Home</a><a href="https://massachusettswx-weather.github.io/seasonal-graphics/model.html">Model</a><a href="https://massachusettswx-weather.github.io/seasonal-graphics/snow.html">Snowfall</a><a href="https://massachusettswx-weather.github.io/seasonal-graphics/spv.html">Stratosphere</a><a href="https://massachusettswx-weather.github.io/seasonal-graphics/enso.html">ENSO</a><a href="https://massachusettswx-weather.github.io/seasonal-graphics/maps.html" class="active">Maps</a></nav>
+</head>
+<body>
+<div class="card">
+  <div class="crumb"><a href="https://massachusettswx-weather.github.io/seasonal-graphics/">&larr; All models</a> &middot;
+    <a href="maps.html">Maps</a></div>
+  <h2 class="sec">Maps</h2>
+  <p class="lead">One map and one timeline: the whole world with the
+  seasonal snowfall painted on it, drawn from Natural Earth 1:50m data.
+  The field is the model's own output - every grid cell the model came on,
+  nothing resampled - and it can be read as the accumulated snowfall or as
+  the anomaly against that model's own hindcast climate, either for one
+  month or for the three-month window that starts with it. The map can be
+  the flat world on an equirectangular grid or the globe you can spin. Zoom in
+  and out with the buttons on the map, with the scroll wheel or with the
+  keyboard, drag the flat map to pan it, and press the tilt button on the
+  globe to tip the earth over on its side. The <em>Compare with</em> picker
+  puts an earlier run of the same model beside the current one: the map then
+  draws the change between the two.</p>
+  <div class="mapviews" id="mapviews">
+    <button data-view="flat">2D Map</button>
+    <button data-view="globe" class="active">3D Globe</button>
+  </div>
+  <div class="picker">
+    <label for="snowModel">Model</label>
+    <select id="snowModel" class="ctrl"></select>
+    <label for="snowArchive">Compare with</label>
+    <select id="snowArchive" class="ctrl"></select>
+    <div class="seg" id="snowfield">
+      <button class="segbtn ghost on" data-field="total">Snowfall</button>
+      <button class="segbtn ghost" data-field="anom">Anomaly vs the model's own climate</button>
+    </div>
+    <div class="seg" id="snowwindow">
+      <button class="segbtn ghost on" data-window="1">Month</button>
+      <button class="segbtn ghost" data-window="3">3-month</button>
+    </div>
+  </div>
+  <div class="maplegend" id="maplegend"></div>
+  <div class="maptimeline" id="maptimeline"></div>
+  <div class="mapbox" id="mapbox">
+    <canvas id="mapbg"></canvas>
+    <canvas id="mapcanvas"></canvas>
+    <svg id="mapsvg"></svg>
+    <div id="maptip"></div>
+    <div class="mapmark">@Massachusettswx</div>
+  </div>
+  <p class="mapload" id="mapload" style="display:none">Loading the map data&hellip;</p>
+  <p class="mapnote" id="mapnote"></p>
+</div>
+
+<script src="assets/js/d3.v7.min.js?v=20261124185328"></script>
+<script src="assets/js/mapgl.js?v=20261124185328"></script>
+<script src="assets/js/maps.js?v=20261124185328"></script>
+<div class="wrap">
+<footer>
+  <span>Data: Copernicus CDS (ECMWF SEAS5 and C3S seasonal systems) &middot;
+        ERA5 reanalysis and climatology 1991&ndash;2020 &middot;
+        NOAA CORe reanalysis (the polar cap section) &middot;
+        ECMWF open data &middot; the figures are from the 24 Nov 2026 build</span>
+  <span><strong>@Massachusettswx</strong></span>
+</footer>
+</div>
+<script>
+(function(){
+  var b=document.getElementById('themebtn'); if(!b){return;}
+  function label(){
+    var t=document.documentElement.getAttribute('data-theme');
+    b.textContent=(t==='dark')?'Light':'Dark';
+  }
+  label();
+  b.addEventListener('click',function(){
+    var t=document.documentElement.getAttribute('data-theme');
+    t=(t==='dark')?'light':'dark';
+    document.documentElement.setAttribute('data-theme',t);
+    try{localStorage.setItem('theme',t);}catch(e){}
+    label();
+  });
+})();
+</script>
+</body>
+</html>

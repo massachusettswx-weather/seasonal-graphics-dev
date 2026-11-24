@@ -55,6 +55,14 @@
                drag: null, zoom: 1,
                pan: [0, 0], field: "total", month: -1, tag: null,
                manifest: null, raster: null, index: null,
+               /* THE ARCHIVE: the runs that came before this one, so a
+                  reader can put the current run beside an older one.
+                  runs is the whole list the exporter wrote;
+                  archive is the init of the run being compared with
+                  (null = the current run alone); diff carries the
+                  comparison's own scale while one is showing. */
+               runs: [], archive: null, archiveManifest: null,
+               diff: null,
                timer: null, data: {}, gl: null, hover: -1,
                base: null, baseKey: null, pending: false,
                boxW: null, svgW: null, svgH: null, canvasW: null, canvasH: null};
@@ -193,6 +201,17 @@
   /* the value a byte stands for, for the tooltip */
   function byteValue(byte) {
     var man = state.manifest;
+    /* A COMPARISON: the byte is a difference between two runs, and it
+       stands for the change, not for the field itself. */
+    if (state.diff) {
+      if (byte >= 255) { return null; }
+      if (state.diff.kind === "totals") {
+        var t = byte / 254 * 2 - 1;
+        var mag = Math.pow(10, Math.abs(t) * state.diff.k) - 1;
+        return (t >= 0 ? 1 : -1) * mag * DIFF_FLOOR;
+      }
+      return (byte / 254 * 2 - 1) * state.diff.scale;
+    }
     if (state.field === "anom") {
       if (byte >= 255) { return null; }
       var s = man.anom_scale || 10;
@@ -433,18 +452,22 @@
   function loadField() {
     var file = fieldFile();
     if (!file) { return; }
+    /* A COMPARISON WITH AN EARLIER RUN: both fields are fetched and the
+       difference between them is drawn, because that is what "compare
+       with the previous run" means on a map.  The difference is computed
+       here, in the browser, and uploaded as an ordinary field - the
+       renderer needs no second texture and no new mode. */
+    var arch = archiveFile();
+    if (arch) { loadPair(file, arch); return; }
+    if (state.archive) {
+      note("That run does not cover the month on the timeline.");
+    }
+    state.diff = null;
     var img = new Image();
     img.onload = function () {
-      var c = document.createElement("canvas");
-      c.width = img.width; c.height = img.height;
-      var ctx = c.getContext("2d");
-      ctx.drawImage(img, 0, 0);
-      var data = ctx.getImageData(0, 0, img.width, img.height).data;
-      var bytes = new Uint8Array(img.width * img.height);
-      for (var i = 0, j = 0; i < bytes.length; i++, j += 4) {
-        bytes[i] = data[j];
-      }
-      state.raster = {w: img.width, h: img.height, bytes: bytes};
+      var r = readBytes(img);
+      if (!r) { return; }
+      state.raster = r;
       uploadField();
       requestDraw();
     };
@@ -458,11 +481,186 @@
     img.src = "data/" + file;
   }
 
+  /* the bytes of a field image, in the order the grid wants them */
+  function readBytes(img) {
+    var c = document.createElement("canvas");
+    c.width = img.width; c.height = img.height;
+    var ctx = c.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+    var data = ctx.getImageData(0, 0, img.width, img.height).data;
+    var bytes = new Uint8Array(img.width * img.height);
+    for (var i = 0, j = 0; i < bytes.length; i++, j += 4) {
+      bytes[i] = data[j];
+    }
+    return {w: img.width, h: img.height, bytes: bytes};
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* THE ARCHIVE: the runs that came before this one                   */
+
+  var MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
+                     "July", "August", "September", "October", "November",
+                     "December"];
+
+  function initLabel(init) {
+    if (!init || init.length < 7) { return init || ""; }
+    var y = init.slice(0, 4), m = parseInt(init.slice(5, 7), 10);
+    if (!m || m < 1 || m > 12) { return init; }
+    return MONTH_NAMES[m - 1] + " " + y;
+  }
+
+  function modelRuns(tag) {
+    return (state.runs || []).filter(function (r) { return r.tag === tag; });
+  }
+
+  /* the picker: the current run, and every earlier run of this model */
+  function buildArchivePicker() {
+    var sel = el("snowArchive");
+    if (!sel) { return; }
+    var mine = modelRuns(state.tag);
+    sel.innerHTML = "";
+    if (mine.length < 2) {
+      var none = document.createElement("option");
+      none.value = "";
+      none.textContent = "no earlier run";
+      sel.appendChild(none);
+      sel.disabled = true;
+      return;
+    }
+    sel.disabled = false;
+    mine.forEach(function (r) {
+      var o = document.createElement("option");
+      o.value = r.current ? "" : r.init;
+      o.textContent = r.current
+        ? ("the current run (" + initLabel(r.init) + ")")
+        : ("the " + initLabel(r.init) + " run");
+      sel.appendChild(o);
+    });
+    sel.value = state.archive || "";
+  }
+
+  /* choose the run to compare the current one with */
+  function setArchive(init) {
+    state.archive = init || null;
+    state.archiveManifest = null;
+    state.diff = null;
+    if (!state.archive) {
+      loadField();
+      drawLegend();
+      return;
+    }
+    var run = modelRuns(state.tag).filter(function (r) {
+      return r.init === state.archive;
+    })[0];
+    if (!run) { state.archive = null; loadField(); return; }
+    d3.json("data/" + run.manifest).then(function (man) {
+      state.archiveManifest = {run: run.manifest, man: man};
+      loadField();
+      drawLegend();
+    }).catch(function () {
+      state.archive = null;
+      loadField();
+      drawLegend();
+    });
+  }
+
+  /* the archived run's own file for the month the map is showing */
+  function archiveFile() {
+    if (!state.archive || !state.manifest) { return null; }
+    var man = state.archiveManifest && state.archiveManifest.man;
+    if (!man || !man.months) { return null; }
+    var cur = state.manifest.months ? state.manifest.months[state.month] : null;
+    if (!cur || !cur.ym) { return null; }
+    /* THE SAME VALID MONTH, NOT THE SAME INDEX: two runs have different
+       month lists - a November run starts in December and a December run
+       starts in January - so the month is matched by its own label. */
+    var g = state.win3
+      ? (state.field === "anom" ? "avg3_anom" : "avg3_total")
+      : (state.field === "anom" ? "anom" : "total");
+    for (var i = 0; i < man.months.length; i++) {
+      if (man.months[i].ym === cur.ym) { return man.months[i][g] || null; }
+    }
+    return null;
+  }
+
+  /* THE DIFFERENCE BETWEEN TWO RUNS.
+
+     The anomaly is in standard deviations and the totals in inches, so
+     the difference is worked out in those units and then put back on a
+     byte scale of its own: the anomaly on +-2 sigma, the totals on a
+     signed log scale (a snowfall difference is almost always a small
+     number of inches, and a linear scale would show nothing). */
+  var DIFF_SIGMA = 2.0;      /* the anomaly's difference scale, sigma */
+  var DIFF_INCH = 5.0;       /* the totals' difference scale, inches */
+  var DIFF_FLOOR = 0.02;     /* the totals' log scale's floor, inches */
+
+  function diffK() { return Math.log10(1 + DIFF_INCH / DIFF_FLOOR); }
+
+  function differenceBytes(nowB, archB) {
+    var n = Math.min(nowB.length, archB.length);
+    var out = new Uint8Array(n);
+    if (state.field === "anom") {
+      var s = (state.manifest.anom_scale || 10);
+      for (var i = 0; i < n; i++) {
+        var a = nowB[i], b = archB[i];
+        if (a >= 255 || b >= 255) { out[i] = 255; continue; }
+        var d = ((a / 254 * 2 - 1) - (b / 254 * 2 - 1)) * s;
+        var t = d / DIFF_SIGMA;
+        if (t > 1) { t = 1; } else if (t < -1) { t = -1; }
+        out[i] = Math.round((t + 1) * 127);
+      }
+      return out;
+    }
+    var k = diffK();
+    for (var j = 0; j < n; j++) {
+      var a2 = nowB[j], b2 = archB[j];
+      if (a2 >= 255 || b2 >= 255) { out[j] = 255; continue; }
+      var dd = byteValue(a2) - byteValue(b2);
+      var tt = (dd >= 0 ? 1 : -1) * Math.log10(1 + Math.abs(dd) / DIFF_FLOOR) / k;
+      if (tt > 1) { tt = 1; } else if (tt < -1) { tt = -1; }
+      out[j] = Math.round((tt + 1) * 127);
+    }
+    return out;
+  }
+
+  /* both fields, and the difference between them */
+  function loadPair(nowFile, archFile) {
+    var img1 = new Image(), img2 = new Image();
+    var got = 0;
+    var done = function () {
+      got++;
+      if (got < 2) { return; }
+      var b1 = readBytes(img1), b2 = readBytes(img2);
+      if (!b1 || !b2) { return; }
+      state.raster = {w: b1.w, h: b1.h, bytes: differenceBytes(b1.bytes, b2.bytes)};
+      state.diff = state.field === "anom"
+        ? {kind: "anom", scale: DIFF_SIGMA}
+        : {kind: "totals", scale: DIFF_INCH, k: diffK()};
+      /* the legend describes what is on the map, so it is drawn once the
+         difference is known - not when the archive was chosen */
+      drawLegend();
+      uploadField();
+      requestDraw();
+    };
+    img1.onload = done;
+    img1.onerror = function () { fail("the current field could not be loaded"); };
+    img2.onload = done;
+    img2.onerror = function () { fail("the earlier run's field could not be loaded"); };
+    img1.src = "data/" + nowFile;
+    img2.src = "data/" + archFile;
+  }
+
   function loadModel(tag) {
     state.tag = tag;
     state.manifest = null;
     state.raster = null;
     state.month = -1;
+    /* a new model means a new set of runs: the archive that was chosen
+       belonged to the model before */
+    state.archive = null;
+    state.archiveManifest = null;
+    state.diff = null;
+    buildArchivePicker();
     if (!tag) { draw(); return; }
     d3.json("data/snowmap_" + tag + ".json").then(function (d) {
       try {
@@ -613,7 +811,37 @@
     var cap = document.createElement("div");
     cap.style.marginTop = "4px";
 
-    if (state.field === "anom") {
+    if (state.diff) {
+      /* THE COMPARISON'S OWN SCALE: the change since the earlier run,
+         on the same diverging palette the anomaly uses - brown is less
+         snow than the earlier run said, teal is more. */
+      (man.anom_colors || []).forEach(function (c) {
+        var i = document.createElement("i");
+        i.style.background = c;
+        bar.appendChild(i);
+      });
+      var run = (state.runs || []).filter(function (r) {
+        return r.tag === state.tag && r.init === state.archive;
+      })[0];
+      var when = run ? initLabel(run.init) : "the earlier run";
+      if (state.diff.kind === "anom") {
+        lo.textContent = "-" + state.diff.scale.toFixed(1) + " sigma";
+        hi.textContent = "+" + state.diff.scale.toFixed(1) + " sigma";
+        cap.textContent = "The change since the " + when + " run - the " +
+          "current run minus that run, in standard deviations of the " +
+          "model's own hindcast climate (" + man.name + "). Brown is less " +
+          "snow than the earlier run said, teal is more" +
+          (windowLabel() ? " - " + windowLabel() + ", the 3-month mean" : "");
+      } else {
+        lo.textContent = "-" + state.diff.scale + " in";
+        hi.textContent = "+" + state.diff.scale + " in";
+        cap.textContent = "The change since the " + when + " run - the " +
+          "current run minus that run, inches of snowfall (" + man.name +
+          "), on a log scale so that a few hundredths of an inch still " +
+          "shows" +
+          (windowLabel() ? " - " + windowLabel() + ", 3-month total" : "");
+      }
+    } else if (state.field === "anom") {
       (man.anom_colors || []).forEach(function (c) {
         var i = document.createElement("i");
         i.style.background = c;
@@ -1024,6 +1252,23 @@
         msel.appendChild(o);
       });
       msel.addEventListener("change", function () { loadModel(msel.value); });
+      /* THE ARCHIVE: the runs that came before this one, so a reader can
+         put an earlier run beside the current one.  The list is a separate
+         file because the model index is about the models and this is
+         about their runs. */
+      d3.json("data/maps_index.json").then(function (runs) {
+        state.runs = runs || [];
+        buildArchivePicker();
+      }).catch(function () {
+        state.runs = [];
+        buildArchivePicker();
+      });
+      var asel = el("snowArchive");
+      if (asel) {
+        asel.addEventListener("change", function () {
+          setArchive(asel.value);
+        });
+      }
       /* THE PAGE OPENS ON THE MULTI-MODEL MEAN.  The index puts it first,
          but the page asks for it by name as well: the index on disk may be
          an older one, written before the mean existed or before it was
