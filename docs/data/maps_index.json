@@ -77,6 +77,13 @@
   "manifest": "maps/dwd-gcfs2/2026-10/snowmap_dwd-gcfs2.json"
  },
  {
+  "tag": "ecmwf-seas5",
+  "init": "2026-10",
+  "name": "ECMWF SEAS5",
+  "current": false,
+  "manifest": "maps/ecmwf-seas5/2026-10/snowmap_ecmwf-seas5.json"
+ },
+ {
   "tag": "ukmo-gloseas6",
   "init": "2026-10",
   "name": "UKMO GloSeas6-GC5.1",
