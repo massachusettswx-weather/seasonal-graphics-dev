@@ -646,17 +646,27 @@ site (GEFSv12, EC46) - the live PNGs are byte for byte the repo's.
    day: 0.28 sigma on 25 Nov rising to 3.3 sigma on 15 Dec) - a new chart
    family, so it needs the owner's word.
 
-**IN FLIGHT: a CDS ERA5 daily request** - the first one (8-18 Nov,
-job `418366be-b042-44b1-9d94-416dc5c33bf9`) FAILED at 10:15Z without a
-stated reason; the retry (15-18 Nov, job
-`7aaad44b-11f4-4d7c-8a34-4de3c81878d3`, accepted 19:07Z) was still
-"accepted" at 19:45Z.  The watcher is `/workspace/poll_era5.py`; the
-result lands in `/workspace/era5_recent.grib`.  **THE CDS'S QUEUE HOLDS
-A REQUEST FOR HOURS** - the seasonal job queued at 18:46Z had still not
-started at 19:45Z, and one of the pipeline's own jobs waited two hours
-before it started - so a queued request is not a fault, and the results
-stay in the store afterwards, which is why a watcher that dies costs
-nothing but the wait.
+**IN FLIGHT: a CDS ERA5 daily request** - **ONE DAY PER REQUEST.**
+The first attempt (8-18 Nov, job `418366be-b042-44b1-9d94-416dc5c33bf9`)
+FAILED, and the reason is only in the job's RESULTS endpoint, not in its
+record: *"MARS has returned an error... UserError: **Duplicate value for
+month: 2026-11**"*.  **The CDS turns year + month + day into a date
+list, so a LIST OF DAYS inside one month asks for that month twice.**
+The pipeline's own request works because it asks for ONE day (the 15th)
+across thirty years.  The queued retry carried the same bad shape and
+was DISMISSED (`DELETE /retrieve/v1/jobs/<id>` works ✓ - it frees the
+slot ✓); the replacement is job `d357b674-50f5-4a4d-8411-c12455508591`
+(17 Nov, one day, 12Z, the polar cap box).  The watcher is
+`/workspace/poll_era5.py`; the result lands in `/workspace/era5_recent.grib`.
+**THE CDS'S QUEUE HOLDS A REQUEST FOR HOURS** - the CMCC's seasonal job
+queued at 18:46Z started at 20:14Z, 88 minutes later - so a queued
+request is not a fault, and the results stay in the store afterwards,
+which is why a watcher that dies costs nothing but the wait.
+
+**THE ARCHIVE HAS TWO RUNS NOW** (both live on the dev site): the UKMO
+GloSeas6's and the CMCC SPS4's October 2026 init, each built from the
+C3S archive and compared with the November run.  The DWD GCFS2.2 and the
+ECMWF SEAS5 are queued behind them.
 
 ## The maps page: an ARCHIVE picker, and comparing two runs (24 Nov 2026, 19:10 UTC)
 
