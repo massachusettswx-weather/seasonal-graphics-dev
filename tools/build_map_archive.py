@@ -53,6 +53,12 @@ def fetch_init(tag, centre, system, leads, y, m, out):
            "leadtime_month": [str(k) for k in range(1, leads + 1)],
            "data_format": FM.GC}
     print("   %-16s the %04d-%02d init" % (tag, y, m), flush=True)
+    # A RUN THAT IS ALREADY ON DISK IS NOT FETCHED AGAIN: the CDS's
+    # queue can take hours, and a fetch that is already paid for must
+    # not be paid for twice.
+    if os.path.exists(out) and os.path.getsize(out) > 10000:
+        print("      already fetched", flush=True)
+        return True
     if not FM.retrieve("seasonal-monthly-single-levels", req, out, tries=3):
         return False
     return os.path.getsize(out) > 10000
