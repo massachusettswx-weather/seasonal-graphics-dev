@@ -67,7 +67,7 @@ def load_sector_clim():
         if not os.path.exists(path):
             continue
         d = np.load(path, allow_pickle=True)
-        if "sector_data" not in d:
+        if "sector_data" not in d or "levels" not in d:
             continue
         out = {}
         for entry in d["sector_data"]:
@@ -76,11 +76,11 @@ def load_sector_clim():
                                       np.array(v["sigma"], float))
                              for m, v in months.items()}
         if out:
-            return out
+            return out, [int(x) for x in d["levels"]]
     nat = load_clim_native()
     if nat is not None and nat[1]:
-        return nat[1]
-    return None
+        return nat[1], [int(x) for x in (nat[0][1] if nat[0] else [])]
+    return None, []
 
 
 def load_recent_sectors():
@@ -108,8 +108,9 @@ def load_recent_sectors():
         out = {}
         for i, sec in enumerate(names):
             out[sec] = np.asarray(sd[i], float)
-        return times, out, product
-    return [], {}, "ERA5"
+        rlevs = [int(x) for x in (d["levels"] if "levels" in d else [])]
+        return times, out, product, rlevs
+    return [], {}, "ERA5", []
 
 
 def main(tag="gefsv12", label="NOAA GEFSv12", short=None, rebase="forecast"):
@@ -126,7 +127,7 @@ def main(tag="gefsv12", label="NOAA GEFSv12", short=None, rebase="forecast"):
     if not rec or not rec.get("sectors"):
         print("   the %s series carries no sector means" % tag)
         return None
-    clim = load_sector_clim()
+    clim, clim_levels = load_sector_clim()
     if not clim:
         print("   no sector climate yet - the CDS monthly means are still "
               "being fetched")
@@ -151,10 +152,31 @@ def main(tag="gefsv12", label="NOAA GEFSv12", short=None, rebase="forecast"):
 
     # The analysis in front of it, from the same reanalysis the cap section
     # is measured with.
-    rt, rv, _ana_name = load_recent_sectors()
+    rt, rv, _ana_name, rlevs = load_recent_sectors()
     rday = {}
     for i, t in enumerate(rt):
         rday.setdefault(t[:10], i)
+
+    # THE LEVELS THE THREE SIDES SHARE.  The ECMWF's sub-seasonal EC46
+    # serves ten levels and the reanalysis and the climate twelve, so the
+    # chart is drawn on the ten they all have - the same rule the cap
+    # section follows, so the two charts can be read against each other.
+    own_levels = list(levels)
+    common = [l for l in own_levels if (not rlevs or l in rlevs)
+              and (not clim_levels or l in clim_levels)]
+    if not common:
+        print("   the %s section has no level the three sides share" % tag)
+        return None
+    if len(common) != len(own_levels):
+        print("   the %s section is drawn on %d of the %d levels"
+              % (tag, len(common), len(own_levels)))
+    mkeep = [own_levels.index(l) for l in common]
+    rkeep = [rlevs.index(l) for l in common] if rlevs else list(mkeep)
+    levels = common
+    for name in list(fc.keys()):
+        fc[name] = (fc[name][0], fc[name][1][:, mkeep])
+    for name in list(rv.keys()):
+        rv[name] = rv[name][:, rkeep]
 
     first = min((v[0][0] for v in fc.values() if len(v[0])), default=None)
     ana_days = sorted(d for d in rday if first and d < first)[-ANA_DAYS:]
@@ -185,9 +207,11 @@ def main(tag="gefsv12", label="NOAA GEFSv12", short=None, rebase="forecast"):
         # at every month boundary and the step draws a seam across the
         # chart
         mlist = sorted(clim[name])
-        mmean = np.array([np.asarray(clim[name][m][0], float)[:len(levels)]
+        ccols = ([clim_levels.index(l) for l in levels]
+                 if clim_levels else list(range(len(levels))))
+        mmean = np.array([np.asarray(clim[name][m][0], float)[ccols]
                           for m in mlist])
-        msig = np.array([np.asarray(clim[name][m][1], float)[:len(levels)]
+        msig = np.array([np.asarray(clim[name][m][1], float)[ccols]
                          for m in mlist])
         # A SEASONAL model's mean state is not the observed climate, and by
         # the far end of a seven-month run it is thousands of m2/s2 below it
@@ -196,9 +220,9 @@ def main(tag="gefsv12", label="NOAA GEFSv12", short=None, rebase="forecast"):
         # the model's OWN hindcast climate, exactly as the cap section
         # does it, so the two charts stay in step.
         corr, note = polar_rebase.correction(
-            all_days, levels, {m: np.asarray(clim[name][m][0], float)[:len(levels)]
-                               for m in mlist}, mlist, sector=name, mode=rebase,
-            run=rec.get("run") or "")
+            all_days, levels,
+            {m: np.asarray(clim[name][m][0], float)[ccols] for m in mlist},
+            mlist, sector=name, mode=rebase, run=rec.get("run") or "")
         if corr is not None:
             vals = vals.copy()
             if rebase == "both":

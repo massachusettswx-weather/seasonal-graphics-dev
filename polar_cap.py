@@ -796,9 +796,17 @@ def plot_domain_map(ax):
         mpatches.Patch(facecolor="#d9d3c6", edgecolor="#b3aa9a",
                        label="land"),
     ]
-    leg = ax.legend(handles=handles, loc="lower center",
-                    bbox_to_anchor=(0.5, -0.22), fontsize=8.0, frameon=False,
-                    handlelength=1.1, handleheight=1.0, labelspacing=0.40)
+    # THE KEYS GO UNDER THE MAP, CLEAR OF THE WATERMARK AND OF THE
+    # ECMWF CREDIT.  Both of those belong in the bottom right - the ECMWF
+    # because it asks for its credit there, the watermark because that is
+    # the house's place for it - and the keys used to be printed over
+    # them.  The sectors are named on the map itself, so the keys are
+    # only a key.
+    leg = ax.legend(handles=handles, loc="lower left",
+                    bbox_to_anchor=(0.762, 0.052),
+                    bbox_transform=ax.figure.transFigure,
+                    fontsize=8.0, frameon=False, ncol=1,
+                    handlelength=1.1, handleheight=1.0, labelspacing=0.34)
     for t in leg.get_texts():
         t.set_color(C_TEXT)
     return ax
@@ -918,8 +926,14 @@ def plot_sector_sections(times, sectors, levels, out_path, title, subtitle,
     npan = len(names)
     map_w = 0.225
     map_x = 1.0 - 0.018 - map_w
-    panel_right = map_x - 0.030
-    gap = 0.018
+    # THE GAP BETWEEN THE PANELS IS WIDE ENOUGH FOR A DATE LABEL.  The
+    # labels used to be dropped at the inner edges, which made the two
+    # panels look as if they covered different periods - the left one
+    # appeared to end on 27 December and the right one to begin on 15
+    # November - when in fact every panel covers the same days.  Both
+    # panels now carry every date.
+    panel_right = map_x - 0.052
+    gap = 0.048
     left0 = 0.045
     width = (panel_right - left0 - (npan - 1) * gap) / npan
     axes = []
@@ -982,15 +996,10 @@ def plot_sector_sections(times, sectors, levels, out_path, title, subtitle,
                 del idx[j + 1]
         ax.set_xticks(idx)
         labs = [_short_date(times[k]) for k in idx]
-        # A tick label centred on its tick hangs half outside the panel, so
-        # the last date of one panel ran into the first date of the next.
-        # The panels share one time axis, so the outer panels carry the
-        # start and the end date and the inner ones leave them out.  The
-        # TICKS stay on every panel, so the gridlines still line up.
-        if i > 0:
-            labs[0] = ""
-        if i < npan - 1:
-            labs[-1] = ""
+        # EVERY PANEL CARRIES EVERY DATE.  The panels share one time
+        # axis, and a reader who has to work out which panel's axis is
+        # offset cannot read the two sectors against each other - which
+        # is the whole reason for drawing them side by side.
         ax.set_xticklabels(labs, fontsize=8.5, color=C_TEXT)
         ax.set_xlim(-0.5, n - 0.5)
 
@@ -1042,7 +1051,13 @@ def plot_sector_sections(times, sectors, levels, out_path, title, subtitle,
 
     sm = ScalarMappable(norm=norm_c, cmap=cmap)
     sm.set_array([])
-    cax = fig.add_axes([0.135, 0.082, 0.45, 0.018])
+    # THE COLOUR BAR UNDER THE PANELS, not floating in the middle of the
+    # bottom band: it belongs to the two panels above it, and it is drawn
+    # from the first panel's left edge to the last one's right edge so
+    # that it reads as one scale for both of them.
+    bar_x = left0 + 0.018
+    bar_w = (panel_right - left0) - 0.036
+    cax = fig.add_axes([bar_x, 0.082, bar_w, 0.018])
     cb = fig.colorbar(sm, cax=cax, orientation="horizontal",
                       boundaries=edges, ticks=edges[1:-1], extend="neither",
                       spacing="uniform")
@@ -1052,7 +1067,8 @@ def plot_sector_sections(times, sectors, levels, out_path, title, subtitle,
     cb.outline.set_edgecolor("#c8c5c2")
     cb.outline.set_linewidth(0.8)
     cb.ax.tick_params(length=2, colors=C_TEXT)
-    fig.text(0.36, 0.034, "Normalized geopotential height anomaly (\u03c3)",
+    fig.text(bar_x + bar_w / 2.0, 0.034,
+             "Normalized geopotential height anomaly (\u03c3)",
              fontsize=10.5, ha="center", va="center", fontweight="bold",
              color=C_TEXT)
 

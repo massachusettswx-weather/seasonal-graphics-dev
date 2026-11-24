@@ -202,6 +202,17 @@ def main():
         EX.write_index(tags, state)
         with open(tags_p, "w") as f:
             f.write(tags_backup)
+        # THE SYNTHETIC RUN'S ARCHIVE GOES TOO: the exporter now keeps a
+        # copy of every run under docs/data/maps/<tag>/<init>/, and a test
+        # model left in the published data directory is a picker entry
+        # that points at a model the site does not have.
+        adir = os.path.join(EX.OUT, "maps", TAG)
+        if os.path.isdir(adir):
+            shutil.rmtree(adir)
+            up = os.path.dirname(adir)
+            if os.path.isdir(up) and not os.listdir(up):
+                os.rmdir(up)
+        EX.write_archive_index()
         print("cleaned up")
 
     print("")

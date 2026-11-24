@@ -91,3 +91,8 @@ data/nov_pending.json
 # the 3-hourly CORe and the GEFS's own analysis: re-fetchable in seconds
 # (no key, no queue), so they are working data, not state
 data/polar_gefs_f000.json
+data/map_scratch_ukmo/
+data/map_scratch/
+data/models_shadow/
+data/_archive_*.grib
+data/map_archive_state.json

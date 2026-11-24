@@ -651,6 +651,78 @@ site (GEFSv12, EC46) - the live PNGs are byte for byte the repo's.
 the polar cap box) - to size the ERA5-vs-GEFS gap with real numbers
 before the owner is asked to choose.  The poller is
 `/workspace/poll_era5.py`; the result lands in `/workspace/era5_recent.grib`.
+**THAT JOB FAILED** at 10:15Z without a stated reason; a smaller retry
+(15-18 Nov) is job `7aaad44b-11f4-4d7c-8a34-4de3c81878d3`, accepted
+19:07Z.  The CDS's queue is slow - the seasonal job queued at 18:46Z
+was still "accepted" half an hour later.
+
+## The maps page: an ARCHIVE picker, and comparing two runs (24 Nov 2026, 19:10 UTC)
+
+**THE OWNER'S WORD:** *"add an archives dropdown selection that users
+can go back to previous runs and compare to the current"*.
+
+**THE FEATURE IS ON THE DEVELOPMENT SITE** (`/maps.html`): a picker
+labelled **Compare with**, beside the model picker.  It lists the runs
+that model has - the current one first, then the earlier ones - and
+choosing an earlier one draws **the change between the two runs**: the
+current run minus that run, over the same valid month.
+
+* **THE DIFFERENCE IS COMPUTED IN THE BROWSER**, not by a second texture
+  and a new shader mode: the two rasters are fetched, the difference is
+  worked out in the field's own units and uploaded as an ordinary field.
+  The renderer needs no change at all for the comparison itself.
+* **THE SCALES.**  The anomaly's difference is on **+-2 sigma**; the
+  totals' difference is on **+-5 inches on a signed log scale**, because
+  a snowfall difference is nearly always a few hundredths of an inch and
+  a linear scale would show nothing.
+* **THE COLOUR TABLE.**  The comparison is drawn with the **anomaly's
+  diverging table** (brown = less snow than the earlier run said, teal =
+  more), NOT with the totals' ladder - whose deep end is a magenta that
+  means "a lot of snow", not "a lot of change".  This was a real bug:
+  the map and its own legend disagreed until the mode was fixed.
+* **THE MONTHS ARE MATCHED BY THEIR LABEL, NOT THEIR INDEX.**  The
+  November run's first month is December 2026 and the October run's
+  first month is November 2026, so the same index is a different month.
+  The two runs overlap from the second month of the older one.
+* **THE RUN TOTAL CANNOT BE COMPARED** (one run's total covers its own
+  months and the other's covers a different set), so choosing an archive
+  moves the map to the first month the two runs share.
+
+**THE ARCHIVE ITSELF:**
+* `export_snow_map.py` now writes `archive_run()` and
+  `write_archive_index()`: every export keeps a copy of the run's
+  manifest and rasters under `docs/data/maps/<tag>/<init>/`, and
+  `docs/data/maps_index.json` lists every run - the current one (its
+  manifest at the top of `docs/data`) and the archived ones.
+* `tools/build_map_archive.py` builds an archived run from an EARLIER
+  init: it fetches that init from the C3S archive (the same route the
+  pipeline uses), takes the model's own hindcast climate from the run on
+  disk (the climate does not change from one init to the next), and
+  exports it against a shadow tree (`MAP_MDIR`, `MAP_OUT`, `MAP_STATE`
+  point the exporter at it).
+* **THE FIRST ARCHIVED RUN IS THE UKMO's OCTOBER 2026 INIT** - built,
+  published and working on the development site.
+
+**THE NARROW PATH:** `tools/publish_maps_page.py` (the general publisher
+is off, and the maps page is part of the general build, so it needed a
+path of its own).  It carries the page, the three scripts, the model
+index, the index of runs and the archive - and nothing else.  **THE
+OPERATIONAL SITE HAS NO MAPS PAGE AT ALL** (404), so nothing there was
+touched and nothing there needs the owner's word for this feature.
+
+**THE TWO TRAPS OF THIS AFTERNOON:**
+1. **A NARROW PUBLISHER'S FILE LIST MUST BE IN THE TARGET'S PATHS.**
+   The first version used the source's own paths and put a copy of the
+   page at the TOP of the repository (`maps.html`, `data/maps/**`).
+   The list is relative to the source (`docs/`) and the staging is
+   relative to the target (`docs/`) - and the source and the target can
+   be the SAME tree (the sandbox mounts one tree under two paths), so
+   the copy is skipped when `os.path.realpath` says they are the same
+   file.
+2. **THE TEST'S CLEAN-UP MUST REBUILD THE INDEX, NOT RESTORE IT.**  A
+   saved copy of `maps_index.json` can be the TEST's own, and the
+   development site was briefly serving a "TEST MODEL" index.  The
+   index is now rebuilt from the manifests that are actually there.
 
 ## The rules that are not negotiable
 

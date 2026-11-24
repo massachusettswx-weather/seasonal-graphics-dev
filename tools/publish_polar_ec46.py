@@ -75,9 +75,14 @@ OPERATIONAL_REPO = ("massachusettswx-weather", "seasonal-graphics")
 # the one product.  A constant, not a record of the last run.
 MODEL_ID = "ec46"
 NAME = "ECMWF EC46"
-# the one picture that makes up the product: the EC46 has no by-sector
-# chart, so the POLARSECTORS registry is left exactly as it is
+# the two pictures that make up the product: the polar-cap section and
+# the same section split into the North Pacific and the North Atlantic.
+# The EC46's by-sector chart was drawn on 24 Nov 2026 - the ECMWF's
+# sub-seasonal serves ten pressure levels and the reanalysis twelve, so
+# the chart is drawn on the ten they share - and the POLARSECTORS
+# registry now carries it.
 CHART = "polar_cap_ec46.png"
+SECTOR_CHART = "polar_sectors_ec46.png"
 # the EC46's window is 46 days, and the chart carries one point a day
 EXPECTED_DAYS = 45
 # the pages that carry the main registry (the snowfall page reads the
@@ -150,8 +155,13 @@ def add_inline(text, name, entry, version):
             e["init"] = entry["init"]
         if name == "POLARMODELS":
             e["file"] = "assets/polar/%s?v=%s" % (CHART, version)
+        if name == "POLARSECTORS":
+            e["file"] = "assets/polar/%s?v=%s" % (SECTOR_CHART, version)
         if isinstance(e.get("polar"), dict):
             e["polar"]["file"] = "assets/polar/%s?v=%s" % (CHART, version)
+        if isinstance(e.get("polar_sectors"), dict):
+            e["polar_sectors"]["file"] = ("assets/polar/%s?v=%s"
+                                          % (SECTOR_CHART, version))
         if e == cur:
             return text
         obj[MODEL_ID] = e
@@ -161,8 +171,15 @@ def add_inline(text, name, entry, version):
         e = {"id": MODEL_ID, "name": NAME,
              "file": "assets/polar/%s?v=%s" % (CHART, version),
              "caption": (entry.get("polar") or {}).get("caption", "")}
+    if name == "POLARSECTORS":
+        e = {"id": MODEL_ID, "name": NAME,
+             "file": "assets/polar/%s?v=%s" % (SECTOR_CHART, version),
+             "caption": (entry.get("polar_sectors") or {}).get("caption", "")}
     if isinstance(e.get("polar"), dict):
         e["polar"]["file"] = "assets/polar/%s?v=%s" % (CHART, version)
+    if isinstance(e.get("polar_sectors"), dict):
+        e["polar_sectors"]["file"] = ("assets/polar/%s?v=%s"
+                                      % (SECTOR_CHART, version))
     # the entry goes in where the builder would have put it: the polar-only
     # models are appended, and the EC46 sits in front of the GEFSv12 (the
     # builder appends the polar charts in the order of their file names).
@@ -313,6 +330,13 @@ def main():
     if not os.path.exists(drawn):
         say("   %s has no %s - NOTHING IS CHANGED." % (src, CHART))
         return 2
+    # the by-sector chart: the EC46 has one now (24 Nov 2026), and the
+    # page's "By sector" control is offered for a model that has it
+    drawn_sector = os.path.join(src, "docs", "assets", "polar", SECTOR_CHART)
+    if not os.path.exists(drawn_sector):
+        say("   %s has no %s - the by-sector chart would be missing."
+            % (src, SECTOR_CHART))
+        return 2
 
     # the version: a fresh one, so the browser fetches the new picture
     oldver = ""
@@ -323,6 +347,7 @@ def main():
     # the plan
     say("   it would put on the target:")
     say("     docs/assets/polar/%-28s (%s)" % (CHART, md5(drawn)))
+    say("     docs/assets/polar/%-28s (%s)" % (SECTOR_CHART, md5(drawn_sector)))
     say("     docs/data/models.json          the %s entry" % MODEL_ID)
     say("     docs/data/models_public.json   the same entry")
     for f in REGISTRY_PAGES:
@@ -339,7 +364,8 @@ def main():
     # else's work, and this change is not mixed with it
     st = git(target, "status", "--porcelain")
     dirty = [l for l in st.stdout.strip().split("\n") if l.strip()]
-    ours = ("docs/assets/polar/%s" % CHART, "docs/data/models.json",
+    ours = ("docs/assets/polar/%s" % CHART,
+            "docs/assets/polar/%s" % SECTOR_CHART, "docs/data/models.json",
             "docs/data/models_public.json") + \
         tuple(os.path.join("docs", f) for f in REGISTRY_PAGES) + \
         (os.path.join("docs", HOME_PAGE),)
@@ -389,6 +415,11 @@ def main():
             if t3 is None:
                 say("   %s carries no polar registry - NOTHING IS CHANGED." % f)
                 return 2
+            t3 = add_inline(t3, "POLARSECTORS", e, version)
+            if t3 is None:
+                say("   %s carries no by-sector registry - NOTHING IS CHANGED."
+                    % f)
+                return 2
             t3 = add_picker_option(t3)
             if t3 is None:
                 say("   %s has no polar picker - NOTHING IS CHANGED." % f)
@@ -434,6 +465,11 @@ def main():
     if os.path.realpath(drawn) != os.path.realpath(dst):
         shutil.copyfile(drawn, dst)
     written.append(os.path.join("docs", "assets", "polar", CHART))
+    dsts = os.path.join(docs, "assets", "polar", SECTOR_CHART)
+    os.makedirs(os.path.dirname(dsts), exist_ok=True)
+    if os.path.realpath(drawn_sector) != os.path.realpath(dsts):
+        shutil.copyfile(drawn_sector, dsts)
+    written.append(os.path.join("docs", "assets", "polar", SECTOR_CHART))
     json.dump(newreg, open(regp, "w"), indent=1)
     written.append(os.path.join("docs", "data", "models.json"))
     if newpub is not None:
