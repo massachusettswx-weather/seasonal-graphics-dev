@@ -40,7 +40,7 @@ need the conversation.
 * The GEFSv12 sub-seasonal series is at the **20261123 00Z** cycle (35
   days, 31 members, 12 levels) on **both** sites (24 Nov 2026).
 * **The EC46 polar-cap section is on BOTH sites** (the owner's approval,
-  22 Nov 2026): the **20261120 00Z** run, 45 days, 101 members, published
+  22 Nov 2026): the **20261122 00Z** run, 45 days, 101 members, published
   with `tools/publish_polar_ec46.py`.
 * **The dark mode is on the operational site** (the owner's approval,
   22 Nov 2026): every page carries the button, the theme is read back
@@ -482,92 +482,97 @@ better: the GEFS's **f000 analysis** and the **3-hourly CORe** let us draw
 the model's own analysis against the reanalysis's analysis at the same
 instant, which is what the owner asked for on 23 Nov.
 
-## The seam, rebuilt (24 Nov 2026)
+## The seam, and why it showed nothing (24 Nov 2026)
 
-**THE OWNER:** *"yes use the Past Days idea, 3 hrly CORe and the GEFS f000
-analysis amongst EC46 and SEAS5"*.  What the three polar-cap charts now do:
+**THE OWNER, twice:** *"yes use the Past Days idea, 3 hrly CORe and the GEFS
+f000 analysis amongst EC46 and SEAS5"*, then - after seeing it - *"those
+new additions don't fix it.. remove them, 'GEFS Analysis' as well"*, and
+*"figure out why there's no disagreements between analyses and reanalysis"*.
 
-* **The reanalysis half is drawn at an INSTANT**, not at a day's mean: the
-  3-hourly CORe at the model's own clock hour (12Z for the GEFSv12 and the
-  SEAS5, 00Z for the EC46).  The day's mean is up to 25 hours away from the
-  forecast's first point, and on a falling day that gap is worth 400 m2/s2.
-  The caption says which basis it used ("(12Z, 3-hourly)"), and the whole
-  half falls back to the daily file if one stamp is missing.
-* **The GEFSv12's OWN analysis (lead f000, 31 members) stands between the
-  reanalysis and the forecast** - the reference site's "Past Days" segment,
-  done with the model's own analysis instead of its past one-day forecasts.
-  The chart now carries three labelled parts and TWO dashed seams:
-  "CORe reanalysis" | "GEFSv12 analysis" | "GEFSv12 sub-seasonal forecast".
-* **THE DIFFERENCE AT THE HANDOVER IS WRITTEN ON THE SEAM** - "model - CORe:
-  +0.18 sigma", in bold, just inside the panel, with a white halo.  It is
-  where the reader is looking, and the caption has no room for it.
-* The numbers (10 hPa over the cap, at the same instant, 21 Nov 00Z):
-  the GEFSv12's analysis **+0.18 sigma** above the CORe, the EC46's first
-  point **+0.18 sigma** above it, the SEAS5's first point **-0.32 sigma**
-  below it (the ECMWF's colder mean state).
+**THE DEVICE WAS BUILT AND HAS BEEN TAKEN BACK OUT.**  The charts are back
+to their two-part form: the reanalysis on the left, the model's forecast on
+the right, one dashed seam.  The model's own analysis segment and the
+number that was written on the seam are gone.  The tools behind it stay
+(the 3-hourly CORe pull, the f000 analysis pull, the narrow path for the
+SEAS5) - they are good tools, they just cannot draw this particular point.
 
-**TWO FAULTS FOUND IN NOAA'S OWN TREE (both fixed):**
+**WHY THERE IS NO DISAGREEMENT ON THE GEFS CHART: THERE ISN'T ONE.**
+
+* **THE CORe IS THE FV3-GFS.**  NOAA's CORe is a reanalysis built on the
+  FV3-GFS, and the GEFSv12 **IS** the FV3-GFS - so that chart joins the
+  same system to itself.  The smooth join is the product's construction,
+  not a measurement.
+* **MEASURED, at the SAME instant, 10 hPa over the polar cap** (the
+  GEFSv12's own analysis = the 31-member mean of lead f000, against the
+  CORe's own analysis at that hour):
+
+  | the cycle | the GEFS's analysis | the CORe | the difference |
+  |---|---|---|---|
+  | 20261121 00Z | 292,685.0 | 292,335.2 | **+349.8** (+0.18 sigma) |
+  | 20261122 00Z | 292,447.4 | 292,404.8 | **+42.6** (+0.02 sigma) |
+  | 20261123 00Z | 292,336.3 | 292,308.9 | **+27.4** (+0.01 sigma) |
+
+  So on two of the three days the two agree to within the ensemble's own
+  spread (33 m2/s2).  **There is nothing to draw.**
+* **THE EC46's CHART IS DIFFERENT, AND STILL CANNOT SHOW IT.**  The
+  ECMWF's first point sits **+357 m2/s2 (+0.18 sigma)** above NOAA's
+  analysis at the same instant - a real difference between two different
+  centres - but **the chart's first colour band is +-0.2 sigma**, so it
+  falls inside the white centre and not one pixel changes.  A difference
+  that small has to be PRINTED, not coloured; the owner does not want it
+  printed either.
+* **WHERE THE DISAGREEMENT IS REAL AND LARGE: BETWEEN THE TWO CENTRES'**
+  **FORECASTS, for the same valid day** (the chart's own daily sigma):
+  25 Nov **0.28 sigma**, 1 Dec **0.47**, 5 Dec **1.82**, 10 Dec **1.52**,
+  15 Dec **3.26**, 20 Dec **2.76**, 25 Dec **1.82**.  That one the ladder
+  shows, because it is not a reanalysis-versus-analysis difference - it is
+  the GEFS and the ECMWF disagreeing about December.  A chart that draws
+  the DIFFERENCE of the two centres needs the owner's word (a new chart
+  family).
+
+**WHAT ELSE CAME OUT OF THE NIGHT (all fixed):**
 
 * **NOAA publishes some of the three-hourly files with a ZERO-BYTE `.idx`**
-  (the 00Z stamp of 18 Nov 2026, and 17 others in the cache).  There are no
-  byte ranges to read, so the fetch now decodes the WHOLE file when the
-  inventory is empty (`cap_mean_all`).  **An empty record must count as
-  MISSING** - an earlier version of the tool cached the failure as a good
-  one, and the chart silently fell back to the daily file for a week.
+  (the 00Z stamp of 18 Nov 2026 and 17 others): no byte ranges to read, so
+  the fetch decodes the WHOLE file instead.  **An empty record must count
+  as MISSING** - an earlier version cached the failure as a good one.
 * **EVERY LEVEL IN A CORe FILE HOLDS ELEVEN VARIABLES**, and the GRIB's
   `shortName` for the geopotential height is **`gh`**, not `HGT` (the `.idx`
   writes "HGT").  A decoder that filters on the level alone reads the
-  STREAM FUNCTION and returns a number millions of times too large - it drew
-  a dark blue stripe down the EC46 chart.  Both decoders now select the
-  variable (`HEIGHT_NAMES`) and check the value's range (`SANITY`).
-* **A SANITY BOUND MUST SPAN THE QUANTITY'S OWN RANGE**: the polar-cap mean
-  of the geopotential is about 290,000 m2/s2 at 10 hPa and about 200 m2/s2
-  at 1000 hPa, so a bound of 1e5 to 6e5 throws away every low level.
+  stream function and returns a number millions of times too large - it
+  drew a dark blue stripe down the EC46 chart.  Both decoders now select
+  the variable (`HEIGHT_NAMES`) and check the value's range (`SANITY`) -
+  and the bound must span the quantity's own range (about 290,000 m2/s2 at
+  10 hPa, about 200 m2/s2 at 1000 hPa).
+* **THE CAPTION'S FIT CHECK MEASURED THE WRONG PIXELS**: the figure is
+  created at 100 dpi and saved at 150, so the text is scaled by 1.5 - the
+  check now measures in the pixels the file has.
+* **THE SHORT NAME MUST BE A CONSTANT** (`plot_polar_cap.SHORT_NAME`): the
+  narrow publisher draws the GEFSv12 with the long product name and no
+  short one, and the panel labels ran into each other on the site.
+* **A REDRAW HAS TO MOVE THE `?v=` AND THE ENTRY'S OWN DATE.**  The EC46's
+  path only ever ADDED its entry, so a redrawn chart could not reach the
+  reader, and the page kept the old cycle date beside the new picture.
+  Both are fixed, and the EC46's path now has the GEFSv12 path's "never
+  go back to an older cycle" rule.
+* **`git checkout <ref> -- <path>` STAGES the file**, and the narrow
+  publisher commits the whole index - so a checkout for a revert is swept
+  into the publisher's commit.  It happened: the revert of the chart code
+  went out with the GEFSv12's daily update.  Not harmful that time; the
+  rule is to `git reset -q` after a checkout.
 
-**AND ONE IN OUR OWN CODE:**
+**WHERE THE CHARTS ARE NOW (24 Nov 2026, 05:20 UTC).**
 
-* **THE CAPTION'S FIT CHECK MEASURED THE WRONG PIXELS.**  The chart's figure
-  is created at the default 100 dpi and SAVED at 150 dpi, so the text is
-  rendered small and scaled up by 1.5 - `fit_subtitle` measured it at 150 dpi
-  and let the caption run off the right edge.  It now measures in the pixels
-  the file actually has.
-
-**THE DEV SITE WAS ROLLED BACK AND FIXED.**  The narrow publisher's
-`--force` bypasses its own "never put the site back to an older cycle"
-guard, and this tree's series was a cycle behind the watcher's (the watcher
-runs in its own clone), so a forced publish put the **2026-11-21** cycle
-back on the development copy.  The operational clone was reset to the
-server's HEAD and nothing was pushed there.  **Two rules from that:**
-`--force` is for a redraw of the SAME cycle, never for an older one; and
-the publisher's **default target is the OPERATIONAL clone** (`/workspace/repo`)
-- always pass `--repo`.
-
-**WHERE THE THREE CHARTS ARE NOW (24 Nov 2026, 04:00 UTC).**
-
-* The **development copy** carries all three with the new device: the
-  GEFSv12 at the **20261123 00Z** cycle (35 days, 31 members, the newest
-  complete cycle), the EC46 at the 20261120 00Z run, the SEAS5 on its own
-  monthly product.  The SEAS5 went out through **a new narrow path**,
+* The **development copy**: the GEFSv12 at the **20261123 00Z** cycle (35
+  days, 31 members), the **EC46 at the 20261122 00Z run (45 days, 101
+  members - the Monday run ✓)**, the SEAS5 on its own monthly product.
+  All three are back to the two-part form ✓.
+* The **operational site**: the GEFSv12 at the 20261123 cycle (the nightly
+  watcher's own drawing ✓) and the **EC46 at the 20261122 run** ✓ - the
+  owner's approval of 22 Nov covers the EC46 section on both sites ✓.
+* The SEAS5 went out through **a new narrow path**,
   `tools/publish_polar_seas5.py` - it is one of the site's own models, so
   it used to go out with the general build, and the general build is off.
-* The **operational site** carries the GEFSv12 at the 20261123 cycle, drawn
-  by the **nightly watcher** at 03:43 UTC (its own clone, taken at 03:00
-  UTC).  That chart has the model's own analysis but **not** the seam note
-  and **not** the short names, so its two panel labels run into each
-  other.  The fixes are committed; the next watcher run redraws the chart
-  with them.  **Nothing was pushed there by hand** - the owner's word for
-  this work was not to touch the operational site.
-
-**AND TWO MORE THINGS THE NIGHT TAUGHT:**
-
-* **THE SHORT NAME MUST BE A CONSTANT** (`plot_polar_cap.SHORT_NAME`).
-  The narrow publisher draws the GEFSv12 with the long product name and no
-  short one, so the panel labels ran into each other on the site.
-* **A REDRAW OF THE SAME RUN HAS TO MOVE THE `?v=`.**  The EC46's path only
-  ever ADDED its entry, so a redrawn chart could not reach the reader: the
-  browser kept serving the old picture.  Both narrow paths now bring the
-  chart URL forward, and both skip the copy when the source tree IS the
-  target (the development copy is its own source).
 
 ## The rules that are not negotiable
 
