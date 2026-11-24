@@ -906,11 +906,11 @@
     }
    },
    "polar": {
-    "file": "assets/polar/polar_cap_ecmwf-seas5.png?v=20261124035554",
+    "file": "assets/polar/polar_cap_ecmwf-seas5.png?v=20261124045444",
     "caption": "Polar cap (60-90N) geopotential height anomaly - ECMWF SEAS5."
    },
    "polar_sectors": {
-    "file": "assets/polar/polar_sectors_ecmwf-seas5.png?v=20261124035554",
+    "file": "assets/polar/polar_sectors_ecmwf-seas5.png?v=20261124045444",
     "caption": "North Pacific and North Atlantic (60-90N) geopotential height anomaly - ECMWF SEAS5."
    }
   },
