@@ -1631,11 +1631,11 @@
    "members": 31,
    "init": "2026-11-23",
    "polar": {
-    "file": "assets/polar/polar_cap_gefsv12.png?v=20261124035547",
+    "file": "assets/polar/polar_cap_gefsv12.png?v=20261124045441",
     "caption": "Polar cap (60-90N) geopotential height anomaly - NOAA GEFSv12."
    },
    "polar_sectors": {
-    "file": "assets/polar/polar_sectors_gefsv12.png?v=20261124035547",
+    "file": "assets/polar/polar_sectors_gefsv12.png?v=20261124045441",
     "caption": "North Pacific and North Atlantic (60-90N) geopotential height anomaly - NOAA GEFSv12."
    }
   },

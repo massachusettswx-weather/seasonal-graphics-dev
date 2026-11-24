@@ -35,16 +35,6 @@ RECENT = os.path.join(DATA, "polar_era5_recent.npz")
 # ARCO's own store is about 600 m too low at 10 hPa over the polar cap.
 RECENT_CORE = os.path.join(DATA, "polar_core_recent.npz")
 MODEL_CACHE = os.path.join(DATA, "polar_model_z.json")
-# NOAA's CORe at 3-hourly resolution - the same product as the daily file
-# (the daily file's day's mean IS the mean of the day's eight 3-hourly
-# analyses), so the reanalysis half can be drawn at an INSTANT and not at
-# a day's mean.  That makes the handover with the model's forecast a
-# like-for-like comparison instead of a mix of two different times.
-CORE3H = os.path.join(DATA, "polar_core_3hourly.json")
-# a model's OWN analysis of its init, when the product serves one (the
-# GEFS does: lead f000).  This is the segment that shows the reanalysis
-# and the model at the same instant.
-ANALYSIS_CACHE = os.path.join(DATA, "polar_analysis_%s_%s.json")
 # the EC46 is a separate product and lives in its own file
 EC46_CACHE = os.path.join(DATA, "polar_ec46_z.json")
 
@@ -52,62 +42,6 @@ EC46_CACHE = os.path.join(DATA, "polar_ec46_z.json")
 def cache_for(tag):
     """The file that holds a system's own daily polar-cap series."""
     return EC46_CACHE if tag == "ec46" else MODEL_CACHE
-
-
-def load_core_3h():
-    """The CORe at 3-hourly resolution -> {stamp: {level: value}}."""
-    if not os.path.exists(CORE3H):
-        return {}
-    try:
-        return json.load(open(CORE3H))
-    except Exception:                               # noqa: BLE001
-        return {}
-
-
-def load_model_analysis(tag, digits=None):
-    """A model's own analysis of ITS OWN run, when the product serves one.
-
-    The file carries the run it belongs to (the date and the hour), so a
-    chart never borrows another cycle's analysis.
-
-    -> {"date": "20261122", "hour": "00", "mean": {level: value}} or {}
-    """
-    paths = []
-    if digits:
-        paths.append(ANALYSIS_CACHE % (tag, digits[:10]))
-    try:
-        for name in sorted(os.listdir(DATA)):
-            if name.startswith("polar_analysis_%s_" % tag):
-                paths.append(os.path.join(DATA, name))
-    except Exception:                               # noqa: BLE001
-        pass
-    for path in paths:
-        if not os.path.exists(path):
-            continue
-        try:
-            rec = json.load(open(path))
-        except Exception:                           # noqa: BLE001
-            continue
-        if digits and not (str(rec.get("date")) == digits[:8]
-                           and str(rec.get("hour")) == digits[8:10]):
-            continue
-        if rec.get("mean"):
-            return rec
-    return {}
-
-
-def core_at(three, stamp, levels):
-    """The CORe's values at one 3-hourly stamp, in the level order."""
-    rec = three.get(stamp) or {}
-    if not rec:
-        return None
-    out = []
-    for l in levels:
-        v = rec.get(str(l))
-        if v is None:
-            return None
-        out.append(float(v))
-    return out
 CLIM = os.path.join(DATA, "polar_cap_clim.npz")
 # the climatology in the ARCO NATIVE store's own convention.  It is NOT
 # used: that store mutes the stratospheric variability (the January 2013
@@ -299,10 +233,6 @@ def load_series(path, tag):
     return times, vals, levels
 
 
-# the short name of each product, for the descriptor and the panel labels
-SHORT_NAME = {"gefsv12": "GEFSv12", "ecmwf-seas5": "SEAS5", "ec46": "EC46"}
-
-
 def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
          rebase="forecast"):
     # `rebase` says how the forecast half is put on the reanalysis's scale:
@@ -312,11 +242,7 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
     # where the analysis ends.
     # `short` is the name the DESCRIPTOR line uses, when the title's name is
     # too long for it (the GEFS's title carries "(35-day extended)")
-    # the name the DESCRIPTOR and the panel labels use.  It is a CONSTANT
-    # per product, so every caller gets it - the narrow publisher draws the
-    # GEFSv12 with the long product name and no short one, and the panel
-    # labels then ran into each other.
-    short = short or SHORT_NAME.get(tag) or label
+    short = short or label
     # 1. the climatology.  The one that comes first is the one built from
     # the CDS DAILY reanalysis: the same product and the same grid as the
     # reanalysis half, with the real ERA5's spread.  The ARCO native store
@@ -417,105 +343,20 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
         mv = mv[:, mcols]
         levs = common
 
-    # The reanalysis ends the day before the model's init, and the model's
-    # own run follows from its init.  The two halves therefore meet exactly
-    # at the run's start, and no day is drawn twice.
+    # The ERA5 reanalysis ends the day before the model's init, and the
+    # model's own run follows from its init.  The two halves therefore meet
+    # exactly at the run's start, and no day is drawn twice.
     ana_days = sorted(d for d in rday if d < first)[-ANA_DAYS:]
     fc_days = sorted(mday)
-
-    # The clock hour the model's own points are on - 12Z for the GEFS and
-    # the SEAS5, 00Z for the EC46.  The reanalysis is drawn at the SAME
-    # clock hour, out of the 3-hourly CORe tree, so the two halves are
-    # like for like: the daily file holds a day's MEAN (stepRange 0-21),
-    # and comparing that with an instant 25 hours later is what made the
-    # handover look like nothing at all.
-    clock = (mt[0][11:13] if len(mt[0]) > 11 else "12")
-    three = load_core_3h()
-    # The reanalysis half is drawn at the model's clock hour out of the
-    # 3-hourly CORe tree.  If the tree does not cover the window yet, the
-    # pull is made HERE: it needs no key and no queue, and without it the
-    # handover would again compare a day's mean with an instant.
-    if ana_days:
-        need = [d.replace("-", "") + clock for d in ana_days]
-        if any(x not in three for x in need):
-            try:
-                import fetch_polar_core_3hourly as F3
-                print("   the 3-hourly CORe is not covering the window - "
-                      "pulling it now")
-                three = F3.ensure([d.replace("-", "") for d in ana_days], levs)
-            except Exception as e:                   # noqa: BLE001
-                print("   the 3-hourly CORe could not be pulled (%s) - the "
-                      "section is drawn on the daily file" % str(e)[:70])
-    ana_vals = None
-    n_three = 0
-    if ana_days:
-        rcols = [rlevs.index(l) for l in levs]
-        rows = []
-        for d in ana_days:
-            hit = core_at(three, d.replace("-", "") + clock, levs)
-            if hit is None:
-                break
-            rows.append(hit)
-        if len(rows) == len(ana_days):
-            ana_vals = np.array(rows, float)
-            n_three = len(rows)
-        else:
-            # the 3-hourly tree does not cover every day of the window
-            # yet: the whole half stays on the one basis it has
-            ana_vals = rv[[rday[d] for d in ana_days]][:, rcols]
-
-    # THE MODEL'S OWN ANALYSIS, when the product serves one (the GEFS
-    # does, at lead f000).  It is the segment the reference site calls
-    # "Past Days": the model's own value of the atmosphere, standing
-    # between the reanalysis and the forecast, so the reader can see the
-    # two of them at the same instant instead of guessing where the
-    # reanalysis stops.
-    digits = "".join(ch for ch in run if ch.isdigit()) if run else ""
-    ma = load_model_analysis(tag, digits or None)
-    # THE MODEL'S OWN ANALYSIS.  The GEFS serves one (lead f000); the
-    # products that do not are said so on the chart.  When the run's own
-    # analysis is not on disk yet, it is pulled here - it needs no key and
-    # no queue.
-    if not ma.get("mean") and tag == "gefsv12" and len(digits) >= 10:
-        try:
-            import subprocess
-            print("   the model's own analysis is not on disk - pulling it")
-            subprocess.run([sys.executable,
-                            os.path.join(HERE, "tools", "fetch_gefs_analysis.py"),
-                            digits[:8], digits[8:10]],
-                           cwd=HERE, timeout=2400,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            ma = load_model_analysis(tag, digits)
-        except Exception as e:                       # noqa: BLE001
-            print("   the model's own analysis could not be pulled (%s)"
-                  % str(e)[:70])
-    ma_vals = None
-    ma_day = None
-    if ma.get("mean") and run:
-        digits = "".join(ch for ch in run if ch.isdigit())
-        if digits[:8] == str(ma.get("date")) and digits[8:10] == str(ma.get("hour")):
-            row = []
-            for l in levs:
-                v = (ma.get("mean") or {}).get(str(l))
-                if v is None:
-                    row = None
-                    break
-                row.append(float(v))
-            if row:
-                ma_vals = row
-                ma_day = "%s-%s-%s %s" % (str(ma["date"])[:4], str(ma["date"])[4:6],
-                                          str(ma["date"])[6:8], ma["hour"])
-
-    days = ana_days + ([ma_day] if ma_vals is not None else []) + fc_days
+    days = ana_days + fc_days
     parts = []
-    if ana_vals is not None:
-        parts.append(ana_vals)
-    if ma_vals is not None:
-        parts.append(np.array([ma_vals], float))
+    if ana_days:
+        # the columns are picked by level rather than by position
+        rcols = [rlevs.index(l) for l in levs]
+        parts.append(rv[[rday[d] for d in ana_days]][:, rcols])
     parts.append(mv[[mday[d] for d in fc_days]])
     values = np.vstack(parts)
-    split = len(ana_days) + (1 if ma_vals is not None else 0)
-    split2 = len(ana_days) if ma_vals is not None else None
+    split = len(ana_days)
 
     # where "now" falls, so the reader can tell the model's past days from
     # the days it is still forecasting
@@ -558,36 +399,6 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
             rebase_txt = " · " + note
         anom, norm = normalise_monthly(days, values, levs,
                                        (cmonths, levs, cmean, csigma))
-        # THE HANDOVER, AT THE SAME INSTANT.  What the reader wants to know
-        # is whether the reanalysis and the model agree, and that can only
-        # be asked at one instant: the CORe's own value at the model's
-        # first point's hour, against the model's own value there.
-        hand_txt = ""
-        seam_col = None
-        lev10 = 10 if 10 in levs else (levs[0] if levs else None)
-        if lev10 is not None and fc_days:
-            c10 = levs.index(lev10)
-            if ma_vals is not None:
-                hd_day = ma_day[:10]
-                hd_val = float(ma_vals[c10])
-                hd_stamp = "%s%s" % (ma["date"], ma["hour"])
-            else:
-                hd_day = fc_days[0]
-                hd_val = float(mv[0, c10])
-                hd_stamp = fc_days[0].replace("-", "") + clock
-            core_v = (three.get(hd_stamp) or {}).get(str(lev10))
-            if core_v is not None:
-                _, hsig = daily_climate([hd_day], cmonths,
-                                        cmean[:, [c10]], csigma[:, [c10]])
-                if float(hsig[0, 0]) > 0:
-                    dsig = (hd_val - float(core_v)) / float(hsig[0, 0])
-                    # the number goes on the seam itself, not in the
-                    # caption: it belongs where the reader is looking
-                    hand_txt = ("model \u2212 CORe: %+.2f \u03c3" % dsig)
-                    if ma_vals is not None:
-                        seam_col = split2
-                    else:
-                        seam_col = split
     else:
         cdays, clevs, cmean, csigma = clim
         keep = [clevs.index(l) for l in levs]
@@ -616,17 +427,12 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
     # re-based, the note that says so.
     parts = []
     if ana_days:
-        # the reanalysis is drawn at an instant (the 3-hourly CORe at the
-        # model's own clock hour) or at a day's mean - the caption says
-        # which, because the two are not the same thing
-        basis = ("%sZ, 3-hourly" % clock if n_three == len(ana_days)
-                 else "daily means")
-        parts.append(("%d days of %s reanalysis (%s)"
-                       % (len(ana_days), ana_name, basis), False))
-    parts.append(("the %s forecast from %s to %s"
-                  % (short, init_day, end_day), False))
+        parts.append(("%d days of %s reanalysis" % (len(ana_days), ana_name),
+                       False))
+    parts.append(("the %s %s forecast from %s to %s"
+                  % (short, kind_word, init_day, end_day), False))
     if members:
-        parts.append(("%s members" % members, True))
+        parts.append(("%s members" % members, False))
     if run:
         parts.append(("%s run" % run.replace("Z", "Z"), True))
     if freq:
@@ -640,9 +446,6 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
     p = os.path.join(OUT, "polar_cap_%s.png" % tag)
     plot_section(days, norm, levs, p, title, subtitle,
                  split=split if split else None,
-                 split2=split2,
-                 middle_label=("%s analysis" % short) if ma_vals is not None else None,
-                 seam_note=hand_txt or None, seam_note_col=seam_col,
                  credit=credit_for_polar(tag),
                  analysis_label=("%s reanalysis" % ana_name) if ana_days else None,
                  forecast_label="%s %s forecast" % (

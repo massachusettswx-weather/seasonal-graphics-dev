@@ -491,15 +491,12 @@ def fit_subtitle(parts, limit=1995.0, fs=9.5, fig_w=13.5, x0=0.052):
     keep = list(parts)
 
     def end_px(s):
-        # the chart's figure is created at the default 100 dpi and SAVED at
-        # 150 dpi, so the text is rendered small and then scaled up by 1.5 -
-        # measuring at 150 dpi alone would let the caption run off the edge
-        fig = plt.figure(figsize=(fig_w, 7.0), dpi=100)
+        fig = plt.figure(figsize=(fig_w, 7.0), dpi=150)
         t = fig.text(x0, 0.921, s, fontsize=fs, ha="left", va="top")
         fig.canvas.draw()
         bb = t.get_window_extent(fig.canvas.get_renderer())
         plt.close(fig)
-        return x0 * fig_w * 150 + bb.width * 1.5
+        return x0 * fig_w * 150 + bb.width
 
     while True:
         s = " · ".join(p[0] for p in keep if p[0])
@@ -516,8 +513,7 @@ def fit_subtitle(parts, limit=1995.0, fs=9.5, fig_w=13.5, x0=0.052):
 def plot_section(times, norm, levels, out_path, title, subtitle,
                  split=None, split_label="", credit=None, handle="@Massachusettswx",
                  vmax=5.0, analysis_label=None, forecast_label=None,
-                 today=None, forecast_alpha=0.55, split2=None,
-                 middle_label=None, seam_note=None, seam_note_col=None):
+                 today=None, forecast_alpha=0.55):
     """Draw the time-height section.
 
     times:  (n,)   ISO strings
@@ -632,13 +628,10 @@ def plot_section(times, norm, levels, out_path, title, subtitle,
     ax2.spines["right"].set_linewidth(0.9)
     ax.tick_params(length=3, colors=C_TEXT)
 
-    # the boundaries: the reanalysis ends, the model's own analysis takes
-    # over, and the forecast begins.  Each one is a dashed line, so the
-    # reader can see where one kind of number stops and the next begins.
-    for sp in (split2, split):
-        if sp is not None and 0 < sp < n:
-            ax.axvline(sp - 0.5, color=C_SPLIT, lw=1.3, ls=(0, (5, 3)),
-                       zorder=6)
+    # the boundary between the analysis and the forecast
+    if split is not None and 0 < split < n:
+        ax.axvline(split - 0.5, color=C_SPLIT, lw=1.3, ls=(0, (5, 3)),
+                   zorder=6)
 
     # the titles: left aligned, the way the rest of the site does it
     fig.text(0.052, 0.968, title, fontsize=15.5, fontweight="bold",
@@ -654,22 +647,6 @@ def plot_section(times, norm, levels, out_path, title, subtitle,
     if forecast_label:
         fig.text(0.924, 0.858, forecast_label, fontsize=10,
                  fontweight="bold", color=C_SPLIT, ha="right", va="bottom")
-    if middle_label and split2 and split:
-        fig.text(0.5, 0.858, middle_label, fontsize=10,
-                 fontweight="bold", color=C_SPLIT, ha="center", va="bottom")
-
-    # THE HANDOVER, WRITTEN AT THE SEAM.  Where the reanalysis stops and
-    # the model's own numbers begin, the reader wants to know whether the
-    # two agree, and that can only be asked at one instant.  The number
-    # sits just inside the panel, right of the line, with a white halo so
-    # it reads over any colour.
-    if seam_note and seam_note_col is not None:
-        import matplotlib.patheffects as pe
-        ax.text(seam_note_col - 0.5 + 0.30, 11.4, seam_note, fontsize=8.5,
-                fontweight="bold", color="#111111", ha="left", va="top",
-                zorder=9,
-                path_effects=[pe.withStroke(linewidth=2.6,
-                                            foreground="white")])
 
     # the colour bar, below the panel.  It is drawn from a clean mappable so
     # that it always shows the colours at full strength, whatever the
