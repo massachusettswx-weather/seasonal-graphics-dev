@@ -1,4 +1,4 @@
-# The state of the project - 22 Nov 2026, 04:20 UTC
+# The state of the project - 24 Nov 2026, 06:20 UTC
 
 Short and factual.  The long history of how it got here is in
 `notes/STATE_LOG.md`; the rules that are not negotiable are in
@@ -37,8 +37,10 @@ need the conversation.
   changes every day.  The 10 hPa wind picker on the same page is a
   different product and still opens on the ECMWF SEAS5 (the GEFSv12 has no
   wind panel).
-* The GEFSv12 sub-seasonal series is at the **20261121 00Z** cycle (35
-  days, 31 members, 12 levels) and is on **both** sites.
+* The GEFSv12 sub-seasonal series is at the **20261122 00Z** cycle (35
+  days, 31 members, 12 levels) on the operational site; the development
+  copy is being brought back to it with the new chart (see "The seam,
+  rebuilt").
 * **The EC46 polar-cap section is on BOTH sites** (the owner's approval,
   22 Nov 2026): the **20261120 00Z** run, 45 days, 101 members, published
   with `tools/publish_polar_ec46.py`.
@@ -481,6 +483,66 @@ analysis while the reanalysis catches up.  We have the same thing and
 better: the GEFS's **f000 analysis** and the **3-hourly CORe** let us draw
 the model's own analysis against the reanalysis's analysis at the same
 instant, which is what the owner asked for on 23 Nov.
+
+## The seam, rebuilt (24 Nov 2026)
+
+**THE OWNER:** *"yes use the Past Days idea, 3 hrly CORe and the GEFS f000
+analysis amongst EC46 and SEAS5"*.  What the three polar-cap charts now do:
+
+* **The reanalysis half is drawn at an INSTANT**, not at a day's mean: the
+  3-hourly CORe at the model's own clock hour (12Z for the GEFSv12 and the
+  SEAS5, 00Z for the EC46).  The day's mean is up to 25 hours away from the
+  forecast's first point, and on a falling day that gap is worth 400 m2/s2.
+  The caption says which basis it used ("(12Z, 3-hourly)"), and the whole
+  half falls back to the daily file if one stamp is missing.
+* **The GEFSv12's OWN analysis (lead f000, 31 members) stands between the
+  reanalysis and the forecast** - the reference site's "Past Days" segment,
+  done with the model's own analysis instead of its past one-day forecasts.
+  The chart now carries three labelled parts and TWO dashed seams:
+  "CORe reanalysis" | "GEFSv12 analysis" | "GEFSv12 sub-seasonal forecast".
+* **THE DIFFERENCE AT THE HANDOVER IS WRITTEN ON THE SEAM** - "model - CORe:
+  +0.18 sigma", in bold, just inside the panel, with a white halo.  It is
+  where the reader is looking, and the caption has no room for it.
+* The numbers (10 hPa over the cap, at the same instant, 21 Nov 00Z):
+  the GEFSv12's analysis **+0.18 sigma** above the CORe, the EC46's first
+  point **+0.18 sigma** above it, the SEAS5's first point **-0.32 sigma**
+  below it (the ECMWF's colder mean state).
+
+**TWO FAULTS FOUND IN NOAA'S OWN TREE (both fixed):**
+
+* **NOAA publishes some of the three-hourly files with a ZERO-BYTE `.idx`**
+  (the 00Z stamp of 18 Nov 2026, and 17 others in the cache).  There are no
+  byte ranges to read, so the fetch now decodes the WHOLE file when the
+  inventory is empty (`cap_mean_all`).  **An empty record must count as
+  MISSING** - an earlier version of the tool cached the failure as a good
+  one, and the chart silently fell back to the daily file for a week.
+* **EVERY LEVEL IN A CORe FILE HOLDS ELEVEN VARIABLES**, and the GRIB's
+  `shortName` for the geopotential height is **`gh`**, not `HGT` (the `.idx`
+  writes "HGT").  A decoder that filters on the level alone reads the
+  STREAM FUNCTION and returns a number millions of times too large - it drew
+  a dark blue stripe down the EC46 chart.  Both decoders now select the
+  variable (`HEIGHT_NAMES`) and check the value's range (`SANITY`).
+* **A SANITY BOUND MUST SPAN THE QUANTITY'S OWN RANGE**: the polar-cap mean
+  of the geopotential is about 290,000 m2/s2 at 10 hPa and about 200 m2/s2
+  at 1000 hPa, so a bound of 1e5 to 6e5 throws away every low level.
+
+**AND ONE IN OUR OWN CODE:**
+
+* **THE CAPTION'S FIT CHECK MEASURED THE WRONG PIXELS.**  The chart's figure
+  is created at the default 100 dpi and SAVED at 150 dpi, so the text is
+  rendered small and scaled up by 1.5 - `fit_subtitle` measured it at 150 dpi
+  and let the caption run off the right edge.  It now measures in the pixels
+  the file actually has.
+
+**THE DEV SITE WAS ROLLED BACK AND FIXED.**  The narrow publisher's
+`--force` bypasses its own "never put the site back to an older cycle"
+guard, and this tree's series was a cycle behind the watcher's (the watcher
+runs in its own clone), so a forced publish put the **2026-11-21** cycle
+back on the development copy.  The operational clone was reset to the
+server's HEAD and nothing was pushed there.  **Two rules from that:**
+`--force` is for a redraw of the SAME cycle, never for an older one; and
+the publisher's **default target is the OPERATIONAL clone** (`/workspace/repo`)
+- always pass `--repo`.
 
 ## The rules that are not negotiable
 
