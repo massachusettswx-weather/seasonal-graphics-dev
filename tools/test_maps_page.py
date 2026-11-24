@@ -432,6 +432,7 @@ def main():
                   return {archive: st ? st.archive : null,
                           diff: st ? !!st.diff : null,
                           kind: st && st.diff ? st.diff.kind : null,
+                          mode: st && st.gl ? st.gl.mode : null,
                           cap: cap};
                 }""")
                 print("the comparison:", cmp_["archive"], cmp_["kind"])
@@ -439,6 +440,10 @@ def main():
                 if cmp_["archive"] != "2026-10" or not cmp_["diff"]:
                     print("   FAIL: the comparison did not switch on")
                     errors.append("the archive comparison did not draw")
+                elif cmp_["mode"] != 1:
+                    print("   FAIL: the comparison is not drawn with the "
+                          "diverging table")
+                    errors.append("the comparison uses the wrong colour table")
                 elif "change since" not in (cmp_["cap"] or "").lower():
                     print("   FAIL: the caption does not say what is drawn")
                     errors.append("the comparison caption is wrong")
@@ -512,12 +517,11 @@ def main():
                 up = os.path.dirname(adir)
                 if os.path.isdir(up) and not os.listdir(up):
                     os.rmdir(up)
-            ibak = os.path.join(DATA, "maps_index.json.bak")
-            if os.path.exists(ibak):
-                shutil.copyfile(ibak, os.path.join(DATA, "maps_index.json"))
-                os.remove(ibak)
-            elif os.path.exists(os.path.join(DATA, "maps_index.json")):
-                os.remove(os.path.join(DATA, "maps_index.json"))
+            # THE INDEX OF RUNS IS REBUILT, never restored from a saved
+            # copy: the saved copy can be the test's own, and the site's
+            # index must never carry a model that is not there.
+            import export_snow_map as ESM2
+            ESM2.write_archive_index()
             # put the real model index back, rebuilt from the manifests
             # that are actually there - restoring a saved copy can put
             # back a picker entry for a model the site does not have

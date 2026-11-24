@@ -555,6 +555,17 @@
     if (!run) { state.archive = null; loadField(); return; }
     d3.json("data/" + run.manifest).then(function (man) {
       state.archiveManifest = {run: run.manifest, man: man};
+      /* THE MAP MOVES TO A MONTH THE TWO RUNS SHARE: the run total has
+         no counterpart (one run's total covers a different set of
+         months), and the two runs do not start at the same place. */
+      var i = firstCommonMonth();
+      if (i >= 0 && (state.month < 0 ||
+                     !man.months.some(function (m) {
+                       return m.ym === state.manifest.months[state.month].ym;
+                     }))) {
+        state.month = i;
+        markTimeline();
+      }
       loadField();
       drawLegend();
     }).catch(function () {
@@ -569,6 +580,10 @@
     if (!state.archive || !state.manifest) { return null; }
     var man = state.archiveManifest && state.archiveManifest.man;
     if (!man || !man.months) { return null; }
+    /* THE RUN TOTAL CANNOT BE COMPARED: one run's total covers its own
+       months and the other run's total covers a different set, so there
+       is nothing like for like to subtract. */
+    if (state.month < 0) { return null; }
     var cur = state.manifest.months ? state.manifest.months[state.month] : null;
     if (!cur || !cur.ym) { return null; }
     /* THE SAME VALID MONTH, NOT THE SAME INDEX: two runs have different
@@ -581,6 +596,25 @@
       if (man.months[i].ym === cur.ym) { return man.months[i][g] || null; }
     }
     return null;
+  }
+
+  /* the first month that BOTH runs have, or -1.
+     The two runs do not start at the same place: the November run starts
+     in December and the October run starts in November, so their months
+     overlap only from the second month of the older run. */
+  function firstCommonMonth() {
+    var man = state.archiveManifest && state.archiveManifest.man;
+    if (!man || !man.months || !state.manifest || !state.manifest.months) {
+      return -1;
+    }
+    for (var i = 0; i < state.manifest.months.length; i++) {
+      var ym = state.manifest.months[i].ym;
+      if (!ym) { continue; }
+      for (var j = 0; j < man.months.length; j++) {
+        if (man.months[j].ym === ym) { return i; }
+      }
+    }
+    return -1;
   }
 
   /* THE DIFFERENCE BETWEEN TWO RUNS.
@@ -1046,7 +1080,12 @@
     var params = projParams(W, H);
     state.params = params;
     state.gl.setProjection(params);
-    state.gl.setMode(state.field === "anom" ? 1 : 0);
+    /* A COMPARISON IS DRAWN WITH THE ANOMALY'S OWN TABLE: the difference
+       between two runs is signed - less snow than the earlier run said,
+       more - so it takes the diverging palette, not the ladder of
+       accumulated snowfall (whose deep end is a magenta that means
+       "a lot of snow", not "a lot of change"). */
+    state.gl.setMode((state.field === "anom" || state.diff) ? 1 : 0);
     state.gl.render();
 
     /* the pole, when it is on the near side of the globe */
