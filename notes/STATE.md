@@ -663,10 +663,17 @@ queued at 18:46Z started at 20:14Z, 88 minutes later - so a queued
 request is not a fault, and the results stay in the store afterwards,
 which is why a watcher that dies costs nothing but the wait.
 
-**THE ARCHIVE HAS TWO RUNS NOW** (both live on the dev site): the UKMO
-GloSeas6's and the CMCC SPS4's October 2026 init, each built from the
-C3S archive and compared with the November run.  The DWD GCFS2.2 and the
-ECMWF SEAS5 are queued behind them.
+**THE ARCHIVE HAS THREE RUNS NOW** (all live on the dev site): the UKMO
+GloSeas6's, the CMCC SPS4's and the DWD GCFS2.2's October 2026 init,
+each built from the C3S archive and compared with the November run.  The
+ECMWF SEAS5's is queued behind them.
+
+**THE OPERATIONAL SITE CARRIES THE SEAS5 TOO** - its cap and by-sector
+charts were published by the general build on 15 November and had
+neither the thin black contours nor the tidied sector layout.  Both
+were refreshed on 24 November (the owner's "perfect that page" covers a
+redraw of a chart that is already on the page ✓), so all three models on
+the operational site now carry the same two charts.
 
 ## The maps page: an ARCHIVE picker, and comparing two runs (24 Nov 2026, 19:10 UTC)
 
