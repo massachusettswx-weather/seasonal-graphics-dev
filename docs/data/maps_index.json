@@ -1,1 +1,65 @@
-[{"tag": "c3s-multi", "init": "2026-11", "name": "TEST MODEL", "current": true, "manifest": "snowmap_c3s-multi.json"}, {"tag": "c3s-multi", "init": "2026-10", "name": "TEST MODEL", "current": false, "manifest": "maps/c3s-multi/2026-10/snowmap_c3s-multi.json"}]
+[
+ {
+  "tag": "c3s-multi",
+  "init": "2026-11",
+  "name": "C3S Multi-Model Mean",
+  "current": true,
+  "manifest": "snowmap_c3s-multi.json"
+ },
+ {
+  "tag": "cfsv2",
+  "init": "2026-12",
+  "name": "NOAA CFSv2",
+  "current": true,
+  "manifest": "snowmap_cfsv2.json"
+ },
+ {
+  "tag": "cmcc-sps4",
+  "init": "2026-11",
+  "name": "CMCC SPS4",
+  "current": true,
+  "manifest": "snowmap_cmcc-sps4.json"
+ },
+ {
+  "tag": "dwd-gcfs2",
+  "init": "2026-11",
+  "name": "DWD GCFS2.2",
+  "current": true,
+  "manifest": "snowmap_dwd-gcfs2.json"
+ },
+ {
+  "tag": "eccc-cansips",
+  "init": "2026-11",
+  "name": "ECCC canSIPS",
+  "current": true,
+  "manifest": "snowmap_eccc-cansips.json"
+ },
+ {
+  "tag": "ecmwf-seas5",
+  "init": "2026-11",
+  "name": "ECMWF SEAS5",
+  "current": true,
+  "manifest": "snowmap_ecmwf-seas5.json"
+ },
+ {
+  "tag": "meteo-france-s9",
+  "init": "2026-11",
+  "name": "METFR System 9",
+  "current": true,
+  "manifest": "snowmap_meteo-france-s9.json"
+ },
+ {
+  "tag": "sfsv1",
+  "init": "2026-11",
+  "name": "NOAA SFSv1",
+  "current": true,
+  "manifest": "snowmap_sfsv1.json"
+ },
+ {
+  "tag": "ukmo-gloseas6",
+  "init": "2026-11",
+  "name": "UKMO GloSeas6-GC5.1",
+  "current": true,
+  "manifest": "snowmap_ukmo-gloseas6.json"
+ }
+]
