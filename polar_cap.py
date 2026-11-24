@@ -570,6 +570,13 @@ def plot_section(times, norm, levels, out_path, title, subtitle,
     mid = today if (today is not None and 0 < today < n) else n
     ax.contourf(x, lev, z, levels=edges, cmap=cmap,
                 norm=norm_c, extend="both", alpha=1.0)
+    # A THIN BLACK LINE AT EVERY BAND BOUNDARY (the owner's word, 24 Nov
+    # 2026).  Without it the bands run into each other and the reader
+    # cannot see where one anomaly step ends and the next begins - which
+    # matters here, because the first band is only +-0.2 sigma wide and the
+    # difference between two analyses is smaller than that.
+    ax.contour(x, lev, z, levels=edges, colors="black", linewidths=0.35,
+               alpha=0.6, zorder=5)
 
     ax.set_yscale("log")
     ax.set_ylim(1000.0, 10.0)
@@ -937,6 +944,9 @@ def plot_sector_sections(times, sectors, levels, out_path, title, subtitle,
         # made the forecast read as weaker than it is.
         ax.contourf(x, lev, z, levels=edges, cmap=cmap,
                     norm=norm_c, extend="both", alpha=1.0)
+        # the same thin black band boundaries as the cap section
+        ax.contour(x, lev, z, levels=edges, colors="black", linewidths=0.35,
+                   alpha=0.6, zorder=5)
 
         ax.set_yscale("log")
         ax.set_ylim(1000.0, 10.0)

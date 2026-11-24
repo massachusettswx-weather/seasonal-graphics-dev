@@ -574,6 +574,84 @@ SEAS5) - they are good tools, they just cannot draw this particular point.
   `tools/publish_polar_seas5.py` - it is one of the site's own models, so
   it used to go out with the general build, and the general build is off.
 
+## The owner's second CORe question, measured over ten days (24 Nov 2026, 06:00 UTC)
+
+The owner's word: *"still having issues with CORe reanalysis and model
+analysis... they aren't supposed to be the same thing"*.
+
+**WHAT THE BUCKET IS - CPC's OWN DOCUMENTATION.**
+`https://ftp.cpc.ncep.noaa.gov/CORe/get_core/get_core.txt` says the CORe
+archive lives in the NODD bucket `noaa-nws-ncep-core`, with `pgb`/`flx`
+files under `grib/{3hour,day}/...` and date codes `YYYYMMDDHH` - **the
+exact tree `fetch_polar_core_3hourly.py` reads**.  It also says *"the pgb
+files are atmospheric analyses created using the Unified Post Processor"*
+and *"CORe creates output every 3 hours"*.  **So the chart's left half
+really is the CORe, and the label is right.**  The `ftp.cpc.ncep.noaa.gov`
+README's *"as of 7/2024, CORe is not operational"* means it is not the
+operational replacement for CDAS, not that it stopped being produced.
+
+**WHY THEY LOOK THE SAME: THE CORe IS THE FV3-GFS - THE SAME SYSTEM AS
+THE GEFSv12.**  The CORe is the GFS with conventional observations only;
+the GEFSv12's own analysis also uses the satellite radiances.  They are
+one model with different data, so they differ by the radiances' impact
+and by little else.
+
+**MEASURED - the GEFSv12's f000 (the 31-member mean) minus the CORe's
+analysis, at the SAME instant (00Z), 10 hPa, the polar cap, in the
+chart's own sigma (the CORe's own climate):**
+
+| the day | the GEFS f000 | the CORe | the difference | in sigma |
+|---|---|---|---|---|
+| 14 Nov | 296149.7 | 295828.6 | +321.1 | +0.197 |
+| 15 Nov | 295771.5 | 295673.7 | +97.8 | +0.059 |
+| 16 Nov | 295345.8 | 295255.4 | +90.3 | +0.053 |
+| 17 Nov | 294825.3 | 294664.1 | +161.1 | +0.091 |
+| 18 Nov | 294251.3 | 294099.4 | +152.0 | +0.084 |
+| 19 Nov | 293700.2 | 293640.9 | +59.3 | +0.032 |
+| 20 Nov | 293156.6 | 293073.0 | +83.7 | +0.044 |
+| 21 Nov | 292685.0 | 292335.2 | +349.8 | +0.177 |
+| 22 Nov | 292447.4 | 292404.8 | +42.6 | +0.021 |
+| 23 Nov | 292336.3 | 292308.9 | +27.4 | +0.013 |
+
+* The two **never** agree exactly, and the GEFS's analysis is **always
+  warmer** (the radiances) - but in the chart's units the gap is
+  **0.01-0.20 sigma**, and the chart's first colour band is **+-0.2
+  sigma**.  **On eight of the ten days the gap sits inside ONE colour
+  band, so the chart cannot show it as a colour change at all.**  That
+  is the whole of the "they look like the same thing" complaint.
+* The gap is largest on the wave days (14 Nov +0.20, 21 Nov +0.18) and
+  smallest on the quiet ones (22-23 Nov +0.02, +0.01).
+* The f000 files for 14-20 Nov were fetched tonight
+  (`tools/fetch_gefs_analysis.py`, one cycle at a time).
+
+**THE THIN BLACK CONTOURS (the owner's word, 24 Nov 2026) ARE IN.**
+`polar_cap.py` now draws `ax.contour(..., levels=edges, colors="black",
+linewidths=0.35, alpha=0.6)` after each `contourf` - in the cap section
+and in the by-sector chart.  A gap smaller than one colour band cannot
+change a colour but it **does** move a boundary line, so the seam is now
+visible as a shift in the contours even when the fill does not change.
+Published to the dev site (GEFSv12, EC46, SEAS5) and to the operational
+site (GEFSv12, EC46) - the live PNGs are byte for byte the repo's.
+
+**THE OPTIONS FOR THE OWNER (nothing has been changed yet):**
+1. **Put the ERA5 on the left of the NOAA charts.**  The ERA5 is the
+   ECMWF's own reanalysis, so the GEFS's chart would compare two
+   different centres and the seam would step by ~0.3-0.5 sigma.  The ERA5
+   lags about five days (the reference site has the same lag), and its
+   climate has to be rebuilt from the CDS daily product (one 30-year
+   request; the file is gitignored and does not survive a wipe).
+2. **Keep the CORe everywhere** and accept that the two halves are one
+   model - the contours now show the small step.
+3. **A difference chart** (the two centres' difference for the same valid
+   day: 0.28 sigma on 25 Nov rising to 3.3 sigma on 15 Dec) - a new chart
+   family, so it needs the owner's word.
+
+**IN FLIGHT: a CDS ERA5 daily request for 8-18 Nov 2026** (job
+`418366be-b042-44b1-9d94-416dc5c33bf9`, one request, 12 levels, 12Z,
+the polar cap box) - to size the ERA5-vs-GEFS gap with real numbers
+before the owner is asked to choose.  The poller is
+`/workspace/poll_era5.py`; the result lands in `/workspace/era5_recent.grib`.
+
 ## The rules that are not negotiable
 
 * Our own graphics; a climatology from the same product as the data it
@@ -585,3 +663,13 @@ SEAS5) - they are good tools, they just cannot draw this particular point.
 * **A membership is a constant, not a record** of the last run.
 * The state lives here, in git, and in the agent's memory - never only in
   a conversation.
+* **A build without `SITE_DEV=1` stamps the OPERATIONAL identity on the
+  pages** (`build_site.py`: `SITE_DEV = os.environ.get("SITE_DEV", "")`).
+  A build run in the development tree without that variable leaves
+  `docs/*.html` claiming to be the operational site (the title loses
+  "DEVELOPMENT COPY" and the canonical URL points at
+  `/seasonal-graphics/`).  It happened on the night of 24 Nov; the working
+  copy was restored with `git checkout HEAD -- <paths>` **and a
+  `git reset -q` afterwards**, because a checkout stages the file and the
+  narrow publisher commits the whole index.  Always build the
+  development copy with `SITE_DEV=1`.
