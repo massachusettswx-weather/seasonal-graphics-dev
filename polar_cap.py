@@ -491,12 +491,15 @@ def fit_subtitle(parts, limit=1995.0, fs=9.5, fig_w=13.5, x0=0.052):
     keep = list(parts)
 
     def end_px(s):
-        fig = plt.figure(figsize=(fig_w, 7.0), dpi=150)
+        # the chart's figure is created at the default 100 dpi and SAVED at
+        # 150 dpi, so the text is rendered small and then scaled up by 1.5 -
+        # measuring at 150 dpi alone would let the caption run off the edge
+        fig = plt.figure(figsize=(fig_w, 7.0), dpi=100)
         t = fig.text(x0, 0.921, s, fontsize=fs, ha="left", va="top")
         fig.canvas.draw()
         bb = t.get_window_extent(fig.canvas.get_renderer())
         plt.close(fig)
-        return x0 * fig_w * 150 + bb.width
+        return x0 * fig_w * 150 + bb.width * 1.5
 
     while True:
         s = " · ".join(p[0] for p in keep if p[0])

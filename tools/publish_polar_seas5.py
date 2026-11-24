@@ -236,8 +236,8 @@ def main():
     say("   written and checked: the %s entries carry ?v=%s" % (MODEL_ID,
                                                                 version))
 
-    msg = args.message or ("The ECMWF SEAS5 polar-cap section: the chart's "
-                            "own reanalysis, drawn at an instant")
+    msg = args.message or ("The ECMWF SEAS5 polar-cap section: the chart, "
+                            "redrawn")
     rc = commit_files(target, files, msg)
     if rc:
         return rc

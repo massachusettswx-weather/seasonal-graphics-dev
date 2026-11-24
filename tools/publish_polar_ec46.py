@@ -143,6 +143,11 @@ def add_inline(text, name, entry, version):
         # brought forward and everything else in the entry is left alone.
         cur = obj[MODEL_ID]
         e = copy.deepcopy(cur)
+        # the entry's own cycle date is the source tree's: the page was
+        # built when the run was older, and the card must not keep the old
+        # date beside the new picture
+        if entry.get("init"):
+            e["init"] = entry["init"]
         if name == "POLARMODELS":
             e["file"] = "assets/polar/%s?v=%s" % (CHART, version)
         if isinstance(e.get("polar"), dict):
@@ -288,6 +293,17 @@ def main():
         say("   the target already carries the %s section - nothing to do"
             % (have[0].get("init") or ""))
         return 4
+    # NEVER PUT THE TARGET BACK TO AN OLDER CYCLE.  The GEFSv12's path has
+    # this rule; the EC46's path had only the coarse "the target has an
+    # entry" test, so a NEWER run also needed --force and an older one
+    # could have been published with it.
+    if have:
+        old = have[0].get("init") or ""
+        new = entry.get("init") or ""
+        if old and new and old > new:
+            say("   the target carries the %s section, which is NEWER than "
+                "the %s one - NOTHING IS CHANGED." % (old, new))
+            return 4
 
     # the picture: taken from the source tree's own build, byte for byte.
     # It is NOT redrawn here - redrawing would replace it with a chart made
