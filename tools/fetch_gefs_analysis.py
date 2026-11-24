@@ -28,8 +28,8 @@ sys.path.insert(0, ROOT)
 import fetch_polar_gefs as G  # noqa: E402
 from polar_cap import G0, zonal_mean  # noqa: E402
 
-OUT = os.path.join(ROOT, "data", "polar_gefs_f000.json")
-LEVEL = 10
+OUT_DIR = os.path.join(ROOT, "data")
+LEVELS = [10, 30, 50, 100, 200, 300, 400, 500, 700, 850, 925, 1000]
 MEMBERS = ["gec00"] + ["gep%02d" % i for i in range(1, 31)]
 
 
@@ -70,26 +70,43 @@ def main():
     blobs = G.lead_members(MEMBERS, 0)
     vals = {}
     tmp = os.path.join(ROOT, "data", "_core_f000_tmp.grb")  # gitignored
+    vals = {}
     for m in MEMBERS:
-        if LEVEL not in blobs.get(m, {}):
-            continue
-        try:
-            vals[m] = cap_mean(blobs[m][LEVEL], tmp)
-        except Exception as e:                       # noqa: BLE001
-            print("   %s: FAILED (%s)" % (m, str(e)[:60]))
+        row = {}
+        for lev in LEVELS:
+            if lev not in blobs.get(m, {}):
+                continue
+            try:
+                row[str(lev)] = cap_mean(blobs[m][lev], tmp)
+            except Exception as e:                   # noqa: BLE001
+                print("   %s %d hPa: FAILED (%s)" % (m, lev, str(e)[:60]))
+        if row:
+            vals[m] = row
     if os.path.exists(tmp):
         os.remove(tmp)
     if not vals:
         print("   no member answered - nothing written")
         return
-    arr = np.array(list(vals.values()))
-    print("   %d members   the ensemble mean %10.1f   the spread %6.1f "
-          "(min %10.1f  max %10.1f)"
-          % (len(arr), arr.mean(), arr.max() - arr.min(), arr.min(), arr.max()))
-    json.dump({"date": date, "hour": hour, "level": LEVEL,
-               "members": vals, "mean": float(arr.mean())},
-              open(OUT, "w"), indent=1, sort_keys=True)
-    print("   written: %s" % OUT)
+    # the ensemble mean and the spread at every level
+    mean, spread = {}, {}
+    for lev in LEVELS:
+        col = [v.get(str(lev)) for v in vals.values() if v.get(str(lev)) is not None]
+        if not col:
+            continue
+        arr = np.array(col, float)
+        mean[str(lev)] = float(arr.mean())
+        spread[str(lev)] = float(arr.max() - arr.min())
+    print("   %d members" % len(vals))
+    for lev in LEVELS:
+        if str(lev) in mean:
+            print("      %4d hPa   mean %10.1f   spread %6.1f"
+                  % (lev, mean[str(lev)], spread[str(lev)]))
+    out = os.path.join(OUT_DIR, "polar_analysis_gefsv12_%s%s.json"
+                       % (date, hour))
+    json.dump({"date": date, "hour": hour, "levels": LEVELS,
+               "members": vals, "mean": mean, "spread": spread},
+              open(out, "w"), indent=1, sort_keys=True)
+    print("   written: %s" % out)
 
 
 if __name__ == "__main__":

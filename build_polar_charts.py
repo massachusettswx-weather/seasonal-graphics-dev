@@ -25,7 +25,7 @@ OUT = os.path.join(HERE, "output", "polar_cap")
 # added, and for the METFR system 9 section to come out - so the list is
 # the whole of it, and nothing is drawn that is not on it.
 MODELS = [
-    ("ecmwf-seas5", "ECMWF SEAS5", None),
+    ("ecmwf-seas5", "ECMWF SEAS5", "SEAS5"),
     ("gefsv12", "NOAA GEFSv12 (35-day extended)", "GEFSv12"),
     ("ec46", "ECMWF EC46", "EC46"),
 ]

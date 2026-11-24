@@ -86,6 +86,23 @@ for f in $SLOW; do
     sleep 1
 done
 
+# THE CORe AT 3-HOURLY RESOLUTION.  The polar section's reanalysis half is
+# drawn from it, so the analysis is an INSTANT at the model's own clock
+# hour and not a day's mean - that is what makes the handover with the
+# forecast a like-for-like comparison.  The pull needs no key and no queue,
+# and the cache keeps what it has, so a day's cost is eight stamps.
+if [ -f fetch_polar_core_3hourly.py ]; then
+    days3=""
+    i=0
+    while [ $i -lt 45 ]; do
+        days3="$days3 $(date -u -d "-$i day" +%Y%m%d)"
+        i=$((i+1))
+    done
+    setsid nohup python3 -u fetch_polar_core_3hourly.py $days3 \
+        >> "logs_fetch_polar_core_3hourly.log" 2>&1 < /dev/null &
+    sleep 1
+fi
+
 # THE EC46 IS PULLED ON THREE DAYS A WEEK, NOT SEVEN.  The owner's days
 # (22 Nov 2026) are Monday, Thursday and Saturday.  The reason is the
 # queue, not the product: the extended range runs EVERY day (measured 22

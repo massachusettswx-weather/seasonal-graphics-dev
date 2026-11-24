@@ -42,6 +42,17 @@ OUT = os.path.join(DATA, "polar_core_3hourly.json")
 
 # the levels the polar section draws
 LEVELS = [10, 30, 50, 100, 200, 300, 400, 500, 700, 850, 925, 1000]
+# The geopotential height.  NOAA's `.idx` writes it as "HGT" but the GRIB
+# message itself carries the shortName "gh", and EVERY level in the file
+# holds eleven variables - so a decoder that filters on the level alone
+# reads the stream function and gets a number that is millions of times
+# too large.
+HEIGHT_NAMES = ("gh", "HGT", "Geopotential height")
+# A polar-cap mean of the geopotential that is not inside this is a
+# decoding fault, not a value.  The bound is wide because the quantity
+# itself varies by three orders of magnitude with the level: about
+# 290,000 m2/s2 at 10 hPa and about 200 m2/s2 at 1000 hPa.
+SANITY = (0.0, 1.0e6)
 # the eight analyses of a day
 HOURS = ["00", "03", "06", "09", "12", "15", "18", "21"]
 
@@ -99,13 +110,68 @@ def cap_mean(blob, tmp):
             if gid is None:
                 break
             try:
+                snm = eccodes.codes_get(gid, "shortName")
+                if snm not in HEIGHT_NAMES:
+                    continue
                 la = np.asarray(eccodes.codes_get_array(gid, "latitudes"), float)
                 v = np.asarray(eccodes.codes_get_array(gid, "values"), float)
                 lats = np.unique(la)[::-1]
                 lons = np.unique(np.asarray(
                     eccodes.codes_get_array(gid, "longitudes"), float))
                 v = v.reshape(len(lats), len(lons))
-                out = float(zonal_mean(v * G0, lats))
+                val = float(zonal_mean(v * G0, lats))
+                if SANITY[0] <= val <= SANITY[1]:
+                    out = val
+            finally:
+                eccodes.codes_release(gid)
+    return out
+
+
+def cap_mean_all(blob, levels, tmp):
+    """-> {level: the polar-cap mean} for every wanted level in a file.
+
+    The fallback for a stamp whose INVENTORY is empty: NOAA publishes some
+    of the three-hourly files with a zero-byte `.idx` (the 00Z stamp of
+    18 Nov 2026, for one), so there are no byte ranges to read and the
+    whole file is decoded instead.  It costs forty megabytes instead of
+    one, and it is exact - the same messages, the same polar-cap mean.
+    """
+    import eccodes
+    with open(tmp, "wb") as f:
+        f.write(blob)
+    out = {}
+    with open(tmp, "rb") as f:
+        while True:
+            try:
+                gid = eccodes.codes_grib_new_from_file(f)
+            except Exception:                       # noqa: BLE001
+                break
+            if gid is None:
+                break
+            try:
+                try:
+                    tol = eccodes.codes_get(gid, "typeOfLevel")
+                    lev = int(eccodes.codes_get(gid, "level"))
+                    snm = eccodes.codes_get(gid, "shortName")
+                except Exception:                   # noqa: BLE001
+                    continue
+                if tol != "isobaricInhPa" or lev not in levels:
+                    continue
+                if snm not in HEIGHT_NAMES:
+                    continue
+                la = np.asarray(eccodes.codes_get_array(gid, "latitudes"),
+                                float)
+                v = np.asarray(eccodes.codes_get_array(gid, "values"), float)
+                lats = np.unique(la)[::-1]
+                lons = np.unique(np.asarray(
+                    eccodes.codes_get_array(gid, "longitudes"), float))
+                v = v.reshape(len(lats), len(lons))
+                val = float(zonal_mean(v * G0, lats))
+                if SANITY[0] <= val <= SANITY[1]:
+                    out[lev] = val
+                else:
+                    print("   %s %d hPa: the value %s is out of range"
+                          % (stamp, lev, "%.3g" % val), flush=True)
             finally:
                 eccodes.codes_release(gid)
     return out
@@ -119,6 +185,22 @@ def one_stamp(stamp, levels=LEVELS):
         # the tree does not hold every three hours of the last day yet
         print("   %s : not published (%s)" % (stamp, str(e)[:60]))
         return {}
+    if not rows:
+        # an EMPTY inventory: NOAA wrote a zero-byte .idx for this stamp.
+        # The file itself is complete, so the whole thing is decoded.
+        print("   %s : the inventory is empty - decoding the whole file"
+              % stamp, flush=True)
+        tmp = os.path.join(DATA, "_core3h_%s.grb" % stamp)
+        try:
+            r = get(url(stamp) + ".grb")
+            out = cap_mean_all(r.content, levels, tmp)
+        except Exception as e:                       # noqa: BLE001
+            print("   %s : the whole file failed (%s)" % (stamp, str(e)[:60]))
+            out = {}
+        finally:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        return out
     jobs = []
     for i, (off, var, lev) in enumerate(rows):
         if var != "HGT":
@@ -153,6 +235,42 @@ def stamps_for(days, hours=HOURS):
     return out
 
 
+def ensure(days, levels=None):
+    """-> the cache, with every stamp of these days present.
+
+    The cache keeps what it has, so a day that is already there costs
+    nothing.  This is what the chart builder calls when its own window is
+    not covered - the pull needs no key and no queue, and it is the only
+    way the reanalysis half can be drawn at an INSTANT.
+    """
+    levels = levels or LEVELS
+    out = {}
+    if os.path.exists(OUT):
+        try:
+            out = json.load(open(OUT))
+        except Exception:                           # noqa: BLE001
+            out = {}
+    stamps = []
+    for d in days:
+        stamps.extend(stamps_for([d]) if len(d) == 8 else [d])
+    # an EMPTY record is a failed fetch that was cached by an earlier
+    # version of this script - it must be treated as missing, or the
+    # window is never completed and the chart falls back to the daily file
+    todo = [s for s in stamps if not (out.get(s) or {})]
+    if not todo:
+        return out
+    print("   %d stamps to pull (%d levels each)" % (len(todo), len(levels)),
+          flush=True)
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        for stamp, rec in zip(todo, ex.map(lambda s: one_stamp(s, levels), todo)):
+            if not rec:
+                continue
+            out[stamp] = {str(k): v for k, v in rec.items()}
+            print("   %s : %d levels" % (stamp, len(rec)), flush=True)
+            json.dump(out, open(OUT, "w"), indent=1, sort_keys=True)
+    return out
+
+
 def main():
     args = sys.argv[1:]
     levels = LEVELS
@@ -161,25 +279,7 @@ def main():
         levels = [int(x) for x in args[i + 1].split(",")]
         del args[i:i + 2]
     days = args or ["20261121"]
-    stamps = []
-    for d in days:
-        stamps.extend(stamps_for([d]) if len(d) == 8 else [d])
-    out = {}
-    if os.path.exists(OUT):
-        try:
-            out = json.load(open(OUT))
-        except Exception:                           # noqa: BLE001
-            out = {}
-    todo = [s for s in stamps if s not in out]
-    print("   %d stamps to pull (%d levels each)" % (len(todo), len(levels)),
-          flush=True)
-    with ThreadPoolExecutor(max_workers=4) as ex:
-        for stamp, rec in zip(todo, ex.map(lambda s: one_stamp(s, levels), todo)):
-            out[stamp] = {str(k): v for k, v in rec.items()}
-            print("   %s : %s" % (stamp, ", ".join(
-                "%d hPa %.1f" % (k, v) for k, v in sorted(rec.items()))),
-                flush=True)
-            json.dump(out, open(OUT, "w"), indent=1, sort_keys=True)
+    out = ensure(days, levels)
     print("   written: %s" % OUT)
     check_daily(out)
 
