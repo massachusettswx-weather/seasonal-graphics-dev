@@ -137,7 +137,20 @@ def add_inline(text, name, entry, version):
         return None
     start, end, obj = got
     if MODEL_ID in obj:
-        return text
+        # THE ENTRY IS ALREADY ON THE PAGE.  It was put there by the first
+        # run; a REDRAW of the same run still has to reach the reader, and
+        # the ?v= on the chart URL is the cache-buster - so the URL is
+        # brought forward and everything else in the entry is left alone.
+        cur = obj[MODEL_ID]
+        e = copy.deepcopy(cur)
+        if name == "POLARMODELS":
+            e["file"] = "assets/polar/%s?v=%s" % (CHART, version)
+        if isinstance(e.get("polar"), dict):
+            e["polar"]["file"] = "assets/polar/%s?v=%s" % (CHART, version)
+        if e == cur:
+            return text
+        obj[MODEL_ID] = e
+        return text[:start] + json.dumps(obj) + text[end:]
     e = copy.deepcopy(entry)
     if name == "POLARMODELS":
         e = {"id": MODEL_ID, "name": NAME,
@@ -402,7 +415,8 @@ def main():
     written = []
     dst = os.path.join(docs, "assets", "polar", CHART)
     os.makedirs(os.path.dirname(dst), exist_ok=True)
-    shutil.copyfile(drawn, dst)
+    if os.path.realpath(drawn) != os.path.realpath(dst):
+        shutil.copyfile(drawn, dst)
     written.append(os.path.join("docs", "assets", "polar", CHART))
     json.dump(newreg, open(regp, "w"), indent=1)
     written.append(os.path.join("docs", "data", "models.json"))

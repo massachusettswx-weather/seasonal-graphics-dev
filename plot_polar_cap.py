@@ -299,6 +299,10 @@ def load_series(path, tag):
     return times, vals, levels
 
 
+# the short name of each product, for the descriptor and the panel labels
+SHORT_NAME = {"gefsv12": "GEFSv12", "ecmwf-seas5": "SEAS5", "ec46": "EC46"}
+
+
 def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
          rebase="forecast"):
     # `rebase` says how the forecast half is put on the reanalysis's scale:
@@ -308,7 +312,11 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
     # where the analysis ends.
     # `short` is the name the DESCRIPTOR line uses, when the title's name is
     # too long for it (the GEFS's title carries "(35-day extended)")
-    short = short or label
+    # the name the DESCRIPTOR and the panel labels use.  It is a CONSTANT
+    # per product, so every caller gets it - the narrow publisher draws the
+    # GEFSv12 with the long product name and no short one, and the panel
+    # labels then ran into each other.
+    short = short or SHORT_NAME.get(tag) or label
     # 1. the climatology.  The one that comes first is the one built from
     # the CDS DAILY reanalysis: the same product and the same grid as the
     # reanalysis half, with the real ERA5's spread.  The ARCO native store
