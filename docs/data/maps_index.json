@@ -61,5 +61,12 @@
   "name": "UKMO GloSeas6-GC5.1",
   "current": true,
   "manifest": "snowmap_ukmo-gloseas6.json"
+ },
+ {
+  "tag": "ukmo-gloseas6",
+  "init": "2026-10",
+  "name": "UKMO GloSeas6-GC5.1",
+  "current": false,
+  "manifest": "maps/ukmo-gloseas6/2026-10/snowmap_ukmo-gloseas6.json"
  }
 ]
