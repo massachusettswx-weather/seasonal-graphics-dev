@@ -646,6 +646,30 @@ site (GEFSv12, EC46) - the live PNGs are byte for byte the repo's.
    day: 0.28 sigma on 25 Nov rising to 3.3 sigma on 15 Dec) - a new chart
    family, so it needs the owner's word.
 
+**THE ERA5 MEASURED AGAINST THE NOAA ANALYSES (24 Nov, the number
+the owner's decision was waiting for)** - the ERA5 was read straight from
+the ARCO store (`ar/full_37-1h-0p25deg-chunk-1.zarr-v3`, the same
+pressure-level product the CDS serves), at 10 hPa over the polar cap
+with the chart's own weights.  The house's own
+`data/polar_era5_recent_arco.npz` corroborates it.  **Each side is put
+on its OWN climate** (the house's rule ✓):
+
+| the instant | the ERA5 | the CORe | the GEFS f000 | the step (the CORe - the ERA5) |
+|---|---|---|---|---|
+| 17 Nov 00Z | 291,001.9 | 294,664.1 | 294,825.2 | +3,320 = **+1.97 sigma** |
+| 21 Nov 00Z | 291,088.4 | 292,335.2 | 292,685.0 | +706 = **+0.42 sigma** |
+| 23 Nov 00Z | 290,923.3 | 292,308.9 | 292,336.3 | +722 = **+0.43 sigma** |
+
+(the raw mean-state gap is -3,662 / -1,247 / -1,386 m2/s2 = -2.18 / -0.74 /
+-0.82 sigma; the chart's own sigma is 1,681.8 ✓).  **SO: THE ERA5 SITS
+0.74-2.18 SIGMA BELOW THE NOAA ANALYSES, AND THE ERA5 IS THE ONE THAT
+DISAGREES** - the GFS's own analysis agrees with the CORe to 0.21 sigma
+and the ECMWF's forecasts to ~0.2 sigma.  **SWITCHING THE CHART'S LEFT
+HALF TO THE ERA5 WOULD PUT A VISIBLE ~0.4 SIGMA STEP INTO THE CHART**
+(the first colour band is +-0.2 sigma, so it WOULD change pixels) - and
+it would be a genuine cross-centre difference, not a seam artefact.
+The measurement is in `/workspace/era5_vs_noaa.txt`.
+
 **IN FLIGHT: a CDS ERA5 daily request** - **ONE DAY PER REQUEST.**
 The first attempt (8-18 Nov, job `418366be-b042-44b1-9d94-416dc5c33bf9`)
 FAILED, and the reason is only in the job's RESULTS endpoint, not in its
