@@ -13,6 +13,7 @@ the timeline works, that the anomaly toggle works, and that nothing throws.
 """
 import os
 import sys
+import glob
 import json
 import shutil
 import subprocess
@@ -23,7 +24,15 @@ ROOT = os.path.dirname(HERE)
 DOCS = os.path.join(ROOT, "docs")
 DATA = os.path.join(DOCS, "data")
 TAG = "testmodel"
-CHROME = "/root/.cache/ms-playwright/chromium-1243/chrome-linux/chrome"
+# the tag the page OPENS on: the multi-model, whose manifest the test
+# stands in for - so the archived run has to be the multi-model's
+ATAG = "c3s-multi"
+# The browser: playwright's own download, wherever this sandbox put it.
+# The path is not hard-coded - a rebuild of the sandbox moves it, and a
+# test that cannot find the browser is not a test of the page.
+CHROME = None
+for _c in glob.glob("/root/.cache/ms-playwright/chromium-*/chrome-linux/chrome"):
+    CHROME = _c
 sys.path.insert(0, ROOT)
 
 
@@ -120,6 +129,46 @@ def make_model():
     with open(os.path.join(DATA, "snowmap_%s.json" % TAG), "w") as fh:
         json.dump(man, fh)
 
+    # AN EARLIER RUN OF THE SAME MODEL, in the archive: the page's
+    # "Compare with" picker reads docs/data/maps_index.json, and the
+    # archived run's files live under docs/data/maps/<tag>/<init>/.
+    adir = os.path.join(DATA, "maps", ATAG, "2026-10")
+    os.makedirs(adir, exist_ok=True)
+    import numpy as np
+    from PIL import Image
+    # the same field, a little different: the difference must not be zero
+    f2 = make_field() * 0.85 + 2.0
+    t2 = np.round(np.clip((np.log10(np.maximum(f2, lo)) - np.log10(lo)) /
+                          (np.log10(hi) - np.log10(lo)), 0, 1) * 254).astype(np.uint8)
+    a2 = np.round(np.clip(((f2 - clim) + scale) / (2 * scale), 0, 1) * 254).astype(np.uint8)
+    for k in range(3):
+        Image.fromarray(t2, mode="L").save(
+            os.path.join(adir, "snowmap_%s_m%02d_total.png" % (ATAG, k + 1)))
+        Image.fromarray(a2, mode="L").save(
+            os.path.join(adir, "snowmap_%s_m%02d_anom.png" % (ATAG, k + 1)))
+    aman = json.loads(json.dumps(man))
+    aman["init"] = "2026-10"
+    aman["archived"] = True
+    rel = "maps/%s/2026-10" % ATAG
+    for entry in aman["months"]:
+        for k in ("total", "anom"):
+            if entry.get(k):
+                entry[k] = "%s/%s" % (rel, entry[k].replace("snowmap_%s_" % TAG,
+                                                           "snowmap_%s_" % ATAG))
+    with open(os.path.join(adir, "snowmap_%s.json" % ATAG), "w") as fh:
+        json.dump(aman, fh)
+    # the index of runs: the current one and the archived one
+    idx_p = os.path.join(DATA, "maps_index.json")
+    if os.path.exists(idx_p):
+        shutil.copyfile(idx_p, os.path.join(DATA, "maps_index.json.bak"))
+    with open(idx_p, "w") as fh:
+        json.dump([{"tag": ATAG, "init": "2026-11", "name": "TEST MODEL",
+                    "current": True, "manifest": "snowmap_%s.json" % ATAG},
+                   {"tag": ATAG, "init": "2026-10", "name": "TEST MODEL",
+                    "current": False,
+                    "manifest": "maps/%s/2026-10/snowmap_%s.json"
+                               % (ATAG, ATAG)}], fh)
+
     # A SECOND entry that points at the same rasters, under the tag the
     # page is supposed to open on.  It is deliberately NOT first in the
     # index, so the test proves the page picks the multi-model by NAME
@@ -188,7 +237,8 @@ def main():
         from playwright.sync_api import sync_playwright
         errors = []
         with sync_playwright() as p:
-            b = p.chromium.launch(executable_path=CHROME, args=["--no-sandbox"])
+            b = p.chromium.launch(executable_path=CHROME, args=["--no-sandbox"]) if CHROME \
+                else p.chromium.launch(args=["--no-sandbox"])
             pg = b.new_page(viewport={"width": 1280, "height": 1000})
             pg.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
             pg.on("pageerror", lambda e: errors.append(
@@ -352,6 +402,58 @@ def main():
             else:
                 print("   ok")
 
+            # THE ARCHIVE: the picker must offer the earlier run, and
+            # choosing it must draw the CHANGE between the two runs.
+            arch = pg.evaluate("""() => {
+              var s = document.getElementById('snowArchive');
+              if (!s) { return {none: true}; }
+              var opts = [];
+              for (var i = 0; i < s.options.length; i++) {
+                opts.push(s.options[i].value + '|' + s.options[i].textContent);
+              }
+              return {none: false, disabled: s.disabled, opts: opts};
+            }""")
+            print("the archive picker:", arch)
+            if arch.get("none") or arch.get("disabled"):
+                print("   FAIL: the archive picker is missing or disabled")
+                errors.append("the archive picker offers no earlier run")
+            elif len(arch["opts"]) < 2:
+                print("   FAIL: the archive picker lists only one run")
+                errors.append("the archive picker lists one run")
+            else:
+                print("   ok")
+            if not arch.get("none"):
+                pg.select_option("#snowArchive", "2026-10")
+                pg.wait_for_timeout(2500)
+                cmp_ = pg.evaluate("""() => {
+                  var st = window.__maps;
+                  var cap = (document.querySelector('#maplegend') ||
+                             {textContent: ''}).textContent || '';
+                  return {archive: st ? st.archive : null,
+                          diff: st ? !!st.diff : null,
+                          kind: st && st.diff ? st.diff.kind : null,
+                          cap: cap};
+                }""")
+                print("the comparison:", cmp_["archive"], cmp_["kind"])
+                print("   the caption:", (cmp_["cap"] or "")[:120])
+                if cmp_["archive"] != "2026-10" or not cmp_["diff"]:
+                    print("   FAIL: the comparison did not switch on")
+                    errors.append("the archive comparison did not draw")
+                elif "change since" not in (cmp_["cap"] or "").lower():
+                    print("   FAIL: the caption does not say what is drawn")
+                    errors.append("the comparison caption is wrong")
+                else:
+                    print("   ok")
+                pg.screenshot(path="/tmp/maps_compare.png")
+                # and back to the current run alone
+                pg.select_option("#snowArchive", "")
+                pg.wait_for_timeout(2000)
+                back = pg.evaluate("() => window.__maps ? !!window.__maps.diff : null")
+                print("   back to the current run, the comparison is off:",
+                      back is False)
+                if back is not False:
+                    errors.append("the comparison stayed on")
+
             # is anything actually painted on the canvas?
             # the canvas is drawn on the GPU now, so it is read with
             # readPixels, a pixel at a time: a read of the whole canvas
@@ -403,6 +505,19 @@ def main():
             tbak = os.path.join(DATA, "snowmap_tags.json.bak")
             if os.path.exists(tbak):
                 os.remove(tbak)
+            # the archive the test made, and the index of runs
+            adir = os.path.join(DATA, "maps", ATAG, "2026-10")
+            if os.path.isdir(adir):
+                shutil.rmtree(adir)
+                up = os.path.dirname(adir)
+                if os.path.isdir(up) and not os.listdir(up):
+                    os.rmdir(up)
+            ibak = os.path.join(DATA, "maps_index.json.bak")
+            if os.path.exists(ibak):
+                shutil.copyfile(ibak, os.path.join(DATA, "maps_index.json"))
+                os.remove(ibak)
+            elif os.path.exists(os.path.join(DATA, "maps_index.json")):
+                os.remove(os.path.join(DATA, "maps_index.json"))
             # put the real model index back, rebuilt from the manifests
             # that are actually there - restoring a saved copy can put
             # back a picker entry for a model the site does not have

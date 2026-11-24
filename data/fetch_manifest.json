@@ -976,6 +976,30 @@
    "target": "data/small_job.txt",
    "job": "cacaddd8-022a-40dd-a7f0-14e6df65a0f5",
    "note": "a job id kept from an earlier fetch"
+  },
+  {
+   "model": "data",
+   "target": "data/_archive_ukmo-gloseas6.grib",
+   "job": "af38d345-461d-488d-b589-287d403b3614",
+   "note": "recorded after the fact",
+   "dataset": "seasonal-monthly-single-levels",
+   "request": {
+    "originating_centre": "ukmo",
+    "system": "610",
+    "variable": "snowfall",
+    "product_type": "monthly_mean",
+    "year": 2026,
+    "month": 10,
+    "leadtime_month": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6"
+    ],
+    "data_format": "grib"
+   }
   }
  ]
 }

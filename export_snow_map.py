@@ -42,14 +42,28 @@ usage:  python3 export_snow_map.py
 import os
 import sys
 import json
+import shutil
 import warnings
 import numpy as np
 import init_info
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data")
-MDIR = os.path.join(DATA, "models")
-OUT = os.path.join(HERE, "docs", "data")
+# THE ARCHIVE BUILDER exports an EARLIER run of a model against a shadow
+# tree and a scratch output, so these three can be pointed elsewhere.
+# The defaults are the ordinary ones: the models on disk and the site's
+# own data directory.
+MDIR = os.environ.get("MAP_MDIR") or os.path.join(DATA, "models")
+OUT = os.environ.get("MAP_OUT") or os.path.join(HERE, "docs", "data")
+STATE_FILE = (os.environ.get("MAP_STATE")
+              or os.path.join(DATA, "models_fetched.json"))
+# the ARCHIVE: one directory per model and run, so a reader can go back
+# to an earlier run and compare it with the current one.  The current
+# run's files stay at the top of docs/data (the page already fetches
+# them from there); every run that has been superseded is copied under
+# docs/data/maps/<tag>/<init>/.
+ARCHIVE = os.path.join(OUT, "maps")
+ARCHIVE_INDEX = os.path.join(OUT, "maps_index.json")
 
 # the models whose own panels are not published (they are pooled)
 POOLED_INTO = {"eccc-canesm5": "eccc-cansips", "eccc-gem5": "eccc-cansips"}
@@ -325,12 +339,119 @@ def write_index(tags, state):
     return index
 
 
+def archive_run(tag, init):
+    """Keep this run's exports so a reader can go back to them later.
+
+    THE MAP IS THE CURRENT RUN; THE ARCHIVE IS EVERY RUN THAT CAME
+    BEFORE.  Without this the site can only ever show one run: each
+    export overwrites the last one's manifest and rasters, so a reader
+    who wants to see what the November run said has nothing to look at.
+
+    The copy lives in docs/data/maps/<tag>/<init>/ with the same file
+    names inside it, and the manifest's own paths are rewritten to point
+    there - so an archived manifest is read exactly like the current one.
+
+    A run with no init date is not archived: the multi-model mean was
+    written without one for a long time, and an archive entry with no
+    date cannot be told apart from another.
+    """
+    if not init:
+        return None
+    src_man = os.path.join(OUT, "snowmap_%s.json" % tag)
+    if not os.path.exists(src_man):
+        return None
+    try:
+        man = json.load(open(src_man))
+    except Exception:
+        return None
+    d = os.path.join(ARCHIVE, tag, init)
+    os.makedirs(d, exist_ok=True)
+    names = []
+    for m in man.get("months", []):
+        for k in ("total", "anom", "avg3_total", "avg3_anom"):
+            if m.get(k):
+                names.append(m[k])
+    for k in ("total", "anom"):
+        if (man.get("total") or {}).get(k):
+            names.append(man["total"][k])
+    for fn in names:
+        s = os.path.join(OUT, fn)
+        if os.path.exists(s):
+            shutil.copyfile(s, os.path.join(d, fn))
+    rel = "maps/%s/%s" % (tag, init)
+    for m in man.get("months", []):
+        for k in ("total", "anom", "avg3_total", "avg3_anom"):
+            if m.get(k):
+                m[k] = "%s/%s" % (rel, m[k])
+    for k in ("total", "anom"):
+        if (man.get("total") or {}).get(k):
+            man["total"][k] = "%s/%s" % (rel, man["total"][k])
+    man["archived"] = True
+    with open(os.path.join(d, "snowmap_%s.json" % tag), "w") as f:
+        json.dump(man, f)
+    return {"tag": tag, "init": init}
+
+
+def write_archive_index():
+    """The list of runs the page's archive picker reads.
+
+    It is rebuilt from what is on disk, the same rule the model index
+    follows: the current run (its manifest at the top of docs/data) and
+    every archived run (a directory under docs/data/maps).  The current
+    run comes first, then the archives newest first.
+    """
+    runs = []
+    for fn in sorted(os.listdir(OUT)):
+        if not fn.startswith("snowmap_") or not fn.endswith(".json"):
+            continue
+        if fn == "snowmap_tags.json":
+            continue
+        tag = fn[len("snowmap_"):-len(".json")]
+        try:
+            man = json.load(open(os.path.join(OUT, fn)))
+        except Exception:
+            continue
+        runs.append({"tag": tag, "init": man.get("init", ""),
+                     "name": man.get("name", tag), "current": True,
+                     "manifest": fn})
+    if os.path.isdir(ARCHIVE):
+        for tag in sorted(os.listdir(ARCHIVE)):
+            td = os.path.join(ARCHIVE, tag)
+            if not os.path.isdir(td):
+                continue
+            # the run that is on disk at the top of docs/data is the
+            # CURRENT one, and the index already lists it - the copy under
+            # maps/ is the same run and would show up twice
+            cur = ""
+            for r in runs:
+                if r["tag"] == tag and r["current"]:
+                    cur = r["init"]
+                    break
+            for init in sorted(os.listdir(td), reverse=True):
+                if init == cur:
+                    continue
+                p = os.path.join(td, init, "snowmap_%s.json" % tag)
+                if not os.path.exists(p):
+                    continue
+                try:
+                    man = json.load(open(p))
+                except Exception:
+                    continue
+                runs.append({"tag": tag, "init": init,
+                             "name": man.get("name", tag), "current": False,
+                             "manifest": "maps/%s/%s/snowmap_%s.json"
+                                        % (tag, init, tag)})
+    with open(ARCHIVE_INDEX, "w") as f:
+        json.dump(runs, f, indent=1)
+    return runs
+
+
 def main():
     import plot_snow_models as PSM
     from plot_snow_ref import MONTH_NAMES
 
     os.makedirs(OUT, exist_ok=True)
-    state_p = os.path.join(DATA, "models_fetched.json")
+    state_p = STATE_FILE
     state = json.load(open(state_p)) if os.path.exists(state_p) else {}
 
     levels, colors, lut, anom_colors = house_palette()
@@ -753,7 +874,11 @@ def main():
             out = {
                 "tag": tag,
                 "name": "C3S Multi-Model Mean",
-                "init": "",
+                # the mean of several centres has no init of its own, so
+                # it takes the newest of the inits that went into it -
+                # otherwise the archive cannot tell one run of the mean
+                # from another.
+                "init": (state.get(tag, {}) or {}).get("init", ""),
                 "members": 6,
                 "grid": ref["grid"],
                 "levels": levels, "colors": colors, "ramp": colors,
@@ -774,7 +899,17 @@ def main():
 
     # the list the maps page reads to build its model picker
     write_index(summary, state)
-    print("exported %d models" % len(summary))
+    # THE ARCHIVE: every run's exports are kept, so the page can offer a
+    # reader the runs that came before this one.  The archive is written
+    # AFTER the current run's files, because it copies them.
+    for tag in summary:
+        try:
+            archive_run(tag, (state.get(tag, {}) or {}).get("init", ""))
+        except Exception as e:                       # noqa: BLE001
+            print("  %-16s the archive failed: %s" % (tag, str(e)[:70]))
+    runs = write_archive_index()
+    print("exported %d models, %d runs in the archive"
+          % (len(summary), len(runs)))
 
 
 if __name__ == "__main__":
