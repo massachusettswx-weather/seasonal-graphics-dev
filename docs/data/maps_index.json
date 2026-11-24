@@ -56,13 +56,6 @@
   "manifest": "snowmap_sfsv1.json"
  },
  {
-  "tag": "synthetic-test",
-  "init": "2026-11",
-  "name": "SYNTHETIC TEST",
-  "current": true,
-  "manifest": "snowmap_synthetic-test.json"
- },
- {
   "tag": "ukmo-gloseas6",
   "init": "2026-11",
   "name": "UKMO GloSeas6-GC5.1",
