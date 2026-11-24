@@ -724,6 +724,50 @@ touched and nothing there needs the owner's word for this feature.
    development site was briefly serving a "TEST MODEL" index.  The
    index is now rebuilt from the manifests that are actually there.
 
+## The by-sector chart for EVERY model, and the sector chart tidied (24 Nov 2026, 19:30 UTC)
+
+**THE OWNER'S WORD:** *"we also need to extend the EC46 to the sector we
+have for GEFSv12, etc.. have to perfect that page a bit, things still
+look a bit messy as seen in 2nd photo"*.
+
+**THE EC46 NOW HAS ITS BY-SECTOR CHART** (North Pacific and North
+Atlantic, 60-90N), so the page's **By sector** control is offered for it
+instead of saying "not for this model".  All three models on the polar
+page now have one: the GEFSv12, the EC46 and the SEAS5.
+
+* **THE EC46 SERVES TEN PRESSURE LEVELS AND THE REANALYSIS TWELVE.**
+  The sector builder used to stack the two sides together and died on
+  the shape mismatch.  It now draws on the levels the three sides share
+  - the model, the reanalysis and the climate - exactly as the cap
+  section already did, and the chart says how many levels it is on.
+* **THE CLIMATE'S COLUMNS ARE PICKED BY LEVEL, NOT BY POSITION.**  The
+  old code took the climate's first ten levels, which are not the
+  model's ten.
+
+**THE SECTOR CHART, TIDIED (the owner's photo):**
+1. **BOTH PANELS CARRY EVERY DATE.**  The labels at the inner edges
+   were dropped so they would not collide, which made the left panel
+   look as if it ended on 27 December and the right one as if it began
+   on 15 November - when every panel covers the same days.  The gap
+   between the panels is wider now (0.048 of the figure) and both
+   panels carry the full set of dates.
+2. **THE COLOUR BAR BELONGS UNDER THE PANELS.**  It was a fixed box in
+   the middle of the bottom band, unrelated to the two panels it
+   belongs to; it is now drawn from the first panel's left edge to the
+   last one's right edge, with its caption centred under it.
+3. **THE KEYS, THE WATERMARK AND THE ECMWF CREDIT NO LONGER COLLIDE.**
+   The keys used to be printed over the watermark and over the credit.
+   The watermark belongs in the bottom right (the house's place for it)
+   and the ECMWF credit has to be there too (ECMWF asks for it), so the
+   keys went under the map, clear of both.
+
+**PUBLISHED:** the GEFSv12's and the EC46's sector charts to the dev
+site and to the operational site (the owner's 22 Nov approval covers
+the EC46's section on both); the SEAS5's to the dev site, where the
+SEAS5 lives.  `tools/publish_polar_ec46.py` now carries the by-sector
+chart and patches the POLARSECTORS registry - it used to say in a
+comment that the EC46 had no by-sector chart.
+
 ## The rules that are not negotiable
 
 * Our own graphics; a climatology from the same product as the data it
