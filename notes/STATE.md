@@ -646,15 +646,17 @@ site (GEFSv12, EC46) - the live PNGs are byte for byte the repo's.
    day: 0.28 sigma on 25 Nov rising to 3.3 sigma on 15 Dec) - a new chart
    family, so it needs the owner's word.
 
-**IN FLIGHT: a CDS ERA5 daily request for 8-18 Nov 2026** (job
-`418366be-b042-44b1-9d94-416dc5c33bf9`, one request, 12 levels, 12Z,
-the polar cap box) - to size the ERA5-vs-GEFS gap with real numbers
-before the owner is asked to choose.  The poller is
-`/workspace/poll_era5.py`; the result lands in `/workspace/era5_recent.grib`.
-**THAT JOB FAILED** at 10:15Z without a stated reason; a smaller retry
-(15-18 Nov) is job `7aaad44b-11f4-4d7c-8a34-4de3c81878d3`, accepted
-19:07Z.  The CDS's queue is slow - the seasonal job queued at 18:46Z
-was still "accepted" half an hour later.
+**IN FLIGHT: a CDS ERA5 daily request** - the first one (8-18 Nov,
+job `418366be-b042-44b1-9d94-416dc5c33bf9`) FAILED at 10:15Z without a
+stated reason; the retry (15-18 Nov, job
+`7aaad44b-11f4-4d7c-8a34-4de3c81878d3`, accepted 19:07Z) was still
+"accepted" at 19:45Z.  The watcher is `/workspace/poll_era5.py`; the
+result lands in `/workspace/era5_recent.grib`.  **THE CDS'S QUEUE HOLDS
+A REQUEST FOR HOURS** - the seasonal job queued at 18:46Z had still not
+started at 19:45Z, and one of the pipeline's own jobs waited two hours
+before it started - so a queued request is not a fault, and the results
+stay in the store afterwards, which is why a watcher that dies costs
+nothing but the wait.
 
 ## The maps page: an ARCHIVE picker, and comparing two runs (24 Nov 2026, 19:10 UTC)
 
