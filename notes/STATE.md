@@ -663,10 +663,13 @@ queued at 18:46Z started at 20:14Z, 88 minutes later - so a queued
 request is not a fault, and the results stay in the store afterwards,
 which is why a watcher that dies costs nothing but the wait.
 
-**THE ARCHIVE HAS THREE RUNS NOW** (all live on the dev site): the UKMO
-GloSeas6's, the CMCC SPS4's and the DWD GCFS2.2's October 2026 init,
-each built from the C3S archive and compared with the November run.  The
-ECMWF SEAS5's is queued behind them.
+**THE ARCHIVE HOLDS FOUR RUNS NOW** (all live on the dev site): the UKMO
+GloSeas6's, the CMCC SPS4's, the DWD GCFS2.2's and the ECMWF SEAS5's
+October 2026 init, each built from the C3S archive and compared with the
+November run.  **THE C3S'S QUEUE HELD EACH ONE FOR 43-88 MINUTES** and
+the four together took the evening; the ERA5's own queue is slower
+still (its first request waited five hours before it started), so a
+queued request is never a fault.
 
 **THE OPERATIONAL SITE CARRIES THE SEAS5 TOO** - its cap and by-sector
 charts were published by the general build on 15 November and had
