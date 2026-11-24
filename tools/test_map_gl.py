@@ -19,6 +19,7 @@ the snow in the wrong place - so this checks three things:
     python3 tools/test_map_gl.py
 """
 import os
+import glob
 import sys
 import json
 import time
@@ -27,7 +28,12 @@ import subprocess
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 DOCS = os.path.join(ROOT, "docs")
-CHROME = "/root/.cache/ms-playwright/chromium-1243/chrome-linux/chrome"
+# the browser, wherever this sandbox put playwright's download:
+# a hard-coded path stops the test from running at all after a
+# rebuild, and a test that cannot start is not a test
+CHROME = None
+for _c in glob.glob("/root/.cache/ms-playwright/chromium-*/chrome-linux/chrome"):
+    CHROME = _c
 
 # the projection check, run inside the page
 PROJ_JS = r"""
