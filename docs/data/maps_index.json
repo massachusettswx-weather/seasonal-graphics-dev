@@ -63,6 +63,13 @@
   "manifest": "snowmap_ukmo-gloseas6.json"
  },
  {
+  "tag": "cmcc-sps4",
+  "init": "2026-10",
+  "name": "CMCC SPS4",
+  "current": false,
+  "manifest": "maps/cmcc-sps4/2026-10/snowmap_cmcc-sps4.json"
+ },
+ {
   "tag": "ukmo-gloseas6",
   "init": "2026-10",
   "name": "UKMO GloSeas6-GC5.1",
