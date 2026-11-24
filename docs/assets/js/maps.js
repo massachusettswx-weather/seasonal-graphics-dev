@@ -1080,7 +1080,12 @@
     var params = projParams(W, H);
     state.params = params;
     state.gl.setProjection(params);
-    state.gl.setMode(state.field === "anom" ? 1 : 0);
+    /* A COMPARISON IS DRAWN WITH THE ANOMALY'S OWN TABLE: the difference
+       between two runs is signed - less snow than the earlier run said,
+       more - so it takes the diverging palette, not the ladder of
+       accumulated snowfall (whose deep end is a magenta that means
+       "a lot of snow", not "a lot of change"). */
+    state.gl.setMode((state.field === "anom" || state.diff) ? 1 : 0);
     state.gl.render();
 
     /* the pole, when it is on the near side of the globe */
