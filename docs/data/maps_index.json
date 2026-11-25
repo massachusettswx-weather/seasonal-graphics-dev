@@ -61,33 +61,5 @@
   "name": "UKMO GloSeas6-GC5.1",
   "current": true,
   "manifest": "snowmap_ukmo-gloseas6.json"
- },
- {
-  "tag": "cmcc-sps4",
-  "init": "2026-10",
-  "name": "CMCC SPS4",
-  "current": false,
-  "manifest": "maps/cmcc-sps4/2026-10/snowmap_cmcc-sps4.json"
- },
- {
-  "tag": "dwd-gcfs2",
-  "init": "2026-10",
-  "name": "DWD GCFS2.2",
-  "current": false,
-  "manifest": "maps/dwd-gcfs2/2026-10/snowmap_dwd-gcfs2.json"
- },
- {
-  "tag": "ecmwf-seas5",
-  "init": "2026-10",
-  "name": "ECMWF SEAS5",
-  "current": false,
-  "manifest": "maps/ecmwf-seas5/2026-10/snowmap_ecmwf-seas5.json"
- },
- {
-  "tag": "ukmo-gloseas6",
-  "init": "2026-10",
-  "name": "UKMO GloSeas6-GC5.1",
-  "current": false,
-  "manifest": "maps/ukmo-gloseas6/2026-10/snowmap_ukmo-gloseas6.json"
  }
 ]
