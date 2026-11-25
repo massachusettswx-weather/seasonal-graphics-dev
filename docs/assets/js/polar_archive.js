@@ -28,7 +28,10 @@
   var ARCHIVE = null;
 
   function modelName(id) {
-    var m = (window.POLARMODELS || {})[id];
+    /* POLARMODELS is declared with const in the page's own script, so it
+       is a script-scoped binding and not a property of window. */
+    var reg = (typeof POLARMODELS !== 'undefined') ? POLARMODELS : null;
+    var m = reg ? reg[id] : null;
     return m ? m.name : id;
   }
 
