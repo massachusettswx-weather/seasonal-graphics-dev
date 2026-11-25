@@ -673,6 +673,46 @@ HALF TO THE ERA5 WOULD PUT A VISIBLE ~0.4 SIGMA STEP INTO THE CHART**
 it would be a genuine cross-centre difference, not a seam artefact.
 The measurement is in `/workspace/era5_vs_noaa.txt`.
 
+**25 NOVEMBER 2026 - THE OWNER STOPPED THE SCHEDULES AND RESCOPED THE
+ARCHIVE.**
+
+* **EVERY SCHEDULED TASK IS OFF.**  The nightly `seasonal-gefs-subs`
+  task (465527736623226, `0 3 * * *` UTC) is DELETED - the list is empty
+  - and the session's own reminders are cancelled.  **DO NOT RE-CREATE
+  A SCHEDULE WITHOUT THE OWNER SAYING SO.**  The daily GEFSv12 update
+  to the live site therefore STOPS; the last cycle published is the
+  20261124 00Z (operational commit `7b21bdb`).  Everything else is
+  manual: the narrow paths still work by hand.
+* **THE ARCHIVE BELONGS TO THE POLAR CAP ONLY.**  The four October 2026
+  seasonal runs are OFF the site: `docs/data/maps/*/2026-10/` is deleted,
+  the index lists no archived run, and the maps page has no "Compare
+  with" picker any more (the builder and the built page were both
+  changed).  `tools/build_map_archive.py` stays in the repository but
+  nothing of its output is published.
+* **WHY THE SEASONAL ARCHIVE WAS REMOVED - AND IT IS NOT A DATA FAULT.**
+  The owner saw the comparison and said the runs were "not remotely
+  close".  **THEY ARE CLOSE**: for the same calendar month the current
+  (November) init and the archived (October) init give the anomaly maps
+  a correlation of +0.987 to +0.997 and the totals +0.992 to +0.997, and
+  their means differ by 1-3 grey levels out of 255.  **THE COMPARISON
+  MAP WAS THE THING THAT LIED**: the difference was drawn on a +-5 inch
+  LOG scale ("so that a few hundredths of an inch still shows"), so a
+  difference of a few tenths of an inch painted the whole map brown.
+  The lesson: a log scale on a *difference* amplifies noise into drama.
+* **THE POLAR CAP HAS ITS OWN ARCHIVE** (the dev site, 25 Nov 2026):
+  `tools/build_polar_archive.py` reads the earlier cycles' charts back
+  out of the git history - nothing is redrawn, so an archived run is
+  exactly what the reader saw that day - and
+  `tools/publish_polar_archive.py` publishes them with the control.
+  `docs/assets/js/polar_archive.js` drives it; the index is
+  `docs/assets/polar/archive/index.json`.  **THE DAILY CYCLES REALLY
+  ARE COMPARABLE** - the GEFSv12's cycles are a day apart, not a month
+  apart - which is why the archive belongs here.  Live: the GEFSv12 has
+  the 21, 22 and 23 November cycles and the EC46 the 20 and 21 November
+  runs; the SEAS5 has none yet (its section is new).  **The operational
+  site does NOT have it** - it is dev-only until the owner says
+  otherwise.
+
 **IN FLIGHT: a CDS ERA5 daily request** - **ONE DAY PER REQUEST.**
 The first attempt (8-18 Nov, job `418366be-b042-44b1-9d94-416dc5c33bf9`)
 FAILED, and the reason is only in the job's RESULTS endpoint, not in its

@@ -1222,9 +1222,7 @@ def build_maps_page(reg):
   the flat world on an equirectangular grid or the globe you can spin. Zoom in
   and out with the buttons on the map, with the scroll wheel or with the
   keyboard, drag the flat map to pan it, and press the tilt button on the
-  globe to tip the earth over on its side. The <em>Compare with</em> picker
-  puts an earlier run of the same model beside the current one: the map then
-  draws the change between the two.</p>
+  globe to tip the earth over on its side.</p>
   <div class="mapviews" id="mapviews">
     <button data-view="flat">2D Map</button>
     <button data-view="globe" class="active">3D Globe</button>
@@ -1232,8 +1230,6 @@ def build_maps_page(reg):
   <div class="picker">
     <label for="snowModel">Model</label>
     <select id="snowModel" class="ctrl"></select>
-    <label for="snowArchive">Compare with</label>
-    <select id="snowArchive" class="ctrl"></select>
     <div class="seg" id="snowfield">
       <button class="segbtn ghost on" data-field="total">Snowfall</button>
       <button class="segbtn ghost" data-field="anom">Anomaly vs the model's own climate</button>
