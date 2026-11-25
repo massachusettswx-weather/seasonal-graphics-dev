@@ -1,0 +1,34 @@
+{
+ "gefsv12": [
+  {
+   "init": "2026-11-23",
+   "label": "23 November 2026",
+   "cap": "assets/polar/archive/gefsv12/2026-11-23/polar_cap_gefsv12.png",
+   "sectors": "assets/polar/archive/gefsv12/2026-11-23/polar_sectors_gefsv12.png"
+  },
+  {
+   "init": "2026-11-22",
+   "label": "22 November 2026",
+   "cap": "assets/polar/archive/gefsv12/2026-11-22/polar_cap_gefsv12.png",
+   "sectors": "assets/polar/archive/gefsv12/2026-11-22/polar_sectors_gefsv12.png"
+  },
+  {
+   "init": "2026-11-21",
+   "label": "21 November 2026",
+   "cap": "assets/polar/archive/gefsv12/2026-11-21/polar_cap_gefsv12.png",
+   "sectors": "assets/polar/archive/gefsv12/2026-11-21/polar_sectors_gefsv12.png"
+  }
+ ],
+ "ec46": [
+  {
+   "init": "2026-11-21",
+   "label": "21 November 2026",
+   "cap": "assets/polar/archive/ec46/2026-11-21/polar_cap_ec46.png"
+  },
+  {
+   "init": "2026-11-20",
+   "label": "20 November 2026",
+   "cap": "assets/polar/archive/ec46/2026-11-20/polar_cap_ec46.png"
+  }
+ ]
+}
