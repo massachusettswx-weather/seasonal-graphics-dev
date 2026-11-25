@@ -37,8 +37,11 @@ need the conversation.
   changes every day.  The 10 hPa wind picker on the same page is a
   different product and still opens on the ECMWF SEAS5 (the GEFSv12 has no
   wind panel).
-* The GEFSv12 sub-seasonal series is at the **20261123 00Z** cycle (35
-  days, 31 members, 12 levels) on **both** sites (24 Nov 2026).
+* The GEFSv12 sub-seasonal series is at the **20261124 00Z** cycle (35
+  days, 31 members, 12 levels) on **both** sites (25 Nov 2026, 03:42Z -
+  the nightly watcher's own drawing ✓, operational commit `7b21bdb` ✓;
+  the live PNG matches the remote byte for byte ✓ and the local clone
+  fast-forwarded to it ✓).
 * **The EC46 polar-cap section is on BOTH sites** (the owner's approval,
   22 Nov 2026): the **20261122 00Z** run, 45 days, 101 members, published
   with `tools/publish_polar_ec46.py`.
@@ -563,13 +566,13 @@ SEAS5) - they are good tools, they just cannot draw this particular point.
 
 **WHERE THE CHARTS ARE NOW (24 Nov 2026, 05:20 UTC).**
 
-* The **development copy**: the GEFSv12 at the **20261123 00Z** cycle (35
+* The **development copy**: the GEFSv12 at the **20261124 00Z** cycle (35
   days, 31 members), the **EC46 at the 20261122 00Z run (45 days, 101
   members - the Monday run ✓)**, the SEAS5 on its own monthly product.
   All three are back to the two-part form ✓.
-* The **operational site**: the GEFSv12 at the 20261123 cycle (the nightly
-  watcher's own drawing ✓) and the **EC46 at the 20261122 run** ✓ - the
-  owner's approval of 22 Nov covers the EC46 section on both sites ✓.
+* The **operational site**: the GEFSv12 at the **20261124** cycle (the
+  nightly watcher's own drawing ✓) and the **EC46 at the 20261122 run** ✓ -
+  the owner's approval of 22 Nov covers the EC46 section on both sites ✓.
 * The SEAS5 went out through **a new narrow path**,
   `tools/publish_polar_seas5.py` - it is one of the site's own models, so
   it used to go out with the general build, and the general build is off.
