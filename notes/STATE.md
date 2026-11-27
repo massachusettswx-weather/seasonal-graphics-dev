@@ -1025,3 +1025,29 @@ beside it in the record.
 * a step that fails is **reported in the log**: an exception in a thread is held
   until the results are read, so without the print the log shows the step starting
   and nothing else (that is how an unpacking bug went unnoticed for two runs).
+
+### What is LIVE (27 Nov 2026, after this work)
+
+* The **development** copy carries the **ECMWF EPS** in the by-sector area:
+  the picker on the polar section has "ECMWF EPS" (before the GEFSv12), the
+  by-sector registry carries it, and both pictures load (HTTP 200).  The
+  first published run is the **2026-11-26** run, **both cycles**, 15 days,
+  **51 members** (the control and the fifty perturbations).
+* The **operational** site is **untouched**: no EPS, and the operational
+  clone has no changes.  The owner has not approved it there.
+* The **card** on the development home page lists the EPS with the
+  builder's own wording.
+
+### The scheduler
+
+`tools/ec46_disseminate.sh` (the `seasonal-ec46` job, 21:00Z on
+Mon/Thu/Sat) now does **the EPS first**: its pull is the bounded one
+(half an hour, no queue) and the EC46's asks the climate store, whose
+queue is shared and can hold a job for hours.  Each product is drawn and
+published right after its own pull, so a pull that hangs cannot hold the
+other's publication.  **The EPS is published to the development copy only**
+(`tools/publish_polar_eps.py` refuses the operational clone outright).
+
+**WHAT THE OWNER HAS TO DECIDE**: the EPS is on the development copy
+because that is what was asked for.  It is a new product, and the
+operational site needs the owner's word before it carries it.
