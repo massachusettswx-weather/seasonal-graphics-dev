@@ -131,6 +131,10 @@ def head_ok(url):
         return False
 
 
+class MissingStep(Exception):
+    """The store has the index of a step but not the data behind it yet."""
+
+
 def newest_run():
     """The newest run the open data has, and the cycles it has.
 
@@ -139,13 +143,20 @@ def newest_run():
     of a day appears some hours after its 00Z cycle.  When the day's 12Z
     cycle is not out yet, the day before is used - both of its cycles are
     there, and it is the newest run that has both.
+
+    THE DATA IS CHECKED, NOT ONLY THE INDEX: the open data publishes a
+    run's index before its data (the index is a couple of megabytes, the
+    data is gigabytes), so a run can be named and still have nothing
+    behind it - which is how the 2026-11-27 12Z cycle was picked on the
+    evening of the 27th and turned out to have only some of its steps.
     """
     today = datetime.now(timezone.utc).date()
     for back in range(0, LOOKBACK_DAYS):
         d = (today - timedelta(days=back)).strftime("%Y%m%d")
         cycles = []
         for cyc in CYCLES:
-            if head_ok(file_url(d, cyc, "enfo", 36, "index")):
+            if head_ok(file_url(d, cyc, "enfo", 36, "index")) and \
+                    head_ok(file_url(d, cyc, "enfo", 36, "grib2")):
                 cycles.append(cyc)
         if len(cycles) == len(CYCLES):
             return d, cycles
@@ -249,6 +260,9 @@ def fetch_step(day, cyc, step):
                                   ("enfo", "gh", g())):
         url = file_url(day, cyc, stream, step, "index")
         r = s.get(url, timeout=180)
+        if r.status_code == 404:
+            raise MissingStep("the index of the %s %s step %d h is not "
+                              "there yet" % (day, cyc, step))
         if r.status_code != 200:
             raise RuntimeError("the index %s is not there (HTTP %d)"
                                % (url, r.status_code))
@@ -271,6 +285,10 @@ def fetch_step(day, cyc, step):
         for lev, off, length in rows:
             rr = s.get(grib, headers={"Range": "bytes=%d-%d"
                                       % (off, off + length - 1)}, timeout=180)
+            if rr.status_code == 404:
+                raise MissingStep("the data of the %s %s step %d h is not "
+                                  "there yet (%s)"
+                                  % (day, cyc, step, grib))
             if rr.status_code not in (200, 206):
                 raise RuntimeError("the message %s (%d bytes) came back HTTP %d"
                                    % (grib, length, rr.status_code))
@@ -330,6 +348,19 @@ def main():
               flush=True)
         try:
             vals, members = fetch_step(day, cyc, step)
+        except MissingStep as e:
+            # A STEP THE OPEN DATA HAS NOT PUT UP YET IS NOT A FAILURE:
+            # the run is published a file at a time, and the step comes
+            # with the next run of the fetcher.  The series keeps the last
+            # whole one until the new one is whole.
+            print("      not there yet: %s" % e, flush=True)
+            done[key] = {"ok": False, "step": step, "day": k, "cycle": cyc,
+                         "missing": str(e)}
+            with lock:
+                with open(STATE + ".tmp", "w") as f:
+                    json.dump(st, f, indent=1)
+                os.replace(STATE + ".tmp", STATE)
+            return key
         except Exception as e:                        # noqa: BLE001
             # A STEP THAT FAILS IS REPORTED, not swallowed: the work is
             # in a thread, and an exception in a thread is held until the
