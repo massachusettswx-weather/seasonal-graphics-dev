@@ -92,6 +92,19 @@ REGISTRY_PAGES = ("model.html", "spv.html")
 POLAR_PAGE = "spv.html"
 # the page that carries the model's card
 HOME_PAGE = "index.html"
+# THE FILES THE PIPELINE ITSELF WRITES BEFORE THE PUBLISHER RUNS: the
+# series, the job state and the two drawn charts.  The publisher refuses
+# to mix somebody else's work into the target - and these files ARE this
+# pipeline's work, so they are ours, and they are committed with the
+# section so that the target's tree is clean afterwards and both copies
+# carry the same series.
+#
+# (Without this the next NEW cycle could not be published at all: the
+# fetch's own change to data/polar_ec46_z.json would look like somebody
+# else's work and the publisher would refuse.)
+PIPE_FILES = ("data/polar_ec46_z.json", "data/polar_ec46_jobs.json",
+              "output/polar_cap/polar_cap_ec46.png",
+              "output/polar_cap/polar_sectors_ec46.png")
 
 
 # --------------------------------------------------------------------------
@@ -395,14 +408,26 @@ def main():
     # the operational clone is curated: anything else in it is somebody
     # else's work, and this change is not mixed with it
     st = git(target, "status", "--porcelain")
-    dirty = [l for l in st.stdout.strip().split("\n") if l.strip()]
+    # THE LINES ARE CUT BY POSITION, and the first line used to lose a
+    # character: the status is TWO characters and a space, and the whole
+    # output was stripped before the lines were read - so the first line's
+    # path came out one character short and was never recognised as ours.
+    # The lines are now split without the global strip, and the path is
+    # taken after the status.
+    dirty = [l for l in st.stdout.split("\n") if l.strip()]
     ours = ("docs/assets/polar/%s" % CHART,
             "docs/assets/polar/%s" % SECTOR_CHART, "docs/data/models.json",
             "docs/data/models_public.json") + \
         tuple(os.path.join("docs", f) for f in REGISTRY_PAGES) + \
-        (os.path.join("docs", HOME_PAGE),)
-    others = [l for l in dirty
-              if l[3:].strip().strip('"') not in ours]
+        (os.path.join("docs", HOME_PAGE),) + \
+        tuple(PIPE_FILES)
+    others = []
+    for l in dirty:
+        path = l[3:].strip() if len(l) > 3 else ""
+        if path.startswith('"') and path.endswith('"'):
+            path = path[1:-1]
+        if path not in ours:
+            others.append(l)
     if others and is_operational:
         say("   the target's working tree has changes that are not ours -")
         say("   refusing to mix them with this one:")
@@ -502,6 +527,19 @@ def main():
     if os.path.realpath(drawn_sector) != os.path.realpath(dsts):
         shutil.copyfile(drawn_sector, dsts)
     written.append(os.path.join("docs", "assets", "polar", SECTOR_CHART))
+    # AND THE PIPELINE'S OWN FILES: the series, the job state and the two
+    # drawn charts.  They are copied from the source tree so that the
+    # target carries the same series, and they are committed with the
+    # section - which leaves the target's tree clean for the next run.
+    for rel in PIPE_FILES:
+        s_path = os.path.join(src, rel)
+        if not os.path.exists(s_path):
+            continue
+        d_path = os.path.join(target, rel)
+        os.makedirs(os.path.dirname(d_path), exist_ok=True)
+        if os.path.realpath(s_path) != os.path.realpath(d_path):
+            shutil.copyfile(s_path, d_path)
+        written.append(rel)
     json.dump(newreg, open(regp, "w"), indent=1)
     written.append(os.path.join("docs", "data", "models.json"))
     if newpub is not None:
