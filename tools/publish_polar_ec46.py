@@ -115,6 +115,14 @@ def load_series(src):
             "complete": len(times) >= EXPECTED_DAYS}
 
 
+def init_of_run(run):
+    """The run's own date, from a run written as 20261121 00Z or as
+    2026-11-20 00Z.  A run is the model's init; the first valid time is a
+    forecast's first step and can be a day later."""
+    m = re.match(r"(\d{4})-?(\d{2})-?(\d{2})", str(run or ""))
+    return "%s-%s-%s" % m.groups() if m else ""
+
+
 def source_entry(src):
     """The EC46's registry entry, taken from the source tree's own build."""
     p = os.path.join(src, "docs", "data", "models.json")
@@ -298,6 +306,25 @@ def main():
         say("   %s has no %s entry in its built registry" % (src, MODEL_ID))
         say("   NOTHING IS CHANGED.")
         return 2
+
+    # THE INIT IS THE RUN'S OWN DATE, AND IT COMES FROM THE SERIES - the
+    # way the GEFSv12's narrow path takes it.  It used to be read out of
+    # the source tree's BUILT registry, and that registry is only
+    # refreshed by the general build: so when a new run arrived, the chart
+    # was drawn from it and the narrow path compared the new run with the
+    # registry's OLD date, found the two equal, and did nothing at all -
+    # the section could not advance by itself.  The owner's word (26 Nov
+    # 2026): the EC46 is automated on both copies.
+    series_init = init_of_run(series.get("run"))
+    if series_init and entry.get("init") != series_init:
+        say("   the run is %s and the registry still says %s - the entry is"
+            % (series_init, entry.get("init") or "-"))
+        say("   brought forward to the run the chart was drawn from")
+        entry["init"] = series_init
+    if series.get("members"):
+        # the member count is the one behind every day of the series, so a
+        # card is never published with a count nobody checked
+        entry["members"] = series["members"]
 
     docs = os.path.join(target, "docs")
     regp = os.path.join(docs, "data", "models.json")
