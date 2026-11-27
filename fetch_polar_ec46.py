@@ -105,14 +105,20 @@ WEEKLY = ["%d_%d" % (h, h + 24) for h in range(24, 1081, 24)]
 # asking for a lead window that only an extended-range run has.
 EXTENDED_ONLY = ["1080_1104"]
 
-# The archive holds the run about TWO DAYS late (measured 22 Nov 2026: the
-# 20 November run serves the whole 46-day window with the full member set,
-# the 21 and 22 November runs do not).  The older note of a two-day delay
-# was right; the note that said the extended range runs only on Mondays and
-# Thursdays was wrong - it came from probes that carried the `system` field,
-# so every probe failed and the failures were read as "this run has no 46
-# days".
-DELAY_HOURS = 48
+# WHERE THE SEARCH FOR THE NEWEST RUN STARTS.  The archive holds the run
+# about two days late, so the search used to start at today-48h and walk
+# back from there.  That was too late: measured 27 Nov 2026, the
+# 2026-11-26 run was in the store at 03:15 UTC on the 27th - about 27
+# hours after its date - and the search never looked at it, so the EC46
+# on the site stayed a run behind (the owner's word, 26 Nov 2026: "why
+# don't I see the newly updated EC46 from today").
+#
+# The search now starts at TODAY and walks back until the store answers.
+# The request it makes carries BOTH the first week and the far end of the
+# 46-day window, so a run that is only half in the archive is refused and
+# the search moves on to the day before it - a run that is served whole is
+# a run that is there.
+DELAY_HOURS = 0
 
 LICENCE_URL = ("https://ecds.ecmwf.int/datasets/s2s-forecasts"
                "?tab=download#manage-licences")
@@ -257,9 +263,11 @@ def wait_for_queue(s, room, tries=180):
 def latest_run(s, tries=8):
     """The most recent ECMWF sub-seasonal run the archive holds.
 
-    The S2S archive holds the run with about a TWO-DAY delay, so the run
-    that can be had is the one from roughly 48 hours ago - and it comes
-    DAILY, not only on Mondays and Thursdays.
+    The S2S archive holds the run with about a TWO-DAY delay - but not
+    always: the 2026-11-26 run was already there on the 27th (measured
+    27 Nov 2026, 03:15 UTC).  So the search starts at TODAY and walks
+    back until the store answers, and the run it finds is the newest one
+    the archive has - not the newest one the delay allows.
 
     The catalogue has no `system` parameter: the product is picked by the
     RUN DATE.  The probe asks for a lead window at the far end of the
