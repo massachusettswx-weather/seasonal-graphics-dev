@@ -585,6 +585,59 @@ def write_cache(rec):
     os.replace(CACHE + ".tmp", CACHE)
 
 
+def commit_state():
+    """Put the fetch state into git and push it, so that a rebuild does
+    not download the run again.
+
+    Never fatal: a git that will not play is not a reason to stop a fetch
+    that is half done - the state is committed at the end of the run too.
+    """
+    try:
+        import subprocess
+        here = os.path.dirname(os.path.abspath(__file__))
+        env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+        subprocess.run(["git", "add", "--", "data/polar_gefs_jobs.json"],
+                       cwd=here, capture_output=True, text=True, env=env)
+        d = subprocess.run(["git", "diff", "--cached", "--quiet", "--",
+                            "data/polar_gefs_jobs.json"],
+                           cwd=here, capture_output=True, text=True, env=env)
+        if d.returncode == 0:
+            return                       # nothing new to commit
+        c = subprocess.run(["git", "-c", "user.name=MCode",
+                            "-c", "user.email=mcode@local", "commit", "-q",
+                            "-m", "The GEFSv12 fetch state, so a rebuild "
+                                  "does not download it again"],
+                           cwd=here, capture_output=True, text=True, env=env)
+        if c.returncode != 0:
+            return
+        print("   the fetch state is committed (a rebuild does not lose "
+              "the download)", flush=True)
+        # and pushed, so a rebuild that takes the working tree with it
+        # still finds the state on the server
+        tok = (os.environ.get("GITHUB_TOKEN") or "").strip()
+        if not tok:
+            return
+        cred = os.path.join(here, ".git", "gh_cred")
+        with open(cred, "w") as f:
+            f.write("https://x-access-token:%s@github.com\n" % tok)
+        os.chmod(cred, 0o600)
+        try:
+            p = subprocess.run(["git", "-c",
+                                "credential.helper=store --file=%s" % cred,
+                                "push", "origin", "HEAD"],
+                               cwd=here, capture_output=True, text=True,
+                               env=env)
+            if p.returncode == 0:
+                print("   the fetch state is on the server", flush=True)
+        finally:
+            try:
+                os.remove(cred)
+            except OSError:
+                pass
+    except Exception:                    # noqa: BLE001
+        pass
+
+
 def from_state():
     """Rebuild the cache from the state file, without asking for anything.
 
@@ -703,6 +756,15 @@ def main():
         write_cache(build_record(out, date, hour))
         print("      %d members, valid %s, 10 hPa = %.0f m2/s2 (%.0f m)"
               % (len(got), t, row[10], row[10] / G0), flush=True)
+        # THE STATE GOES INTO GIT WHILE THE FETCH RUNS, NOT ONLY AT THE
+        # END.  A new cycle takes about an hour to fetch and the sandbox is
+        # rebuilt every hour or so, which kills it: a state that is only
+        # committed when the fetch RETURNS loses the whole hour with it.
+        # So the state is committed every tenth lead, and a rebuild costs
+        # minutes of fetching instead of an hour.  A failure here is never
+        # fatal - the fetch carries on and commits at the end.
+        if fstep % 240 == 0:
+            commit_state()
 
     if not out:
         print("   nothing was decoded", flush=True)
