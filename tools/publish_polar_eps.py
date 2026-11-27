@@ -282,6 +282,10 @@ def main():
                     help="write the change into the target's working tree")
     ap.add_argument("--push", action="store_true",
                     help="commit and push to the development repository")
+    ap.add_argument("--prod", action="store_true",
+                    help="refused: the EPS is not on the operational site")
+    ap.add_argument("--approved", action="store_true",
+                    help="refused: the EPS is not on the operational site")
     ap.add_argument("--message", default=None, help="the commit message")
     ap.add_argument("--force", action="store_true",
                     help="publish even if the target already has it")
@@ -297,6 +301,10 @@ def main():
         say("   %s is the OPERATIONAL clone." % target)
         say("   The EPS has not been approved for the operational site, so")
         say("   NOTHING IS CHANGED.")
+        return 2
+    if args.prod or args.approved:
+        say("   the EPS is the DEVELOPMENT copy only - --prod and --approved")
+        say("   are refused, and NOTHING IS CHANGED.")
         return 2
 
     series = load_series(src)
