@@ -306,17 +306,22 @@ def main():
         return 2
     reg = json.load(open(regp))
     have = [m for m in reg.get("models", []) if m.get("id") == MODEL_ID]
-    if have and not args.force:
+    old = (have[0].get("init") or "") if have else ""
+    new = entry.get("init") or ""
+    # THE SAME CYCLE IS NOTHING TO DO.  The coarse "the target has an entry"
+    # test that used to stand here made the section publish ONCE and never
+    # again - so the EC46 could not be updated by the automation at all
+    # (the owner's word, 27 November 2026).  What matters is WHICH cycle
+    # the target carries.
+    if have and old and new and old == new and not args.force:
         say("   the target already carries the %s section - nothing to do"
-            % (have[0].get("init") or ""))
+            % old)
         return 4
     # NEVER PUT THE TARGET BACK TO AN OLDER CYCLE.  The GEFSv12's path has
     # this rule; the EC46's path had only the coarse "the target has an
     # entry" test, so a NEWER run also needed --force and an older one
     # could have been published with it.
     if have:
-        old = have[0].get("init") or ""
-        new = entry.get("init") or ""
         if old and new and old > new:
             say("   the target carries the %s section, which is NEWER than "
                 "the %s one - NOTHING IS CHANGED." % (old, new))
