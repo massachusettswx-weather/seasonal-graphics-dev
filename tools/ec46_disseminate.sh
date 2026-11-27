@@ -94,12 +94,38 @@ except Exception as e:
 PY
 
 # ------------------------------------------------------------------
+# 3b. THE EPS - THE SAME WINDOW, RIGHT AFTER THE EC46.
+#
+# The EPS is the medium-range ensemble: the first fifteen days of ECMWF's
+# own run, at BOTH cycles of it, and it comes out of the SAME archive with
+# the SAME account, so it must be asked for AFTER the EC46 has finished.
+# One submitter at a time: the two pulls never overlap, because the script
+# runs them one after the other, in the foreground.
+say "the EPS's run"
+python3 -u fetch_polar_eps.py >>"logs_fetch_polar_eps.py.log" 2>&1
+EPS_FETCH_RC=$?
+
+python3 - <<'PY' >>"$LOG" 2>&1
+import json
+try:
+    d = json.load(open("data/polar_eps_z.json")).get("eps") or {}
+    print("   the EPS series: the run %s, %d days, %s members, the %s cycles"
+          % (d.get("run"), len(d.get("times") or []), d.get("members"),
+             " and ".join(d.get("cycles") or []) or "one"))
+except Exception as e:
+    print("   the EPS series could not be read: %s" % e)
+PY
+
+# ------------------------------------------------------------------
 # 4. the charts and the publication - the narrow path, to both copies
 say "the charts"
 python3 -u plot_polar_cap.py ec46 "ECMWF EC46" >>"$LOG" 2>&1 || true
 python3 -u plot_polar_sectors.py ec46 "ECMWF EC46" >>"$LOG" 2>&1 || true
+python3 -u plot_polar_cap.py eps "ECMWF EPS" >>"$LOG" 2>&1 || true
+python3 -u plot_polar_sectors.py eps "ECMWF EPS" >>"$LOG" 2>&1 || true
 mkdir -p docs/assets/polar
-for f in polar_cap_ec46.png polar_sectors_ec46.png; do
+for f in polar_cap_ec46.png polar_sectors_ec46.png \
+         polar_cap_eps.png polar_sectors_eps.png; do
     if [ -f "output/polar_cap/$f" ]; then
         cp -f "output/polar_cap/$f" "docs/assets/polar/$f"
     fi
@@ -111,8 +137,16 @@ DEV_RC=$?
 python3 -u tools/publish_polar_ec46.py --repo "$LIVE" --apply --push --prod --approved >>"$LOG" 2>&1
 LIVE_RC=$?
 
+# THE EPS GOES TO THE DEVELOPMENT COPY ONLY.  It is a new product and it
+# has not been approved for the operational site; its publisher refuses the
+# operational clone outright, so there is nothing to guard here.
+say "the EPS's publication (the development copy only)"
+python3 -u tools/publish_polar_eps.py --repo "$DEV" --apply --push >>"$LOG" 2>&1
+EPS_DEV_RC=$?
+
 # ------------------------------------------------------------------
 # 5. one line
 say "done: the fetch rc=$FETCH_RC; the development copy rc=$DEV_RC, the"
 say "operational site rc=$LIVE_RC (0 = published, 2 = nothing to publish,"
 say "3 = the push failed, 4 = the target already carries it)"
+say "the EPS: the fetch rc=$EPS_FETCH_RC, the development copy rc=$EPS_DEV_RC"

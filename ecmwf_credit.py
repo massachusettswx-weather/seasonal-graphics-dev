@@ -15,7 +15,7 @@ ECMWF_CREDIT = ("© %d European Centre for Medium-Range Weather Forecasts "
 NOAA_CORE_CREDIT = ("Reanalysis: NOAA's CORe (the FV3-GFS reanalysis).")
 
 # the systems whose data comes from ECMWF
-ECMWF_TAGS = {"ecmwf-seas5", "ecmwf-s4s", "ec46"}
+ECMWF_TAGS = {"ecmwf-seas5", "ecmwf-s4s", "ec46", "eps"}
 
 
 def credit_for(tag):

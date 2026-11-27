@@ -72,8 +72,12 @@ data/polar_aifs.json
 # tools/ec46_disseminate.sh says so in its header - a rebuild must not
 # pull the run again - and the files are small enough to keep (35 kB and
 # 3 kB).
-# data/polar_ec46_jobs.json
-# data/polar_ec46_z.json
+#
+# THE EPS's TWO FILES ARE TRACKED FOR THE SAME REASON AGAIN: the series
+# (15 days) and the job ids that say which chunks are already in the
+# store.  The pull takes hours, and a rebuild takes data/ with it.
+# data/polar_eps_jobs.json
+# data/polar_eps_z.json
 data/_aifs.lock
 data/_aifs_step.grib2
 

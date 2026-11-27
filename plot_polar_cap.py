@@ -37,11 +37,18 @@ RECENT_CORE = os.path.join(DATA, "polar_core_recent.npz")
 MODEL_CACHE = os.path.join(DATA, "polar_model_z.json")
 # the EC46 is a separate product and lives in its own file
 EC46_CACHE = os.path.join(DATA, "polar_ec46_z.json")
+# so is the EPS - the medium-range ensemble, which is its own product and
+# its own section
+EPS_CACHE = os.path.join(DATA, "polar_eps_z.json")
 
 
 def cache_for(tag):
     """The file that holds a system's own daily polar-cap series."""
-    return EC46_CACHE if tag == "ec46" else MODEL_CACHE
+    if tag == "ec46":
+        return EC46_CACHE
+    if tag == "eps":
+        return EPS_CACHE
+    return MODEL_CACHE
 CLIM = os.path.join(DATA, "polar_cap_clim.npz")
 # the climatology in the ARCO NATIVE store's own convention.  It is NOT
 # used: that store mutes the stratospheric variability (the January 2013
@@ -302,6 +309,11 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
     sub_seasonal = bool(mt) and len(mt) <= 90
     kind_word = "sub-seasonal" if sub_seasonal else "seasonal"
     freq = _rec.get("frequency")
+    # the EPS asks for BOTH cycles of its run, and the chart says so: the
+    # two suites are pooled day by day, and a reader who wants to know that
+    # is looking at two cycles and not one needs to be told
+    cycles = _rec.get("cycles") or []
+    cyc_txt = " and ".join(cycles) if cycles else ""
     run_txt = ""
     if run:
         run_txt = "%s run" % run.replace("Z", "Z")
@@ -313,6 +325,8 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
             run_txt += " · %s" % freq
         if members:
             run_txt += " · %s members" % members
+        if cyc_txt:
+            run_txt += " · %s cycles pooled" % cyc_txt
     else:
         run_txt = "%s members" % members if members else ""
 
@@ -433,6 +447,8 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
                   % (short, kind_word, init_day, end_day), False))
     if members:
         parts.append(("%s members" % members, False))
+    if cyc_txt:
+        parts.append(("%s cycles pooled" % cyc_txt, False))
     if run:
         parts.append(("%s run" % run.replace("Z", "Z"), True))
     if freq:

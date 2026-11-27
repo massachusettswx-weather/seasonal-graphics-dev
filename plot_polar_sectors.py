@@ -47,6 +47,8 @@ RECENT_CORE = os.path.join(DATA, "polar_core_recent.npz")
 RECENT_ERA5 = os.path.join(DATA, "polar_era5_recent.npz")
 # the EC46 keeps its own file
 EC46_CACHE = os.path.join(DATA, "polar_ec46_z.json")
+# so does the EPS - the medium-range ensemble, which is its own product
+EPS_CACHE = os.path.join(DATA, "polar_eps_z.json")
 
 # How many days of analysis to show before the forecast starts - the same
 # fifteen the cap section shows, so the two charts line up.
@@ -54,7 +56,11 @@ ANA_DAYS = 15
 
 
 def cache_for(tag):
-    return EC46_CACHE if tag == "ec46" else MODEL_CACHE
+    if tag == "ec46":
+        return EC46_CACHE
+    if tag == "eps":
+        return EPS_CACHE
+    return MODEL_CACHE
 
 
 def load_sector_clim():
@@ -255,6 +261,11 @@ def main(tag="gefsv12", label="NOAA GEFSv12", short=None, rebase="forecast"):
         bits.append((str(freq), True))
     if nmem:
         bits.append(("%s members" % nmem, False))
+    # the EPS asks for BOTH cycles of its run and pools them day by day:
+    # the chart says so, so a reader knows it is looking at two suites
+    cycles = rec.get("cycles") or []
+    if cycles:
+        bits.append(("%s cycles pooled" % " and ".join(cycles), False))
     bits.append(("%d levels (%d-%d hPa)" % (len(levels), min(levels), max(levels)),
                  True))
     _c = ("CORe" if os.path.exists(CLIM_CORE) and not os.path.exists(CLIM_CDSDAILY)
