@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 # The EC46's own DISSEMINATION - the owner's 20:00-22:00 UTC window.
 #
-# ONE job, ONE product, ONE window:
+# ONE job, ONE window, TWO products:
 #
 #   1. put the trees back (a sandbox rebuild takes the working tree with
 #      it; the credentials come back from the environment);
-#   2. pull the newest run the store has - Monday, Thursday and Saturday,
-#      the owner's days - in the FOREGROUND, so that "the run has
-#      arrived" is an answer and not a hope;
-#   3. draw the polar-cap charts from it;
-#   4. publish them: the development copy and the operational site;
-#   5. and then STOP.
+#   2. pull the EPS - ECMWF's medium-range ensemble, both cycles of the
+#      run, from ECMWF's open data - and draw and publish it, on the
+#      DEVELOPMENT copy only;
+#   3. pull the newest EC46 run the store has - Monday, Thursday and
+#      Saturday, the owner's days - in the FOREGROUND, so that "the run
+#      has arrived" is an answer and not a hope;
+#   4. draw the EC46's polar-cap charts from it;
+#   5. publish them: the development copy and the operational site;
+#   6. and then STOP.
 #
 # WHY IT IS ITS OWN JOB AND NOT PART OF THE NIGHTLY GEFVSv12 ONE.  The
 # owner asked for it on 27 November 2026: the EC46's run is wanted
@@ -20,9 +23,10 @@
 #
 #     ./tools/ec46_disseminate.sh
 #
-# The fetch resumes from data/polar_ec46_jobs.json and the series itself
-# lives in data/polar_ec46_z.json - both are in git, so a rebuild does
-# not pull the run again.
+# The EC46's fetch resumes from data/polar_ec46_jobs.json and the series
+# itself lives in data/polar_ec46_z.json - both are in git, so a rebuild
+# does not pull the run again.  The EPS's two files are tracked for the
+# same reason.
 set -u
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -75,32 +79,19 @@ case " $EC46_DAYS " in
 esac
 
 # ------------------------------------------------------------------
-# 2. the pull, in the foreground
-say "the EC46's run"
-python3 -u fetch_polar_ec46.py >>"logs_fetch_polar_ec46.py.log" 2>&1
-FETCH_RC=$?
-
-# ------------------------------------------------------------------
-# 3. the series: is the run complete?  The narrow path refuses a series
-# that is short of its 45 days, so an unfinished pull publishes nothing.
-python3 - <<'PY' >>"$LOG" 2>&1
-import json
-try:
-    d = json.load(open("data/polar_ec46_z.json")).get("ec46") or {}
-    print("   the series: the run %s, %d days, %s members"
-          % (d.get("run"), len(d.get("times") or []), d.get("members")))
-except Exception as e:
-    print("   the series could not be read: %s" % e)
-PY
-
-# ------------------------------------------------------------------
-# 3b. THE EPS - THE SAME WINDOW, RIGHT AFTER THE EC46.
+# 2. THE EPS - THE SAME WINDOW, AND FIRST.
 #
-# The EPS is the medium-range ensemble: the first fifteen days of ECMWF's
-# own run, at BOTH cycles of it, and it comes out of the SAME archive with
-# the SAME account, so it must be asked for AFTER the EC46 has finished.
-# One submitter at a time: the two pulls never overlap, because the script
-# runs them one after the other, in the foreground.
+# The EPS is ECMWF's medium-range ensemble: the first fifteen days of the
+# run, at BOTH cycles of it, read from ECMWF's OPEN data.  It is first
+# because it is the bounded pull - about half an hour, no queue, nothing
+# to wait for - while the EC46's pull asks the climate store, whose queue
+# is shared with every other user and can hold a job for hours.  So the
+# EPS is published in the window whatever the store is doing, and the
+# EC46 follows.
+#
+# The two never overlap: the pulls run one after the other, in the
+# foreground, and each product is drawn and published right after its own
+# pull - so a pull that hangs cannot hold the other product's publication.
 say "the EPS's run"
 python3 -u fetch_polar_eps.py >>"logs_fetch_polar_eps.py.log" 2>&1
 EPS_FETCH_RC=$?
@@ -116,16 +107,48 @@ except Exception as e:
     print("   the EPS series could not be read: %s" % e)
 PY
 
+say "the EPS's charts"
+python3 -u plot_polar_cap.py eps "ECMWF EPS" >>"$LOG" 2>&1 || true
+python3 -u plot_polar_sectors.py eps "ECMWF EPS" >>"$LOG" 2>&1 || true
+mkdir -p docs/assets/polar
+for f in polar_cap_eps.png polar_sectors_eps.png; do
+    if [ -f "output/polar_cap/$f" ]; then
+        cp -f "output/polar_cap/$f" "docs/assets/polar/$f"
+    fi
+done
+
+# THE EPS GOES TO THE DEVELOPMENT COPY ONLY.  It is a new product and it
+# has not been approved for the operational site; its publisher refuses the
+# operational clone outright, so there is nothing to guard here.
+say "the EPS's publication (the development copy only)"
+python3 -u tools/publish_polar_eps.py --repo "$DEV" --apply --push >>"$LOG" 2>&1
+EPS_DEV_RC=$?
+
+# ------------------------------------------------------------------
+# 3. the EC46's pull, in the foreground
+say "the EC46's run"
+python3 -u fetch_polar_ec46.py >>"logs_fetch_polar_ec46.py.log" 2>&1
+FETCH_RC=$?
+
+# ------------------------------------------------------------------
+# 3b. the series: is the run complete?  The narrow path refuses a series
+# that is short of its 45 days, so an unfinished pull publishes nothing.
+python3 - <<'PY' >>"$LOG" 2>&1
+import json
+try:
+    d = json.load(open("data/polar_ec46_z.json")).get("ec46") or {}
+    print("   the series: the run %s, %d days, %s members"
+          % (d.get("run"), len(d.get("times") or []), d.get("members")))
+except Exception as e:
+    print("   the series could not be read: %s" % e)
+PY
+
 # ------------------------------------------------------------------
 # 4. the charts and the publication - the narrow path, to both copies
 say "the charts"
 python3 -u plot_polar_cap.py ec46 "ECMWF EC46" >>"$LOG" 2>&1 || true
 python3 -u plot_polar_sectors.py ec46 "ECMWF EC46" >>"$LOG" 2>&1 || true
-python3 -u plot_polar_cap.py eps "ECMWF EPS" >>"$LOG" 2>&1 || true
-python3 -u plot_polar_sectors.py eps "ECMWF EPS" >>"$LOG" 2>&1 || true
-mkdir -p docs/assets/polar
-for f in polar_cap_ec46.png polar_sectors_ec46.png \
-         polar_cap_eps.png polar_sectors_eps.png; do
+for f in polar_cap_ec46.png polar_sectors_ec46.png; do
     if [ -f "output/polar_cap/$f" ]; then
         cp -f "output/polar_cap/$f" "docs/assets/polar/$f"
     fi
@@ -136,13 +159,6 @@ python3 -u tools/publish_polar_ec46.py --repo "$DEV" --apply --push >>"$LOG" 2>&
 DEV_RC=$?
 python3 -u tools/publish_polar_ec46.py --repo "$LIVE" --apply --push --prod --approved >>"$LOG" 2>&1
 LIVE_RC=$?
-
-# THE EPS GOES TO THE DEVELOPMENT COPY ONLY.  It is a new product and it
-# has not been approved for the operational site; its publisher refuses the
-# operational clone outright, so there is nothing to guard here.
-say "the EPS's publication (the development copy only)"
-python3 -u tools/publish_polar_eps.py --repo "$DEV" --apply --push >>"$LOG" 2>&1
-EPS_DEV_RC=$?
 
 # ------------------------------------------------------------------
 # 5. one line
