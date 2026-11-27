@@ -408,6 +408,21 @@ def main():
         print("   only %d days came back - not enough to draw"
               % len(out_times))
         return
+    # A SHORT SERIES DOES NOT REPLACE A COMPLETE ONE.  The new run's pull
+    # is still in progress (the open data publishes a step at a time), and
+    # a half-pulled run must not put a four-day series where a fifteen-day
+    # one was: the file keeps the last complete series until the new one is
+    # whole.
+    if len(out_times) < DAYS:
+        old = (json.load(open(OUT)).get(TAG) or {}) if os.path.exists(OUT) else {}
+        if len(old.get("times") or []) >= DAYS:
+            print("   the new run has only %d of %d days - the series stays "
+                  "as it was (the %s run)"
+                  % (len(out_times), DAYS, old.get("run")), flush=True)
+            return
+        print("   the new run has only %d of %d days - nothing is published"
+              % (len(out_times), DAYS), flush=True)
+        return
 
     rec = {"times": out_times, "values": out_values,
            "sectors": out_sectors, "levels": list(LEVELS),
