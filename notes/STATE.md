@@ -676,26 +676,16 @@ The measurement is in `/workspace/era5_vs_noaa.txt`.
 **25 NOVEMBER 2026 - THE OWNER STOPPED THE SCHEDULES AND RESCOPED THE
 ARCHIVE.**
 
-* **THE AUTOMATION IS BACK, IN TWO WINDOWS (the owner, 26-27 Nov 2026):
-  "we can pause these schedules until they're actually needed between
-  20:00-22:00UTC (EC46) and 03:00-:04:00UTC (GEFSv12)".**  TWO jobs, and
-  nothing runs outside its window:
-    - `seasonal-gefs-subs` (467751157227591, `10 3 * * *` UTC) runs
-      `tools/gefs_subs_disseminate.sh` - the GEFSv12's cycle, to the dev
-      copy and the operational site.
-    - `seasonal-ec46` (467751157227592, `0 21 * * 1,4,6` UTC) runs the
-      NEW `tools/ec46_disseminate.sh` - the EC46's run, on the owner's
-      own days (Mon/Thu/Sat, tested in New York), to both copies.
-  The two windows never overlap, so there is never a second submitter.
-  The old combined task `seasonal-polar-daily` is deleted.  **THE EC46
-  HAS LEFT BOTH THE DAILY REFRESH AND THE NIGHTLY WATCHER** - the pull
-  lives only in its own script now.  Proven end to end on 27 Nov: the
-  day test said "day 4 (America/New_York) - the pull runs", the pull
-  found the run already on disk, the charts were drawn and both copies
-  answered rc=4 (they already carry it).
-* **THE EC46's SERIES AND ITS JOB STATE ARE IN GIT NOW** - the sandbox is
-  rebuilt every hour and without them the run that was fetched would be
-  pulled again.
+* **THE AUTOMATION IS BACK (the owner, 26 Nov 2026): "why don't I see the
+  newly updated EC46 from today and GEFSv12?! It has to be automated... on
+  both dev and ops page."**  A NEW scheduled task `seasonal-polar-daily`
+  (467695594737817, `0 3 * * *` UTC) runs `tools/gefs_subs_disseminate.sh`
+  and publishes BOTH products to BOTH copies.  **THE EC46 IS NOW WIRED
+  INTO THE WATCHER** (it never was): the charts are drawn from whatever
+  has arrived and `publish_polar_ec46.py` puts them on the dev copy and
+  the operational site; the narrow path refuses an older cycle, so a
+  pass with nothing new does nothing.  The watcher also waits for the
+  EC46's pull to finish before it stops.
 * **THE EC46'S DAY TEST WAS IN UTC AND MUST BE THE OWNER'S OWN
   WEEKDAYS.**  The job runs at 03:00 UTC, which is the PREVIOUS EVENING
   where the owner is, so the UTC test SKIPPED THE OWNER'S THURSDAY -

@@ -103,12 +103,36 @@ if [ -f fetch_polar_core_3hourly.py ]; then
     sleep 1
 fi
 
-# THE EC46 HAS ITS OWN JOB NOW (the owner, 27 November 2026): its run is
-# wanted between 20:00 and 22:00 UTC, and the GEFSv12's cycle between 03:00
-# and 04:00 UTC.  The pull lives in tools/ec46_disseminate.sh, which runs
-# on the owner's own days - Monday, Thursday and Saturday - and it must
-# NOT run from here, or the nightly job would start a second pull of the
-# same run at the wrong hour.
+# THE EC46 IS PULLED ON THREE DAYS A WEEK, NOT SEVEN.  The owner's days
+# (22 Nov 2026) are Monday, Thursday and Saturday.  The reason is the
+# queue, not the product: the extended range runs EVERY day (measured 22
+# Nov 2026 - the Saturdays and the Sundays carry the 46 days too), and
+# each pull asks the store for nine chunks, and the account may hold two
+# jobs at once, and the seasonal requests want those slots in December.
+# The run is the NEWEST one the store has, found by probing for the 46-day
+# window, and a run that is already on disk is not asked for again.
+EC46_DAYS="${EC46_DAYS:-1 4 6}"     # date +%u: 1 = Monday ... 6 = Saturday
+# THE OWNER'S OWN WEEKDAYS, NOT UTC's.  The nightly job runs at 03:00 UTC,
+# which is the PREVIOUS EVENING where the owner is, so a UTC weekday test
+# skipped the owner's Thursday entirely (26 November 2026: the job ran at
+# 03:00 UTC on Friday and the fetch was refused - the owner's word was that
+# the EC46 had to be updated every one of their three days).
+EC46_TZ="${EC46_TZ:-America/New_York}"
+if [ -f fetch_polar_ec46.py ]; then
+    today_u=$(TZ=$EC46_TZ date +%u)
+    case " $EC46_DAYS " in
+        *" $today_u "*)
+            setsid nohup python3 -u fetch_polar_ec46.py \
+                >> "logs_fetch_polar_ec46.py.log" 2>&1 < /dev/null &
+            sleep 1
+            ;;
+        *)
+            say "  fetch_polar_ec46.py - not one of the EC46 days (Mon/Thu/Sat)"
+            ;;
+    esac
+else
+    say "  fetch_polar_ec46.py is not here - skipped"
+fi
 
 if [ "$FAILED" != "0" ]; then
     rm -f "$MARK"

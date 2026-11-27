@@ -182,16 +182,43 @@ PY
         --prod --approved >>"$LOG" 2>&1
     LIVE_RC=$?
 
-    # 3b2. THE EC46 IS NOT HERE.  It has its own job and its own window
-    # (the owner, 27 November 2026): its run is wanted between 20:00 and
-    # 22:00 UTC and the GEFSv12's cycle between 03:00 and 04:00 UTC, and
-    # the two never overlap.  tools/ec46_disseminate.sh does that half.
+    # 3b2. THE EC46.  The owner's word (26 Nov 2026): the EC46 and the
+    # GEFSv12 are both automated, on both copies.  Its run is pulled on
+    # Monday, Thursday and Saturday, and the pull takes hours, so this
+    # runs on EVERY pass: the charts are drawn from whatever has arrived
+    # and the narrow path refuses an older cycle, so a pass with nothing
+    # new does nothing at all.
+    python3 -u plot_polar_cap.py ec46 "ECMWF EC46" >>"$LOG" 2>&1 || true
+    python3 -u plot_polar_sectors.py ec46 "ECMWF EC46" >>"$LOG" 2>&1 || true
+    mkdir -p docs/assets/polar
+    for f in polar_cap_ec46.png polar_sectors_ec46.png; do
+        if [ -f "output/polar_cap/$f" ]; then
+            cp -f "output/polar_cap/$f" "docs/assets/polar/$f"
+        fi
+    done
+    python3 -u tools/publish_polar_ec46.py --repo "$DEV" --apply --push \
+        >>"$LOG" 2>&1
+    EC46_DEV_RC=$?
+    python3 -u tools/publish_polar_ec46.py --repo "$LIVE" --apply --push \
+        --prod --approved >>"$LOG" 2>&1
+    EC46_LIVE_RC=$?
 
     # 3c. is the cycle we were waiting for on the site?  The narrow path
     # says 0 when it published and 4 when the site already carries it.
-    if [ "$RUN" = "$EXPECTED" ] && { [ "$LIVE_RC" = "0" ] || [ "$LIVE_RC" = "4" ]; }; then
-        say "the $RUN cycle is on the site - the watcher stops here"
+    # The watcher also waits for the EC46's own pull to finish, so that
+    # the run it is fetching is published the same night.
+    EC46_BUSY=0
+    if pgrep -f "fetch_polar_ec46.py" > /dev/null 2>&1; then
+        EC46_BUSY=1
+    fi
+    if [ "$RUN" = "$EXPECTED" ] && { [ "$LIVE_RC" = "0" ] || [ "$LIVE_RC" = "4" ]; } \
+       && [ "$EC46_BUSY" = "0" ]; then
+        say "the $RUN cycle is on the site and the EC46's pull is done - the"
+        say "watcher stops here"
         break
+    fi
+    if [ "$EC46_BUSY" = "1" ]; then
+        say "   the EC46's pull is still running (rc=$EC46_LIVE_RC) - waiting"
     fi
 
     NOW=$(date -u +%s)
