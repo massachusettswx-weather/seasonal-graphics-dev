@@ -122,13 +122,14 @@ MODELS = {
                         "store, which carries ten pressure levels rather than "
                         "the twelve the seasonal archive carries."),
     "eps":             ("ECMWF EPS",
-                        "ECMWF medium-range ensemble (EPS) \u00b7 the first "
-                        "fifteen days of the run \u00b7 both cycles of it, the "
-                        "00Z suite and the 12Z suite, pooled day by day \u00b7 a "
-                        "daily run with a 48-hour delay \u00b7 read from "
-                        "ECMWF's own climate store, which carries ten pressure "
-                        "levels rather than the twelve the seasonal archive "
-                        "carries."),
+                        "ECMWF medium-range ensemble (EPS) \u00b7 51 members "
+                        "(the control and the fifty perturbations) \u00b7 the "
+                        "first fifteen days of the run \u00b7 both cycles of "
+                        "it, the 00Z suite and the 12Z suite, pooled day by "
+                        "day \u00b7 a daily run, read from ECMWF's own open "
+                        "data as it is published \u00b7 the polar-cap "
+                        "geopotential height at the ten pressure levels the "
+                        "section is drawn on."),
     "sfsv1":           ("NOAA SFSv1",
                         "Experimental \u00b7 NOAA Seasonal Forecast System v1 \u00b7 31-member "
                         "ensemble \u00b7 0.5\u00b0 grid \u00b7 init 1 Nov 2026 \u00b7 read "
