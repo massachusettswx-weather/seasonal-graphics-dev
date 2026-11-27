@@ -937,3 +937,73 @@ from `76f6466` (where it was added) and checked against the other chat's own
 commit's tree was stale for `tools/` and `notes/STATE.md`, so **a commit made
 from a stale index can silently delete files**.  Check the tree of a commit
 before trusting its message.
+
+## The ECMWF EPS in the by-sector area (27 Nov 2026)
+
+The owner asked for an **"ECMWF EPS"** in the **by-sector** area of the
+**development** page, in our own style (no StormVista labels or branding),
+with **real data**, and for the **scheduler to watch for it in the EC46's
+window** (20:00-22:00Z, one submitter at a time).  The owner added: *"only
+include the main 00, 12z suite from EPS"*.
+
+### What the EPS is, and where the data comes from
+
+**The EPS is ECMWF's medium-range ensemble**: the operational control
+forecast plus fifty perturbed members, fifteen days, at the 00Z and the 12Z
+cycle of the run.  The 46-day product is the EC46 and is not re-added.
+
+**IT IS NOT IN THE CLIMATE STORE.**  Measured 27 Nov 2026 against the live
+ECDS `s2s-forecasts` catalogue and the store itself:
+
+| what was asked | what came back |
+|---|---|
+| the short window `24_48` of the 2026-11-25 00Z run | **101 members** - that is ECMWF's *extended-range* ensemble, the EC46's own members |
+| `system` = 1, 2, 1+2 or 7 (the medium range) | the request is ACCEPTED (HTTP 201) and the job **fails** - the catalogue's form has **no `system` field**, so the store picks the extended range |
+
+So the medium-range ensemble cannot be asked for at ECDS.  **The C3S
+`seasonal-original-pressure-levels` dataset DOES carry the S2S system
+numbers** (so ECMWF's system 4 is askable there), but it is a **00Z-only,
+about-a-month-delayed** product and its queue was saturated on the day.
+
+**IT IS IN ECMWF'S OPEN DATA.**  `https://storage.googleapis.com/ecmwf-open-data/<date>/<cycle>/ifs/0p25/`
+holds the **control** forecast in the `oper` stream and the **fifty
+perturbed members** in the `enfo` stream, at 00Z and 12Z, out to **360
+hours**.  Each file comes with an **index** that says where every message
+sits in it, so only the geopotential at the ten levels the section is drawn
+on is fetched - **a byte range each**, not the 4.5 GB file.
+
+* the control is published as `param: z` (geopotential, m2/s2); the
+  perturbations as `param: gh` (geopotential HEIGHT, metres) - the two are
+  put on one scale with x 9.80665;
+* the open data keeps about **four days**, so the run is the newest one with
+  **both** cycles published (the 12Z cycle of a day appears some hours
+  after its 00Z cycle);
+* the pull is **about 7 GB** - 510 messages a step, 30 steps - and takes
+  **40-90 minutes** on this machine (2 cores; the GRIB decode is the
+  bottleneck, not the network).
+
+### The files
+
+* `fetch_polar_eps.py` - the fetch, the reduction (the house's own
+  `polar_cap.zonal_mean` and `sector_mean`), the state
+  (`data/polar_eps_jobs.json`, the step's values and not only a "done"
+  mark, so a restart does not fetch a step twice) and the series
+  (`data/polar_eps_z.json`, key `eps`, with the sector means beside it).
+* `tools/publish_polar_eps.py` - the narrow path, **the DEVELOPMENT COPY
+  ONLY**: it refuses the operational clone outright, with no flag that
+  turns that off.
+* `plot_polar_cap.py`, `plot_polar_sectors.py` - the EPS's own series file
+  (`cache_for("eps")`), and the "cycles pooled" line in the descriptor.
+* `tools/ec46_disseminate.sh` - the EPS's step, **after** the EC46's pull
+  (the two never overlap), and the publication to the development copy.
+* `build_registry.py` - the model's card and its registry entry (the note
+  is the builder's wording, so the card and the entry agree).
+* `ecmwf_credit.py` - the ECMWF credit on the EPS's charts.
+
+### The two cycles, and how they are pooled
+
+The 12Z step of a day is the one the house's other daily series use.  For
+the 00Z cycle it is 36 hours on, for the 12Z cycle 24 hours on - so **both
+cycles' day k falls on the same calendar day**, and the two can be averaged
+day by day.  The chart shows that mean; each cycle's own series is kept
+beside it in the record.
