@@ -1007,3 +1007,21 @@ the 00Z cycle it is 36 hours on, for the 12Z cycle 24 hours on - so **both
 cycles' day k falls on the same calendar day**, and the two can be averaged
 day by day.  The chart shows that mean; each cycle's own series is kept
 beside it in the record.
+
+#### The traps in the open-data pull (all measured 27 Nov 2026)
+
+* **`Ni` and `Nj` read back as 0** on these GRIB2 messages - the grid has to come
+  from the latitude and longitude arrays the message itself carries
+  (`np.unique(la).size` x `np.unique(lo).size`).  Getting that wrong fails every
+  message with "does not fit a grid".
+* the **grid is the same for every message of a step**, so the latitude and
+  longitude arrays are read ONCE per step and reused (they are a million numbers
+  each, and reading them for every member of every level is pure waste - it nearly
+  doubled the run time).
+* the file name is `<date><hh>0000-<step>h-...`: the date, the cycle's hour, then
+  **four** zeros.
+* the state file is written under a **lock** - the steps are fetched in threads and
+  they all write the same file.
+* a step that fails is **reported in the log**: an exception in a thread is held
+  until the results are read, so without the print the log shows the step starting
+  and nothing else (that is how an unpacking bug went unnoticed for two runs).
