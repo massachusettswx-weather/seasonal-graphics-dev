@@ -619,12 +619,21 @@
 
   /* THE DIFFERENCE BETWEEN TWO RUNS.
 
-     The anomaly is in standard deviations and the totals in inches, so
-     the difference is worked out in those units and then put back on a
-     byte scale of its own: the anomaly on +-2 sigma, the totals on a
-     signed log scale (a snowfall difference is almost always a small
-     number of inches, and a linear scale would show nothing). */
-  var DIFF_SIGMA = 2.0;      /* the anomaly's difference scale, sigma */
+     The map's anomaly is a difference in INCHES against the model's own
+     hindcast climate, and the totals are in inches too, so the
+     difference is worked out in inches and then put back on a byte
+     scale of its own: the anomaly on +-2 inches, the totals on a signed
+     log scale (a snowfall difference is almost always a small number of
+     inches, and a linear scale would show nothing).
+
+     THE ANOMALY'S SCALE IS NOT IN SIGMA.  The legend used to say
+     "+-2.0 sigma" and called the difference "standard deviations of the
+     model's own hindcast climate", which is not what the field is: the
+     exporter writes the anomaly as a plain difference in inches (the
+     field's own scale is in inches too - the legend's "+10 in"), so a
+     difference of two anomalies is a difference in inches and nothing
+     else. */
+  var DIFF_ANOM_IN = 2.0;    /* the anomaly's difference scale, inches */
   var DIFF_INCH = 5.0;       /* the totals' difference scale, inches */
   var DIFF_FLOOR = 0.02;     /* the totals' log scale's floor, inches */
 
@@ -639,7 +648,7 @@
         var a = nowB[i], b = archB[i];
         if (a >= 255 || b >= 255) { out[i] = 255; continue; }
         var d = ((a / 254 * 2 - 1) - (b / 254 * 2 - 1)) * s;
-        var t = d / DIFF_SIGMA;
+        var t = d / DIFF_ANOM_IN;
         if (t > 1) { t = 1; } else if (t < -1) { t = -1; }
         out[i] = Math.round((t + 1) * 127);
       }
@@ -668,7 +677,7 @@
       if (!b1 || !b2) { return; }
       state.raster = {w: b1.w, h: b1.h, bytes: differenceBytes(b1.bytes, b2.bytes)};
       state.diff = state.field === "anom"
-        ? {kind: "anom", scale: DIFF_SIGMA}
+        ? {kind: "anom", scale: DIFF_ANOM_IN}
         : {kind: "totals", scale: DIFF_INCH, k: diffK()};
       /* the legend describes what is on the map, so it is drawn once the
          difference is known - not when the archive was chosen */
@@ -859,12 +868,12 @@
       })[0];
       var when = run ? initLabel(run.init) : "the earlier run";
       if (state.diff.kind === "anom") {
-        lo.textContent = "-" + state.diff.scale.toFixed(1) + " sigma";
-        hi.textContent = "+" + state.diff.scale.toFixed(1) + " sigma";
+        lo.textContent = "-" + state.diff.scale.toFixed(1) + " in";
+        hi.textContent = "+" + state.diff.scale.toFixed(1) + " in";
         cap.textContent = "The change since the " + when + " run - the " +
-          "current run minus that run, in standard deviations of the " +
-          "model's own hindcast climate (" + man.name + "). Brown is less " +
-          "snow than the earlier run said, teal is more" +
+          "current run minus that run, inches of snowfall anomaly (" +
+          man.name + "). Brown is less snow than the earlier run said, " +
+          "teal is more" +
           (windowLabel() ? " - " + windowLabel() + ", the 3-month mean" : "");
       } else {
         lo.textContent = "-" + state.diff.scale + " in";
