@@ -1051,3 +1051,21 @@ other's publication.  **The EPS is published to the development copy only**
 **WHAT THE OWNER HAS TO DECIDE**: the EPS is on the development copy
 because that is what was asked for.  It is a new product, and the
 operational site needs the owner's word before it carries it.
+
+#### Two rules the open-data pull taught (27 Nov 2026)
+
+* **A DAY IS IN THE SERIES ONLY WHEN BOTH CYCLES ARE IN IT.**  The chart
+  says the two suites are pooled, and a day that carries only one of them
+  is not pooled.  The open data publishes a run a file at a time, so the
+  12Z cycle of the newest run can be half up for a while.
+* **THE RUN'S CHECK LOOKS AT THE DATA, NOT ONLY AT THE INDEX.**  The index
+  is a couple of megabytes and the data is gigabytes, so the index of a
+  step arrives long before the step does.  A run can be named and still
+  have nothing behind it - which is how the 2026-11-27 12Z cycle was
+  picked on the evening of the 27th with only four of its fifteen steps
+  behind it.
+
+**WHERE THE EPS STANDS NOW**: the series and the published section are the
+**2026-11-26** run (both cycles, 15 days, 51 members).  The 2026-11-27
+run is in the state file (its 00Z cycle is whole) and will be published
+when its 12Z cycle is up.
