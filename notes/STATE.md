@@ -691,6 +691,14 @@ ARCHIVE.**
   where the owner is, so the UTC test SKIPPED THE OWNER'S THURSDAY -
   which is why the EC46 did not update on 26 November.  It now reads
   `TZ=America/New_York date +%u` ✓.
+* **THE EC46's NARROW PATH COULD ONLY EVER PUBLISH ONCE - FIXED 27 Nov
+  2026.**  `tools/publish_polar_ec46.py` had the coarse test "the target
+  already has an entry -> nothing to do" BEFORE the newer/older cycle
+  comparison, so the section could never be updated: the EC46's run of
+  the 26 November was on disk (45 days, 101 members) and the path
+  refused it with "the target already carries the 2026-11-22 section".
+  Now the SAME cycle is the only thing that is "nothing to do", and a
+  newer cycle is published ✓ and an older one is still refused ✓.
 * The old `seasonal-gefs-subs` task is deleted.  **DO NOT RE-CREATE A
   SCHEDULE WITHOUT THE OWNER SAYING SO** - and do not add a second one:
   one task does the GEFSv12 every night and the EC46 on its three days.
