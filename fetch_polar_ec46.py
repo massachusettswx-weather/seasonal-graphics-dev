@@ -120,6 +120,13 @@ EXTENDED_ONLY = ["1080_1104"]
 # a run that is there.
 DELAY_HOURS = 0
 
+# How long the run probe waits for its own job.  The job is a small one -
+# the control forecast at the two ends of the window - and it is waited for
+# because a run the store cannot produce is not a run (see latest_run).
+# Twenty minutes is long enough for the store's queue to work and short
+# enough for a nightly job to be a nightly job.
+PROBE_TRIES = 80
+
 LICENCE_URL = ("https://ecds.ecmwf.int/datasets/s2s-forecasts"
                "?tab=download#manage-licences")
 
@@ -283,6 +290,7 @@ def latest_run(s, tries=8):
     for back in range(0, tries + 1):
         d = today - timedelta(days=back)
         for t in ("00:00", "12:00"):
+            not_there = False
             for windows, extended in ((list(EXTENDED_ONLY) + ["24_48"], True),
                                       (["24_48"], False)):
                 req = {"origin": "ecmwf",
@@ -297,21 +305,45 @@ def latest_run(s, tries=8):
                 r = s.post(EXEC, json={"inputs": req}, timeout=180)
                 # the Data Store answers 201 Created for a new job, not 200
                 if r.status_code in (200, 201):
+                    jid = None
                     try:
                         j = r.json()
                         jid = j.get("jobID") or j.get("processID")
-                        if jid:
-                            s.delete("%s/retrieve/v1/jobs/%s" % (ECDS, jid),
-                                     timeout=30)
-                            # the dismissal is NOT immediate: until the store
-                            # has actually released the job, the probe is still
-                            # holding one of the account's two queue slots and
-                            # every real request is turned away with
-                            # "rejected".  So the queue is watched until the
-                            # probe is out of it.
-                            wait_for_queue(s, 1)
-                    except Exception:                # noqa: BLE001
+                    except Exception:                    # noqa: BLE001
                         pass
+                    # THE RUN HAS TO BE THERE, NOT JUST NAMED.  The store
+                    # ACCEPTS a request for a run whose data has not been
+                    # uploaded yet, and the job then fails - so a probe
+                    # that only watches the acceptance would pick a run
+                    # that has nothing behind it (measured 27 Nov 2026: the
+                    # 26th and the 27th November runs are named in the
+                    # catalogue and their data is not in the archive; the
+                    # 25th is the one that is there).
+                    #
+                    # So the probe job is WAITED FOR: a run the store can
+                    # produce is the run that is there.  A run that fails is
+                    # not the run - the day before it is tried, and the one
+                    # after that, until the archive answers with a run it
+                    # can serve.
+                    if jid:
+                        what = wait(s, jid, tries=PROBE_TRIES)
+                        if what != "done":
+                            try:
+                                s.delete("%s/retrieve/v1/jobs/%s"
+                                         % (ECDS, jid), timeout=30)
+                            except Exception:                # noqa: BLE001
+                                pass
+                            # the dismissal is NOT immediate: until the store
+                            # has actually released the job, the probe is
+                            # still holding one of the account's two queue
+                            # slots and every real request is turned away
+                            # with "rejected".  So the queue is watched
+                            # until the probe is out of it.
+                            wait_for_queue(s, 1)
+                            print("   the run %s %s is not in the archive "
+                                  "yet (%s)" % (d, t, what), flush=True)
+                            not_there = True
+                            break
                     if not extended:
                         print("   the run %s %s does not serve the far end of "
                               "the extended range" % (d, t), flush=True)
@@ -321,6 +353,8 @@ def latest_run(s, tries=8):
                     raise SystemExit(licence_refusal(r))
                 if r.status_code == 400:
                     break            # this run cannot serve those windows
+            if not_there:
+                break                # the day before it is tried
     return None, None, None
 
 
