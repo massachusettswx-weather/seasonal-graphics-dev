@@ -162,13 +162,21 @@ def add_inline(text, name, entry, version):
         # THE ENTRY IS ALREADY ON THE PAGE.  It was put there by the first
         # run; a REDRAW of the same run still has to reach the reader, and
         # the ?v= on the chart URL is the cache-buster - so the URL is
-        # brought forward and everything else in the entry is left alone.
+        # brought forward.  The WORDING follows the builder too: the note
+        # and the name are the site builder's, and when the builder's
+        # wording changes the page must say the new thing (the first
+        # version of this entry still described the climate store and a
+        # 48-hour delay, which is the EC46's route, not the EPS's).
         cur = obj[MODEL_ID]
         e = copy.deepcopy(cur)
         if entry.get("init"):
             e["init"] = entry["init"]
         if entry.get("members"):
             e["members"] = entry["members"]
+        if entry.get("note"):
+            e["note"] = entry["note"]
+        if entry.get("name"):
+            e["name"] = entry["name"]
         if name == "POLARMODELS":
             e["file"] = "assets/polar/%s?v=%s" % (CHART, version)
         if name == "POLARSECTORS":
@@ -247,8 +255,18 @@ def build_card(entry):
 
 
 def add_model_card(text, card):
-    """The home page's model list gets the EPS's card, before the GEFSv12's."""
-    if 'href="model.html?m=%s"' % MODEL_ID in text:
+    """The home page's model list gets the EPS's card, before the GEFSv12's.
+
+    A card that is ALREADY on the page is REPLACED, not left alone: the
+    card is built from the registry entry, and when the entry's wording
+    changes the card must follow it.
+    """
+    i = text.find('href="model.html?m=%s"' % MODEL_ID)
+    if i >= 0:
+        start = text.rfind('<a class="model"', 0, i)
+        end = text.find("</a>", i)
+        if start >= 0 and end >= 0:
+            return text[:start] + card + text[end + 4:]
         return text
     if not card:
         return None
