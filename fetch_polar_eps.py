@@ -37,6 +37,7 @@ fetching the same step twice.  Both files are in git.
 import json
 import os
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
@@ -64,7 +65,7 @@ DAYS = 15
 # the cycles of the run: the main 00Z suite and the main 12Z suite
 CYCLES = ("00z", "12z")
 # how many steps are fetched at once
-WORKERS = 8
+WORKERS = 4
 # the open data keeps about four days, so the search walks back that far
 LOOKBACK_DAYS = 6
 
@@ -175,13 +176,24 @@ def day_steps(cyc):
 
 
 # --------------------------------------------------------------------------
-def reduce_message(buf, scale):
+def reduce_message(buf, scale, grid=None):
     """One GRIB message -> (the polar cap mean, {sector: mean}).
 
     The message is the global field at one level for one member; the
     reductions are the house's own (polar_cap.zonal_mean and
     polar_cap.sector_mean), so the EPS's series is cut exactly like the
     EC46's and the GEFS's.
+
+    THE GRID IS THE SAME for every message of a step - the run is on one
+    grid - so the latitude and longitude arrays (a million numbers each)
+    are read ONCE and then handed over in the `grid` box.  They are the
+    biggest thing the decode does, and reading them again for every member
+    of every level is pure waste.
+
+    THE SHAPE COMES FROM THE ARRAYS, not from the "Ni" and "Nj" keys:
+    these messages are GRIB2 and carry neither of those (measured: both
+    read back as 0), so the grid is read as the number of distinct
+    latitudes and longitudes the message itself carries.
     """
     import eccodes
     gid = eccodes.codes_new_from_message(buf)
@@ -189,20 +201,21 @@ def reduce_message(buf, scale):
         raise ValueError("the message did not open")
     try:
         v = np.asarray(eccodes.codes_get_array(gid, "values"), float)
-        la = np.asarray(eccodes.codes_get_array(gid, "latitudes"), float)
-        lo = np.asarray(eccodes.codes_get_array(gid, "longitudes"), float)
-        ni = int(eccodes.codes_get(gid, "Ni", 0) or 0)
-        nj = int(eccodes.codes_get(gid, "Nj", 0) or 0)
-        if ni and nj and v.size == ni * nj:
-            field = v.reshape(nj, ni)
-            lats = la.reshape(nj, ni)[:, 0]
-            lons = lo.reshape(nj, ni)[0, :]
+        if grid is not None and grid[0] is not None:
+            la, lo, nj, ni = grid[0], grid[1], grid[2], grid[3]
         else:
-            lats = np.unique(la)[::-1]
-            lons = np.unique(lo)
-            if v.size != lats.size * lons.size:
-                raise ValueError("the message does not fit a grid")
-            field = v.reshape(len(lats), len(lons))
+            la = np.asarray(eccodes.codes_get_array(gid, "latitudes"), float)
+            lo = np.asarray(eccodes.codes_get_array(gid, "longitudes"), float)
+            nj = int(np.unique(la).size)
+            ni = int(np.unique(lo).size)
+            if grid is not None:
+                grid[0], grid[1], grid[2], grid[3] = la, lo, nj, ni
+        if v.size != nj * ni:
+            raise ValueError("the message does not fit the grid (%d points, "
+                             "%d x %d)" % (v.size, nj, ni))
+        field = v.reshape(nj, ni)
+        lats = la.reshape(nj, ni)[:, 0]
+        lons = lo.reshape(nj, ni)[0, :]
         field = field * scale
         cap = zonal_mean(field, lats)
         sec = {}
@@ -231,6 +244,7 @@ def fetch_step(day, cyc, step):
     # fifty-one, and dropping it would quietly change the product.
     acc = {lev: [] for lev in LEVELS}
     secacc = {lev: {name: [] for name in SECTORS} for lev in LEVELS}
+    grid = [None, None, 0, 0]
     for stream, param, scale in (("oper", "z", 1.0),
                                   ("enfo", "gh", g())):
         url = file_url(day, cyc, stream, step, "index")
@@ -260,7 +274,7 @@ def fetch_step(day, cyc, step):
             if rr.status_code not in (200, 206):
                 raise RuntimeError("the message %s (%d bytes) came back HTTP %d"
                                    % (grib, length, rr.status_code))
-            cap, sec = reduce_message(rr.content, scale)
+            cap, sec = reduce_message(rr.content, scale, grid)
             acc[lev].append(cap)
             for name in SECTORS:
                 secacc[lev][name].append(sec[name])
@@ -305,12 +319,27 @@ def main():
         return
 
     results = {}
+    # THE STATE IS WRITTEN UNDER A LOCK: the steps are fetched in threads
+    # and they all write the same file, and two of them writing it at once
+    # would leave a half-written file behind.
+    lock = threading.Lock()
 
     def work(t):
         cyc, k, step, key = t
         print("   the %s cycle, day %d (step %d h) ..." % (cyc, k, step),
               flush=True)
-        (cap, sec), members = fetch_step(day, cyc, step)
+        try:
+            vals, members = fetch_step(day, cyc, step)
+        except Exception as e:                        # noqa: BLE001
+            # A STEP THAT FAILS IS REPORTED, not swallowed: the work is
+            # in a thread, and an exception in a thread is held until the
+            # results are read - so without this the log would show the
+            # step starting and nothing else.
+            print("      FAILED: %r" % (e,), flush=True)
+            raise
+        cap, sec = {}, {}
+        for lev in LEVELS:
+            cap[lev], sec[lev] = vals[lev]
         # THE VALUES GO INTO THE STATE FILE, not just a "done" mark: a
         # restart must not fetch a step again, and the series is written
         # from the state - so the numbers have to be in it.
@@ -320,9 +349,10 @@ def main():
                      "sectors": {name: {str(lev): sec[lev][name]
                                         for lev in LEVELS}
                                  for name in SECTORS}}
-        with open(STATE + ".tmp", "w") as f:
-            json.dump(st, f, indent=1)
-        os.replace(STATE + ".tmp", STATE)
+        with lock:
+            with open(STATE + ".tmp", "w") as f:
+                json.dump(st, f, indent=1)
+            os.replace(STATE + ".tmp", STATE)
         print("      done: %d members" % members, flush=True)
         return key
 
