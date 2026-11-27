@@ -1066,9 +1066,11 @@ operational site needs the owner's word before it carries it.
   behind it.
 
 **WHERE THE EPS STANDS NOW**: the series and the published section are the
-**2026-11-26** run (both cycles, 15 days, 51 members).  The 2026-11-27
-run is in the state file (its 00Z cycle is whole) and will be published
-when its 12Z cycle is up.
+**20261127 12Z** run - the first cycle published on its own, 15 days, 51
+members - with the run's own analysis filling the two days the reanalysis
+does not reach (26 and 27 November).  The 20261127 00Z cycle is whole in
+the state file and the 20261126 run's two cycles are there too, so nothing
+has to be pulled twice.
 
 ---
 
