@@ -1,18 +1,16 @@
 #!/usr/bin/env bash
 # The EC46's own DISSEMINATION - the owner's 20:00-22:00 UTC window.
 #
-# ONE job, ONE window, TWO products:
+# ONE job, ONE window, ONE product:
 #
 #   1. put the trees back (a sandbox rebuild takes the working tree with
 #      it; the credentials come back from the environment);
-#   2. pull the EPS - ECMWF's medium-range ensemble, both cycles of the
-#      run, from ECMWF's open data - and draw and publish it, on the
-#      DEVELOPMENT copy only;
-#   3. pull the newest EC46 run the store has - Monday, Thursday and
+#   2. pull the newest EC46 run the store has - Monday, Thursday and
 #      Saturday, the owner's days - in the FOREGROUND, so that "the run
 #      has arrived" is an answer and not a hope;
-#   4. draw the EC46's polar-cap charts from it;
-#   5. publish them: the development copy and the operational site;
+#   3. draw the EC46's polar-cap charts from it;
+#   4. publish them: the development copy and the operational site;
+#   5. put the run that was just replaced into the archive; and
 #   6. and then STOP.
 #
 # WHY IT IS ITS OWN JOB AND NOT PART OF THE NIGHTLY GEFVSv12 ONE.  The
@@ -21,12 +19,16 @@
 # and 04:00 UTC.  Two windows, two jobs, and nothing runs outside them.
 # They never overlap, so there is never a second submitter.
 #
+# THE EPS IS NOT HERE ANY MORE.  It was, until 27 November 2026, and the
+# owner gave it windows of its own: the 00Z cycle between 07:00 and 08:30
+# UTC and the 12Z cycle between 19:00 and 20:30 UTC.  It has its own
+# script (tools/eps_disseminate.sh) and its own two jobs.
+#
 #     ./tools/ec46_disseminate.sh
 #
 # The EC46's fetch resumes from data/polar_ec46_jobs.json and the series
 # itself lives in data/polar_ec46_z.json - both are in git, so a rebuild
-# does not pull the run again.  The EPS's two files are tracked for the
-# same reason.
+# does not pull the run again.
 set -u
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -79,53 +81,7 @@ case " $EC46_DAYS " in
 esac
 
 # ------------------------------------------------------------------
-# 2. THE EPS - THE SAME WINDOW, AND FIRST.
-#
-# The EPS is ECMWF's medium-range ensemble: the first fifteen days of the
-# run, at BOTH cycles of it, read from ECMWF's OPEN data.  It is first
-# because it is the bounded pull - about half an hour, no queue, nothing
-# to wait for - while the EC46's pull asks the climate store, whose queue
-# is shared with every other user and can hold a job for hours.  So the
-# EPS is published in the window whatever the store is doing, and the
-# EC46 follows.
-#
-# The two never overlap: the pulls run one after the other, in the
-# foreground, and each product is drawn and published right after its own
-# pull - so a pull that hangs cannot hold the other product's publication.
-say "the EPS's run"
-python3 -u fetch_polar_eps.py >>"logs_fetch_polar_eps.py.log" 2>&1
-EPS_FETCH_RC=$?
-
-python3 - <<'PY' >>"$LOG" 2>&1
-import json
-try:
-    d = json.load(open("data/polar_eps_z.json")).get("eps") or {}
-    print("   the EPS series: the run %s, %d days, %s members, the %s cycles"
-          % (d.get("run"), len(d.get("times") or []), d.get("members"),
-             " and ".join(d.get("cycles") or []) or "one"))
-except Exception as e:
-    print("   the EPS series could not be read: %s" % e)
-PY
-
-say "the EPS's charts"
-python3 -u plot_polar_cap.py eps "ECMWF EPS" >>"$LOG" 2>&1 || true
-python3 -u plot_polar_sectors.py eps "ECMWF EPS" >>"$LOG" 2>&1 || true
-mkdir -p docs/assets/polar
-for f in polar_cap_eps.png polar_sectors_eps.png; do
-    if [ -f "output/polar_cap/$f" ]; then
-        cp -f "output/polar_cap/$f" "docs/assets/polar/$f"
-    fi
-done
-
-# THE EPS GOES TO THE DEVELOPMENT COPY ONLY.  It is a new product and it
-# has not been approved for the operational site; its publisher refuses the
-# operational clone outright, so there is nothing to guard here.
-say "the EPS's publication (the development copy only)"
-python3 -u tools/publish_polar_eps.py --repo "$DEV" --apply --push >>"$LOG" 2>&1
-EPS_DEV_RC=$?
-
-# ------------------------------------------------------------------
-# 3. the EC46's pull, in the foreground
+# 2. THE EC46's run, in the foreground
 say "the EC46's run"
 python3 -u fetch_polar_ec46.py >>"logs_fetch_polar_ec46.py.log" 2>&1
 FETCH_RC=$?
@@ -161,8 +117,18 @@ python3 -u tools/publish_polar_ec46.py --repo "$LIVE" --apply --push --prod --ap
 LIVE_RC=$?
 
 # ------------------------------------------------------------------
+# 4b. THE ARCHIVE.  The owner's word (27 November 2026): when each run of
+# our models is posted, the one before it goes into the archive, and a
+# week is kept.  The archive is built from the git history, so it runs
+# AFTER the publication - the run that was just replaced is in the history
+# by then.
+say "the archive"
+python3 -u tools/build_polar_archive.py --repo "$DEV" >>"$LOG" 2>&1 || true
+python3 -u tools/publish_polar_archive.py --repo "$DEV" --apply --push >>"$LOG" 2>&1 || true
+python3 -u tools/publish_polar_archive.py --repo "$LIVE" --apply --push --prod --approved >>"$LOG" 2>&1 || true
+
+# ------------------------------------------------------------------
 # 5. one line
 say "done: the fetch rc=$FETCH_RC; the development copy rc=$DEV_RC, the"
 say "operational site rc=$LIVE_RC (0 = published, 2 = nothing to publish,"
 say "3 = the push failed, 4 = the target already carries it)"
-say "the EPS: the fetch rc=$EPS_FETCH_RC, the development copy rc=$EPS_DEV_RC"

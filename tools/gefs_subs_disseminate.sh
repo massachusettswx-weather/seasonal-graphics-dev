@@ -203,6 +203,16 @@ PY
         --prod --approved >>"$LOG" 2>&1
     EC46_LIVE_RC=$?
 
+    # 3b3. THE ARCHIVE.  The owner's word (27 November 2026): when each
+    # run of our models is posted, the one before it goes into the
+    # archive, and a week is kept.  The archive is built from the git
+    # history, so it runs AFTER the publication.
+    python3 -u tools/build_polar_archive.py --repo "$DEV" >>"$LOG" 2>&1 || true
+    python3 -u tools/publish_polar_archive.py --repo "$DEV" --apply --push \
+        >>"$LOG" 2>&1 || true
+    python3 -u tools/publish_polar_archive.py --repo "$LIVE" --apply --push \
+        --prod --approved >>"$LOG" 2>&1 || true
+
     # 3c. is the cycle we were waiting for on the site?  The narrow path
     # says 0 when it published and 4 when the site already carries it.
     # The watcher also waits for the EC46's own pull to finish, so that

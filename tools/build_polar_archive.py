@@ -26,12 +26,23 @@ It writes:
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARCHIVE = os.path.join(ROOT, "docs", "assets", "polar", "archive")
-MODELS = ("gefsv12", "ec46", "ecmwf-seas5")
+# the models whose earlier runs are kept.  The EPS joined on 27 November
+# 2026, and the seasonal with it: the owner asked for "a couple more of
+# the archived models" on the polar cap page, and these are the two that
+# were missing from it.
+MODELS = ("gefsv12", "ec46", "eps", "ecmwf-seas5")
+# HOW MUCH IS KEPT.  The owner's word (27 November 2026): "we can have up
+# to a week of archived data".  A week is seven runs for a product that
+# runs every day, and seven for the seasonal one too - the seasonal runs
+# once a month, so seven of them is more than enough, and the rule is
+# simply "the last seven".
+KEEP = 7
 
 
 def git(repo, *args):
@@ -119,8 +130,37 @@ def build(repo):
                 continue
             entries.append(item)
             print("   %-14s %-12s %s" % (model, init, item["cap"]))
+        # ONLY A WEEK IS KEPT.  The entries are the newest first, so the
+        # ones past the seventh are dropped - and their files are removed
+        # with them, so the archive on the site never carries more than a
+        # week of a model's runs.
+        dropped = entries[KEEP:]
+        entries = entries[:KEEP]
+        for item in dropped:
+            d = os.path.join(ARCHIVE, model, item["init"])
+            if os.path.isdir(d):
+                shutil.rmtree(d, ignore_errors=True)
+                print("   %-14s %-12s dropped - only a week is kept"
+                      % (model, item["init"]))
         if entries:
             index[model] = entries
+    # anything in the archive's own folders that is not in the index goes:
+    # the archive is rebuilt from the history every time, and a file left
+    # behind from an older week would still be on the site
+    keep = set()
+    for model, runs in index.items():
+        for r in runs:
+            keep.add(os.path.join(ARCHIVE, model, r["init"]))
+    if os.path.isdir(ARCHIVE):
+        for model in os.listdir(ARCHIVE):
+            d = os.path.join(ARCHIVE, model)
+            if not os.path.isdir(d):
+                continue
+            for init in os.listdir(d):
+                p = os.path.join(d, init)
+                if p not in keep:
+                    shutil.rmtree(p, ignore_errors=True)
+                    print("   removed from the archive: %s" % p)
     os.makedirs(ARCHIVE, exist_ok=True)
     with open(os.path.join(ARCHIVE, "index.json"), "w") as fh:
         json.dump(index, fh, indent=1)

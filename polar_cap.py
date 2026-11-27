@@ -431,8 +431,14 @@ COLORS = [
     # reads as a hole in the chart rather than as a strong cold anomaly.
     "#1017c4", "#101fda", "#1230ec", "#1c4cf1", "#3a77f4",
     "#5c9cf7", "#87befa", "#b2d6fb", "#d9e9fc",
-    # the white centre
-    "#ffffff",
+    # THE CENTRE IS NOT PURE WHITE.  A diverging scale is usually white in
+    # the middle, and here the middle is the +-0.2 sigma band - which the
+    # quiet troposphere sits in for days at a time, and a field of white
+    # reads as a HOLE in the chart rather than as an ordinary quiet
+    # atmosphere.  The owner asked for the white gap to be filled on
+    # 27 November 2026.  The band is now a very pale cool grey: still the
+    # quietest colour on the ladder, but visibly a colour.
+    "#eef1f4",
     # seven warms: a bright yellow, then gold, orange, vermilion, a vivid
     # red and a deep red.  These are the saturated colours, not the dusty
     # ones - a muted ramp makes a strong anomaly look like a weak one.
@@ -510,13 +516,18 @@ def fit_subtitle(parts, limit=1995.0, fs=9.5, fig_w=13.5, x0=0.052):
                 del keep[i]
                 break
         else:
+            # NOTHING LEFT TO GIVE UP: the descriptor is too long for the
+            # figure and would run off the edge.  It is said out loud, so
+            # the log shows it, rather than the line being quietly cut.
+            print("   the descriptor is too long for the figure (%d px): %s"
+                  % (end_px(s), s))
             return s
 
 
 def plot_section(times, norm, levels, out_path, title, subtitle,
                  split=None, split_label="", credit=None, handle="@Massachusettswx",
                  vmax=5.0, analysis_label=None, forecast_label=None,
-                 today=None, forecast_alpha=0.55):
+                 today=None, forecast_alpha=0.55, bridge_label=None):
     """Draw the time-height section.
 
     times:  (n,)   ISO strings
@@ -524,6 +535,10 @@ def plot_section(times, norm, levels, out_path, title, subtitle,
     levels: (nlev,) the pressure levels, hPa
     split:  the index where the forecast begins, or None
     today:  the index of "now", drawn as a marker
+    bridge_label: the name of the days that are the model's own analysis
+                  rather than the reanalysis - drawn just in front of the
+                  split, so the reader can see where the reanalysis ends
+                  and the model takes over
 
     The layout is this site's own: a bold title and a grey descriptor line
     on the LEFT, a plain-text summary on the right, the colour bar below
@@ -657,6 +672,14 @@ def plot_section(times, norm, levels, out_path, title, subtitle,
     if forecast_label:
         fig.text(0.924, 0.858, forecast_label, fontsize=10,
                  fontweight="bold", color=C_SPLIT, ha="right", va="bottom")
+    # the days that are the MODEL'S OWN analysis - the run's 0-hour step,
+    # which is what closes the seam between the reanalysis and the
+    # forecast - are named just in front of the split line, so the reader
+    # can see exactly where the reanalysis ends and the model begins
+    if bridge_label and split and 0 < split < n:
+        x = 0.052 + (split - 0.5) / float(n) * 0.876
+        fig.text(x - 0.008, 0.858, bridge_label, fontsize=9,
+                 fontweight="bold", color=C_MUTED, ha="right", va="bottom")
 
     # the colour bar, below the panel.  It is drawn from a clean mappable so
     # that it always shows the colours at full strength, whatever the

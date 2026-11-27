@@ -1069,3 +1069,114 @@ operational site needs the owner's word before it carries it.
 **2026-11-26** run (both cycles, 15 days, 51 members).  The 2026-11-27
 run is in the state file (its 00Z cycle is whole) and will be published
 when its 12Z cycle is up.
+
+---
+
+## The owner's list of 27 November 2026, and what was done to it
+
+The owner asked for seven things at once.  This is what each of them is,
+and where it stands.
+
+### 1. The EPS's two windows (done)
+
+**THE OWNER'S WORD**: the 00Z cycle between 07:00 and 08:30 UTC and the
+12Z cycle between 19:00 and 20:30 UTC - its own windows, not inside the
+EC46's 20:00-22:00 one.
+
+* `tools/eps_disseminate.sh` is the EPS's own script (`12z` or `00z`).
+  It refreshes the CORe, pulls the cycle, draws the two charts, publishes
+  **to the development copy only**, and puts the run that was replaced
+  into the archive.
+* Two jobs: `seasonal-eps-00z` (07:00Z) and `seasonal-eps-12z`
+  (19:00Z).  The EPS came out of `tools/ec46_disseminate.sh`, which
+  no longer pulls it.
+* **THE WINDOW OPENS BEFORE THE DATA IS WHOLE, AND THAT IS ON PURPOSE.**
+  Measured from the objects' own timestamps, ECMWF publishes a cycle's
+  first step about **7.7 h** after its init and its last one (the
+  360-hour step, the end of the fifteen-day product) about **8.5 h**
+  after it.  So the 12Z cycle is whole at about 20:30 and the 00Z cycle
+  at about 08:30.  `fetch_polar_eps.py --wait-minutes N` polls for the
+  steps that are not there yet and fetches them when they arrive; the
+  series is written only when the cycle is whole.
+* **A CYCLE IS PUBLISHED ON ITS OWN NOW.**  The series used to pool the
+  00Z and the 12Z suites day by day, which cannot work with two windows:
+  at 07:30 there is no 12Z cycle of that day yet.  The record carries
+  `cycles` and a `run` of "20261127 12Z", and the chart says which cycle
+  it is showing.
+* The publisher's "the same cycle is nothing to do" test now looks at the
+  **cycle** as well as at the date - otherwise the 12Z cycle of a day
+  would never reach the site, because the 00Z cycle of the same day is
+  already there.
+
+### 2. The chart (done)
+
+* **THE RUN IS NAMED.**  The run was an optional part of the descriptor
+  and the EPS's descriptor was too long, so it was dropped - the one thing
+  the owner asked for.  It is not optional any more, and the level count
+  and the frequency are what give way.
+* **"SUB-SEASONAL" IS GONE FROM THE EPS.**  The product is named in the
+  record (`"product": "medium-range"`), so each product says what it is.
+* **THE SEAM IS CLOSED.**  NOAA's CORe runs about two days behind the day
+  it is fetched for, so the reanalysis half stopped short of the forecast
+  and the chart carried a gap.  The run's own **analysis** - the 0-hour
+  step of the open data, which agrees with the CORe's polar-cap mean at
+  10 hPa to about 23 m - closes it, and the chart says which days are the
+  reanalysis and which are the model's analysis.
+* **THE NEAR-ZERO BAND IS NOT WHITE ANY MORE.**  The centre of the colour
+  ladder (+-0.2 sigma) was pure white, and a quiet troposphere sits in
+  it for days at a time, so a field of white read as a hole in the chart.
+  It is now a very pale cool grey.
+* The panel labels now carry the dates: "CORe reanalysis to 25 Nov" on
+  the left, "ECMWF analysis to 26 Nov" at the seam, "ECMWF EPS
+  medium-range forecast from 27 Nov" on the right.
+
+### 3. The archive (done)
+
+* `tools/build_polar_archive.py` keeps **the last seven runs** of each
+  model - a week - and removes the files of the ones it drops.
+* It now covers **the EPS and the seasonal** as well as the GEFSv12 and
+  the EC46: "a couple more of the archived models".
+* **IT RUNS BY ITSELF**: every product's script builds and publishes the
+  archive right after it publishes its own run.
+
+### 4. The December seasonals (done)
+
+* The nominal dissemination time is the **C3S release calendar**: the
+  ECMWF publishes on the 6th of the month and every other centre on the
+  10th.  `init_info` holds that rule.
+* `tools/seasonal_init_plan.py` points the daily pulls at the init the
+  calendar says they are on - the two centre files were written by hand
+  for November and would have kept asking for November in December.
+* `tools/seasonal_disseminate.sh` is the seasonal's own script: it does
+  nothing when no centre has moved, and when one has it fetches the
+  monthly fields, the daily snowfall, the daily 10 hPa wind and the
+  polar-cap series, rebuilds the site with the init audit in front of the
+  publish as a gate, and publishes.
+* One job: `seasonal-c3s-release`, 08:00Z on the 6th and the 10th.
+  **The cloud cron limit is five jobs**, so the two release days share
+  one job rather than two.
+
+### 5. The interactive maps page (done)
+
+* The page was live on the development site and **not** on the operational
+  one - the owner had not decided whether to release it.
+* **THE COMPARISON SAID THE WRONG UNITS.**  The legend called the
+  anomaly difference "+-2.0 sigma" and "standard deviations of the
+  model's own hindcast climate".  The map's anomaly is a difference in
+  INCHES (the exporter writes `monthly - clim`), so the difference of two
+  anomalies is inches.  The scale is now +-2 **inches** and the caption
+  says so.
+* **THE "COMPARE WITH" PICKER WAS NEVER IN THE PAGE.**  The script had
+  it (`snowArchive`) and the page had no control for it, so the picker
+  was dead code and the page's own test failed on it.  It is in the page
+  now, in `build_site.py`'s template as well.
+* `tools/test_maps_page.py` now passes end to end: the timeline, the
+  three-month window, the tilt, the zoom, the flat map, the picker and
+  the comparison, with **no console errors**.
+
+### 6. The AIFS ENS (NOT DONE, ON PURPOSE)
+
+The owner said: "we *COULD* consider adding AIFS ENS once all is
+complete (BUT DO NOT ADD WITHOUT FINISHING EVERYTHING FIRST/MY
+APPROVAL)".  Everything else on the list is done, and the owner's word
+has not come, so **nothing was added**.

@@ -23,9 +23,10 @@ DATA = os.path.join(HERE, "data")
 sys.path.insert(0, HERE)
 
 import polar_rebase  # noqa: E402
-from polar_cap import (CAP_N, CAP_S, G0, LEVELS, build_climatology,  # noqa: E402
-                       daily_climate, fit_subtitle, load_clim_native,
-                       load_climatology, normalise, plot_section)
+from polar_cap import (CAP_N, CAP_S, G0, LEVELS, _short_date,  # noqa: E402
+                       build_climatology, daily_climate, fit_subtitle,
+                       load_clim_native, load_climatology, normalise,
+                       plot_section)
 from ecmwf_credit import credit_for_polar  # noqa: E402
 
 OUT = os.path.join(HERE, "output", "polar_cap")
@@ -304,16 +305,25 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
     _rec = _all.get(tag) or {}
     members = _rec.get("members")
     run = str(_rec.get("run") or "")
-    # a sub-seasonal run is a different kind of product from a seasonal one,
-    # and the chart has to say which it is
-    sub_seasonal = bool(mt) and len(mt) <= 90
-    kind_word = "sub-seasonal" if sub_seasonal else "seasonal"
+    # A MEDIUM-RANGE PRODUCT IS NOT A SUB-SEASONAL ONE.  The EPS is the
+    # fifteen-day ensemble, and calling it sub-seasonal - which is what a
+    # short series used to be called - is wrong; the owner asked for the
+    # wording to come off on 27 November 2026.  The product is named in
+    # the record, so each product says what it is.
+    product = str(_rec.get("product") or "").strip().lower()
+    if product == "medium-range":
+        sub_seasonal = False
+        kind_word = "medium-range"
+    else:
+        sub_seasonal = bool(mt) and len(mt) <= 90
+        kind_word = "sub-seasonal" if sub_seasonal else "seasonal"
     freq = _rec.get("frequency")
-    # the EPS asks for BOTH cycles of its run, and the chart says so: the
-    # two suites are pooled day by day, and a reader who wants to know that
-    # is looking at two cycles and not one needs to be told
+    # the EPS asked for BOTH cycles of its run and pooled them day by day,
+    # and the chart said so; a single cycle - which is what the owner asked
+    # for on 27 November 2026, one window for the 00Z cycle and one for the
+    # 12Z - says which cycle it is in the run label instead
     cycles = _rec.get("cycles") or []
-    cyc_txt = " and ".join(cycles) if cycles else ""
+    cyc_txt = " and ".join(cycles) if len(cycles) > 1 else ""
     run_txt = ""
     if run:
         run_txt = "%s run" % run.replace("Z", "Z")
@@ -362,15 +372,43 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
     # exactly at the run's start, and no day is drawn twice.
     ana_days = sorted(d for d in rday if d < first)[-ANA_DAYS:]
     fc_days = sorted(mday)
-    days = ana_days + fc_days
+
+    # THE MODEL'S OWN ANALYSIS FILLS THE SEAM.  NOAA's CORe runs about two
+    # days behind the day it is fetched for, so the reanalysis half of the
+    # section stops short of the forecast and the chart would carry a band
+    # of nothing where the two halves meet.  The run's own analysis - the
+    # 0-hour step of the open data - closes the gap, and the chart says
+    # which days are the reanalysis and which are the model's analysis.
+    ana_levels = [int(x) for x in (_rec.get("levels") or LEVELS)]
+    at = _rec.get("analysis_times") or []
+    av = _rec.get("analysis_values") or []
+    bridge, bridge_vals = [], {}
+    for i, t in enumerate(at):
+        d = t[:10]
+        if i >= len(av) or d >= first:
+            continue
+        if ana_days and d <= ana_days[-1]:
+            continue                     # the reanalysis already covers it
+        bridge.append(d)
+        bridge_vals[d] = av[i]
+    bridge.sort()
+
+    days = ana_days + bridge + fc_days
     parts = []
     if ana_days:
         # the columns are picked by level rather than by position
         rcols = [rlevs.index(l) for l in levs]
         parts.append(rv[[rday[d] for d in ana_days]][:, rcols])
+    if bridge:
+        bcols = [ana_levels.index(l) for l in levs]
+        parts.append(np.array([bridge_vals[d] for d in bridge],
+                              float)[:, bcols])
     parts.append(mv[[mday[d] for d in fc_days]])
     values = np.vstack(parts)
-    split = len(ana_days)
+    split = len(ana_days) + len(bridge)
+    if bridge:
+        print("   the model's own analysis fills %s to %s"
+              % (bridge[0], bridge[-1]))
 
     # where "now" falls, so the reader can tell the model's past days from
     # the days it is still forecasting
@@ -434,11 +472,14 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
                 "monthly": "ERA5 1991-2020 monthly climatology",
                 "daily": "ERA5 1991-2020 climatology"}[kind]
     ana_name = (d_recent or {}).get("name") or "ERA5"
+    ana_last = ana_days[-1] if ana_days else ""
     # The descriptor is fitted to the figure: the parts that can be given up
-    # are the level count (the y axis labels the levels) and the run time
-    # (the init date is on the chart already).  What cannot be given up is
-    # the climate the anomaly is measured against - and, for a model that is
-    # re-based, the note that says so.
+    # are the level count (the y axis labels the levels) and the frequency.
+    # The RUN cannot be given up: a reader has to be able to say which run
+    # the chart is showing, and the owner asked for that on 27 November
+    # 2026 - the EPS's descriptor had lost it.  What else cannot be given up
+    # is the climate the anomaly is measured against - and, for a model that
+    # is re-based, the note that says so.
     parts = []
     if ana_days:
         parts.append(("%d days of %s reanalysis" % (len(ana_days), ana_name),
@@ -450,7 +491,7 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
     if cyc_txt:
         parts.append(("%s cycles pooled" % cyc_txt, False))
     if run:
-        parts.append(("%s run" % run.replace("Z", "Z"), True))
+        parts.append(("%s run" % run.replace("Z", "Z"), False))
     if freq:
         parts.append((str(freq), True))
     parts.append(("%d levels (%s hPa)" % (nlev, lev_txt), True))
@@ -463,9 +504,13 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
     plot_section(days, norm, levs, p, title, subtitle,
                  split=split if split else None,
                  credit=credit_for_polar(tag),
-                 analysis_label=("%s reanalysis" % ana_name) if ana_days else None,
-                 forecast_label="%s %s forecast" % (
-                     short, "sub-seasonal" if sub_seasonal else "seasonal"),
+                 analysis_label=("%s reanalysis to %s"
+                                 % (ana_name, _short_date(ana_last)))
+                 if ana_days else None,
+                 bridge_label=("ECMWF analysis to %s" % _short_date(bridge[-1]))
+                 if bridge else None,
+                 forecast_label="%s %s forecast from %s" % (
+                     short, kind_word, _short_date(init_day)),
                  today=today)
     print("   the figure: %s" % p)
     return p

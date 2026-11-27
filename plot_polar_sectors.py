@@ -187,6 +187,28 @@ def main(tag="gefsv12", label="NOAA GEFSv12", short=None, rebase="forecast"):
     first = min((v[0][0] for v in fc.values() if len(v[0])), default=None)
     ana_days = sorted(d for d in rday if first and d < first)[-ANA_DAYS:]
 
+    # THE MODEL'S OWN ANALYSIS FILLS THE SEAM.  NOAA's CORe runs about two
+    # days behind the day it is fetched for, so the reanalysis half of the
+    # section stops short of the forecast; the run's own analysis - the
+    # 0-hour step of the open data - closes the gap, and the chart says
+    # which days are which.  See plot_polar_cap.py for the reasoning.
+    ana_levels = [int(x) for x in (rec.get("levels") or [])]
+    at = rec.get("analysis_times") or []
+    asec = rec.get("analysis_sectors") or {}
+    bridge_pairs = []
+    for i, t in enumerate(at):
+        d = t[:10]
+        if not first or d >= first:
+            continue
+        if ana_days and d <= ana_days[-1]:
+            continue
+        if not asec or any(i >= len(as_) for as_ in asec.values()):
+            continue
+        bridge_pairs.append((d, i))
+    bridge_pairs.sort()
+    bridge = [d for d, _ in bridge_pairs]
+    bridge_idx = [i for _, i in bridge_pairs]
+
     # the monthly climate, per sector, for each month of the series
     anom = {}
     days = None
@@ -198,9 +220,10 @@ def main(tag="gefsv12", label="NOAA GEFSv12", short=None, rebase="forecast"):
         if name not in fc or not fc[name][0]:
             continue
         fdays, fvals = fc[name]
-        # the days of the whole chart: the analysis first, then the forecast
+        # the days of the whole chart: the analysis first, then the model's
+        # own analysis (the seam), then the forecast
         if name in rv and ana_days:
-            all_days = ana_days + fdays
+            all_days = ana_days + bridge + fdays
             avals = rv[name][[rday[d] for d in ana_days]]
         else:
             all_days = fdays
@@ -208,6 +231,12 @@ def main(tag="gefsv12", label="NOAA GEFSv12", short=None, rebase="forecast"):
         if len(all_days) < 3:
             continue
         vals = np.vstack([avals, fvals]) if len(avals) else fvals
+        if bridge and name in asec:
+            # the model's own analysis, on the same levels
+            bcols = [ana_levels.index(l) for l in levels]
+            bvals = np.array([asec[name][i] for i in bridge_idx],
+                             float)[:, bcols]
+            vals = np.vstack([avals, bvals, fvals])
         # the monthly sector climate, as arrays, and then put on the days
         # of the series: a monthly climate applied to a daily series steps
         # at every month boundary and the step draws a seam across the
@@ -252,19 +281,29 @@ def main(tag="gefsv12", label="NOAA GEFSv12", short=None, rebase="forecast"):
     label_txt = "%s · Polar Cap (60-90°N) by Sector" % label
     run = rec.get("run") or ""
     nmem = rec.get("members")
+    # A MEDIUM-RANGE PRODUCT IS NOT A SUB-SEASONAL ONE (the owner, 27
+    # November 2026): the EPS is the fifteen-day ensemble.
+    product = str(rec.get("product") or "").strip().lower()
+    kind_word = ("medium-range" if product == "medium-range"
+                 else ("sub-seasonal" if len(times) <= 90 else "seasonal"))
     bits = []
     if run:
-        bits.append(("%s run" % run, True))
+        # the RUN cannot be given up: the reader has to be able to say
+        # which run the chart is showing
+        bits.append(("%s run" % run, False))
     freq = rec.get("frequency")
     if freq:
         # the ECMWF's sub-seasonal set is a DAILY run with a 48-hour delay
         bits.append((str(freq), True))
     if nmem:
         bits.append(("%s members" % nmem, False))
-    # the EPS asks for BOTH cycles of its run and pools them day by day:
-    # the chart says so, so a reader knows it is looking at two suites
+    # the EPS asked for BOTH cycles of its run and pooled them day by day:
+    # the chart says so, so a reader knows it is looking at two suites.
+    # A single cycle - which is what the owner asked for on 27 November
+    # 2026, one window for the 00Z cycle and one for the 12Z - names the
+    # cycle in the run label instead.
     cycles = rec.get("cycles") or []
-    if cycles:
+    if len(cycles) > 1:
         bits.append(("%s cycles pooled" % " and ".join(cycles), False))
     bits.append(("%d levels (%d-%d hPa)" % (len(levels), min(levels), max(levels)),
                  True))
@@ -283,14 +322,15 @@ def main(tag="gefsv12", label="NOAA GEFSv12", short=None, rebase="forecast"):
     if ana_days:
         head.append(("%d days of %s reanalysis" % (len(ana_days), _ana_name),
                      False))
-    head.append(("the %s sector forecast from %s to %s"
-                 % (short, fc_first, fc_last), False))
+    head.append(("the %s %s sector forecast from %s to %s"
+                 % (short, kind_word, fc_first, fc_last), False))
     subtitle = fit_subtitle(head + bits, limit=2600.0, fig_w=17.6)
 
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, "polar_sectors_%s.png" % tag)
     plot_sector_sections(days, anom, levels, path, label_txt, subtitle,
-                         split=len(ana_days) if ana_days else None,
+                         split=(len(ana_days) + len(bridge))
+                         if (ana_days or bridge) else None,
                          credit=credit_for_polar(tag))
     print("   the figure: %s" % path)
     return path

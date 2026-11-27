@@ -124,9 +124,10 @@ MODELS = {
     "eps":             ("ECMWF EPS",
                         "ECMWF medium-range ensemble (EPS) \u00b7 51 members "
                         "(the control and the fifty perturbations) \u00b7 the "
-                        "first fifteen days of the run \u00b7 both cycles of "
-                        "it, the 00Z suite and the 12Z suite, pooled day by "
-                        "day \u00b7 a daily run, read from ECMWF's own open "
+                        "first fifteen days of the run \u00b7 one cycle of "
+                        "it at a time - the 00Z suite in the morning window "
+                        "and the 12Z suite in the evening one \u00b7 a daily "
+                        "run, read from ECMWF's own open "
                         "data as it is published \u00b7 the polar-cap "
                         "geopotential height at the ten pressure levels the "
                         "section is drawn on."),
@@ -444,6 +445,8 @@ def main():
             name, note = MODELS.get(tag, (tag.replace("-", " ").title(), ""))
             nmem = "?"
             init = "?"
+            cyc = []
+            z = {}
             # the numbers come from the series cache itself, so a card is
             # never published with a member count nobody checked
             for zp in (os.path.join(HERE, "data", "polar_model_z.json"),
@@ -462,14 +465,24 @@ def main():
                 # the EC46's first plotted point is a day after its run and
                 # the card used to say the day after the run.
                 init = init_of_run(z) or init
+                cyc = z.get("cycles") or []
                 break
-            reg["models"].append({
+            entry = {
                 "id": tag,
                 "name": name,
                 "note": note,
                 "members": nmem,
                 "init": init,
-            })
+            }
+            # A RUN THAT IS A CYCLE SAYS SO.  The ECMWF's EPS is published
+            # one cycle at a time - the 00Z cycle in the morning window and
+            # the 12Z in the evening one - so two runs of the same day are
+            # two different runs, and the entry carries the cycle and the
+            # full run label.
+            if cyc:
+                entry["cycle"] = list(cyc)
+                entry["run"] = str(z.get("run") or "")
+            reg["models"].append(entry)
 
     # attach the ENSO plume charts
     for entry in reg["models"]:

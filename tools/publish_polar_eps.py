@@ -142,6 +142,14 @@ def build_entry(series, version):
     init = init_of_run(series.get("run"))
     if init:
         entry["init"] = init
+    # THE CYCLE IS PART OF THE RUN.  The owner gave the 00Z and the 12Z
+    # cycle a window each (27 November 2026), so a run is "20261127 12Z",
+    # not a date: two cycles of the same day are two different runs, and
+    # the entry has to say which one it is.
+    cyc = series.get("cycles") or []
+    if cyc:
+        entry["cycle"] = list(cyc)
+        entry["run"] = series.get("run") or ""
     entry["polar"] = {"file": "assets/polar/%s?v=%s" % (CHART, version),
                       "caption": ("Polar cap (60-90N) geopotential height "
                                   "anomaly - %s." % name),
@@ -368,10 +376,21 @@ def main():
     new = entry.get("init") or ""
     # THE SAME CYCLE IS NOTHING TO DO.  What matters is WHICH cycle the
     # target carries - a coarse "the target has an entry" test would make
-    # the section publish once and never again.
+    # the section publish once and never again.  And a RUN IS A CYCLE: the
+    # owner gave the 00Z and the 12Z cycle a window each, so the 12Z cycle
+    # of a day is not the same run as the 00Z cycle of it, and the test
+    # has to look at the cycle as well as at the date.
+    old_cyc = (have[0].get("cycle") or []) if have else []
+    new_cyc = entry.get("cycle") or []
     if have and old and new and old == new and not args.force:
-        say("   the target already carries the %s section - nothing to do" % old)
-        return 4
+        if old_cyc == new_cyc:
+            say("   the target already carries the %s section - nothing to do"
+                % old)
+            return 4
+        if old_cyc == ["12Z"] and new_cyc == ["00Z"]:
+            say("   the target carries the 12Z cycle of the %s run, which is "
+                "the later one - NOTHING IS CHANGED." % old)
+            return 4
     # NEVER PUT THE TARGET BACK TO AN OLDER CYCLE.
     if have:
         if old and new and old > new:

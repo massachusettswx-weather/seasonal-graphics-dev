@@ -1238,6 +1238,8 @@ def build_maps_page(reg):
       <button class="segbtn ghost on" data-window="1">Month</button>
       <button class="segbtn ghost" data-window="3">3-month</button>
     </div>
+    <label for="snowArchive">Compare with</label>
+    <select id="snowArchive" class="ctrl" disabled></select>
   </div>
   <div class="maplegend" id="maplegend"></div>
   <div class="maptimeline" id="maptimeline"></div>

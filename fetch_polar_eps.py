@@ -7,7 +7,24 @@ two series the polar-cap sections are drawn from: the area-weighted polar
 cap (60-90N) mean and the North Pacific and North Atlantic sector means, at
 the ten pressure levels the section is drawn on.
 
-    python3 fetch_polar_eps.py
+    python3 fetch_polar_eps.py                # both cycles of the newest run
+    python3 fetch_polar_eps.py --cycle 00z    # the 00Z cycle on its own
+    python3 fetch_polar_eps.py --cycle 12z    # the 12Z cycle on its own
+
+The OWNER'S WINDOWS (27 November 2026): the 00Z cycle is published between
+07:00 and 08:30 UTC and the 12Z cycle between 19:00 and 20:30 UTC, each
+on its own.  A cycle is therefore published on its own, and the chart says
+which cycle it is showing.
+
+THE MODEL'S OWN ANALYSIS FILLS THE SEAM.  NOAA's CORe reanalysis runs two
+days behind the day it is fetched for, so the reanalysis half of the
+section stops two days short of the forecast and the chart would carry a
+white band where the two halves meet.  The 0-hour step of the open data is
+ECMWF's own ANALYSIS (checked: it agrees with the CORe's polar-cap mean at
+10 hPa to about 23 m, the same order as the difference between the two
+centres), so the run's analysis - and, if the reanalysis is further
+behind, the day before's - is used to close the gap.  The chart then says
+which days are reanalysis and which are the model's analysis.
 
 WHY THE OPEN DATA AND NOT THE CLIMATE STORE.  The ECDS store's
 `s2s-forecasts` dataset serves the EXTENDED-range ensemble and nothing
@@ -34,6 +51,7 @@ WHAT IS WRITTEN.  The series goes to data/polar_eps_z.json under the key
 data/polar_eps_jobs.json - so a restart picks up where it stopped instead of
 fetching the same step twice.  Both files are in git.
 """
+import argparse
 import json
 import os
 import sys
@@ -68,6 +86,9 @@ CYCLES = ("00z", "12z")
 WORKERS = 4
 # the open data keeps about four days, so the search walks back that far
 LOOKBACK_DAYS = 6
+# the reanalysis the section is measured with, and the last day it holds -
+# the model's own analysis is used for the days after it
+CORE_RECENT = os.path.join(DATA, "polar_core_recent.npz")
 
 
 def g():
@@ -135,38 +156,6 @@ class MissingStep(Exception):
     """The store has the index of a step but not the data behind it yet."""
 
 
-def newest_run():
-    """The newest run the open data has, and the cycles it has.
-
-    The run date is the one whose BOTH cycles are published: the owner asked
-    for the 00Z suite and the 12Z suite of the same run, and the 12Z cycle
-    of a day appears some hours after its 00Z cycle.  When the day's 12Z
-    cycle is not out yet, the day before is used - both of its cycles are
-    there, and it is the newest run that has both.
-
-    THE DATA IS CHECKED, NOT ONLY THE INDEX: the open data publishes a
-    run's index before its data (the index is a couple of megabytes, the
-    data is gigabytes), so a run can be named and still have nothing
-    behind it - which is how the 2026-11-27 12Z cycle was picked on the
-    evening of the 27th and turned out to have only some of its steps.
-    """
-    today = datetime.now(timezone.utc).date()
-    for back in range(0, LOOKBACK_DAYS):
-        d = (today - timedelta(days=back)).strftime("%Y%m%d")
-        cycles = []
-        for cyc in CYCLES:
-            if head_ok(file_url(d, cyc, "enfo", 36, "index")) and \
-                    head_ok(file_url(d, cyc, "enfo", 36, "grib2")):
-                cycles.append(cyc)
-        if len(cycles) == len(CYCLES):
-            return d, cycles
-        if back == 0:
-            print("   the newest run %s has only the %s cycle(s) - the day "
-                  "before is used" % (d, " and ".join(cycles) or "none"),
-                  flush=True)
-    return None, []
-
-
 def day_steps(cyc):
     """-> {day number (1..15): the step that lands on that day at 12Z}.
 
@@ -184,6 +173,86 @@ def day_steps(cyc):
             step += 1
         out[k] = min(step, 360)
     return out
+
+
+def cycle_complete(day, cyc):
+    """-> True when the cycle is fully published.
+
+    BOTH the index and the data are checked, for every step the cycle
+    needs.  The open data publishes a run's index before its data - the
+    index is a couple of megabytes, the data is gigabytes - so a cycle
+    can be named and still have nothing behind it, which is how the
+    2026-11-27 12Z cycle was picked on the evening of the 27th and turned
+    out to have only some of its steps.
+    """
+    steps = sorted(set(list(day_steps(cyc).values())) | {0})
+    for step in steps:
+        for stream in ("oper", "enfo"):
+            if not head_ok(file_url(day, cyc, stream, step, "index")):
+                return False
+            if not head_ok(file_url(day, cyc, stream, step, "grib2")):
+                return False
+    return True
+
+
+def cycle_present(day, cyc):
+    """-> True when the cycle has begun to be published.
+
+    The open data puts a cycle up a step at a time - the first step about
+    7.7 hours after the init, the last one about 8.5 hours after it - so
+    a cycle that has its first step is one the pull can work on while the
+    rest arrives.
+    """
+    for step in (24, 0):
+        for stream in ("oper", "enfo"):
+            if not head_ok(file_url(day, cyc, stream, step, "index")):
+                return False
+            if not head_ok(file_url(day, cyc, stream, step, "grib2")):
+                return False
+    return True
+
+
+def newest_run(want, complete=False):
+    """The newest run the open data has, and the cycles it has.
+
+    `want` is "00z", "12z" or "both".  The run date is the newest whose
+    wanted cycles are there.  When the day's 12Z cycle is not out yet, the
+    day before is used - it is the newest run that has what is asked for.
+
+    `complete` asks for the cycles to be WHOLE (every step published),
+    not merely begun; the publisher uses that to decide whether there is
+    anything new to draw.
+    """
+    wanted = CYCLES if want == "both" else (want,)
+    today = datetime.now(timezone.utc).date()
+    for back in range(0, LOOKBACK_DAYS):
+        d = (today - timedelta(days=back)).strftime("%Y%m%d")
+        cycles = []
+        for cyc in wanted:
+            ok = (cycle_complete(d, cyc) if complete
+                  else cycle_present(d, cyc))
+            if ok:
+                cycles.append(cyc)
+        if len(cycles) == len(wanted):
+            return d, cycles
+        if back == 0:
+            print("   the newest run %s has only the %s cycle(s) of the %s "
+                  "wanted - the day before is used"
+                  % (d, " and ".join(cycles) or "none", " and ".join(wanted)),
+                  flush=True)
+    return None, []
+
+
+def core_last_day():
+    """The last day the reanalysis file holds, or "" when there is none."""
+    if not os.path.exists(CORE_RECENT):
+        return ""
+    try:
+        d = np.load(CORE_RECENT, allow_pickle=True)
+        times = [str(t) for t in d["times"]]
+    except Exception:                                # noqa: BLE001
+        return ""
+    return times[-1][:10] if times else ""
 
 
 # --------------------------------------------------------------------------
@@ -307,12 +376,78 @@ def fetch_step(day, cyc, step):
     return out, members
 
 
+def fetch_analysis(day, cyc):
+    """ECMWF's own ANALYSIS of one run -> (the cap mean per level, the
+    sector means).
+
+    It is the 0-hour step of the "oper" stream: the state the run started
+    from, which is the ECMWF's analysis of that hour.  It is used for the
+    days the reanalysis does not reach - NOAA's CORe runs about two days
+    behind the day it is fetched for, so without this the section would
+    carry a white band where the reanalysis ends and the forecast begins.
+
+    Only the control is read: at 0 hours every member of the ensemble is
+    the same analysis, so the ensemble mean of it is the analysis.
+    """
+    s = session()
+    step = 0
+    url = file_url(day, cyc, "oper", step, "index")
+    r = s.get(url, timeout=180)
+    if r.status_code == 404:
+        raise MissingStep("the index of the %s %s analysis is not there yet"
+                          % (day, cyc))
+    if r.status_code != 200:
+        raise RuntimeError("the index %s is not there (HTTP %d)"
+                           % (url, r.status_code))
+    rows = []
+    for line in r.text.splitlines():
+        try:
+            d = json.loads(line)
+        except Exception:                            # noqa: BLE001
+            continue
+        if d.get("param") != "z":
+            continue
+        try:
+            lev = int(d.get("levelist"))
+        except Exception:                            # noqa: BLE001
+            continue
+        if lev in LEVELS:
+            rows.append((lev, int(d["_offset"]), int(d["_length"])))
+    grib = file_url(day, cyc, "oper", step, "grib2")
+    out = {}
+    grid = [None, None, 0, 0]
+    for lev, off, length in rows:
+        rr = s.get(grib, headers={"Range": "bytes=%d-%d"
+                                  % (off, off + length - 1)}, timeout=180)
+        if rr.status_code == 404:
+            raise MissingStep("the %s %s analysis is not there yet"
+                              % (day, cyc))
+        if rr.status_code not in (200, 206):
+            raise RuntimeError("the message %s (%d bytes) came back HTTP %d"
+                               % (grib, length, rr.status_code))
+        cap, sec = reduce_message(rr.content, 1.0, grid)
+        out[lev] = (float(cap), {name: float(sec[name]) for name in SECTORS})
+    missing = [l for l in LEVELS if l not in out]
+    if missing:
+        raise RuntimeError("the %s %s analysis has no %s hPa field"
+                           % (day, cyc, missing[0]))
+    return out
+
+
 # --------------------------------------------------------------------------
 def main():
+    ap = argparse.ArgumentParser(description="the ECMWF EPS for the polar cap")
+    ap.add_argument("--cycle", default="both", choices=("00z", "12z", "both"),
+                    help="which cycle of the run to publish")
+    ap.add_argument("--wait-minutes", type=int, default=0,
+                    help="how long to wait for the steps the open data has "
+                         "not put up yet")
+    args = ap.parse_args()
+
     st = json.load(open(STATE)) if os.path.exists(STATE) else {"steps": {}}
     done = st.setdefault("steps", {})
 
-    day, cycles = newest_run()
+    day, cycles = newest_run(args.cycle)
     if not day:
         print("   no ECMWF run in the open data")
         return
@@ -391,6 +526,29 @@ def main():
         for key in ex.map(work, tasks):
             results[key] = True
 
+    # THE WAIT.  ECMWF publishes the open data a step at a time: measured
+    # from the objects' own timestamps, a cycle's first step lands about
+    # 7.7 hours after its init and its LAST step - the 360-hour one, the
+    # end of the fifteen-day product - about 8.5 hours after it.  The
+    # owner's windows open before that (the 12Z window at 19:00, the data
+    # whole at about 20:30), so the pull waits for the steps that are not
+    # there yet and fetches them when they arrive.  The series is written
+    # only when the cycle is whole.
+    if args.wait_minutes:
+        left = [t for t in tasks
+                if not (done.get(t[3]) or {}).get("ok")]
+        waited = 0
+        while left and waited < args.wait_minutes:
+            nap = min(5, args.wait_minutes - waited)
+            print("   %d steps are not there yet - waiting %d min for them"
+                  % (len(left), nap), flush=True)
+            time.sleep(nap * 60)
+            waited += nap
+            with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+                list(ex.map(work, left))
+            left = [t for t in left
+                    if not (done.get(t[3]) or {}).get("ok")]
+
     # THE SERIES: the days of the run, the pooled mean of the cycles.
     init = datetime.strptime(day, "%Y%m%d").date()
 
@@ -426,6 +584,10 @@ def main():
     # half up for a while.  The days that are not whole are left out, and
     # the guard below keeps the last whole series until the new one is
     # whole.
+    #
+    # A SINGLE CYCLE IS PUBLISHED ON ITS OWN - the owner gave the 00Z and
+    # the 12Z cycle a window each - so a cycle on its own carries its own
+    # days, and the chart says which cycle it is showing.
     if len(cycles) > 1:
         days = {d: keys for d, keys in days.items()
                 if len(keys) == len(cycles)}
@@ -470,15 +632,93 @@ def main():
               % (len(out_times), DAYS), flush=True)
         return
 
+    # THE MODEL'S OWN ANALYSIS, for the days the reanalysis does not
+    # reach.  NOAA's CORe runs about two days behind the day it is fetched
+    # for, so the reanalysis half of the section would stop short of the
+    # forecast and the chart would carry a white band where the two meet.
+    # The 0-hour step of the open data is ECMWF's own analysis of that
+    # hour (it agrees with the CORe's polar-cap mean at 10 hPa to about
+    # 23 m, the same order as the difference between the two centres), so
+    # it closes the seam.
+    ana_times, ana_values, ana_sectors = [], [], {n: [] for n in SECTORS}
+    ana_by_day = {}
+    core_last = core_last_day()
+    fc_first = out_times[0][:10] if out_times else ""
+    if fc_first:
+        # the run's own analysis, and the day before's, in case the
+        # reanalysis is further behind than it usually is
+        wanted = []
+        for cyc in cycles:
+            hour = int(cyc[:2])
+            for back in (0, 1):
+                d = (init - timedelta(days=back)).strftime("%Y%m%d")
+                key = "%s/%s/analysis" % (d, cyc)
+                if (done.get(key) or {}).get("ok"):
+                    wanted.append((key, (init - timedelta(days=back)),
+                                   "%02d" % hour, cyc))
+                    continue
+                try:
+                    vals = fetch_analysis(d, cyc)
+                except MissingStep:
+                    continue
+                except Exception as e:                # noqa: BLE001
+                    print("      the %s %s analysis FAILED: %r"
+                          % (d, cyc, e), flush=True)
+                    continue
+                done[key] = {"ok": True, "cycle": cyc, "analysis": True,
+                             "cap": {str(lev): vals[lev][0]
+                                     for lev in LEVELS},
+                             "sectors": {name: {str(lev): vals[lev][1][name]
+                                                for lev in LEVELS}
+                                         for name in SECTORS}}
+                with lock:
+                    with open(STATE + ".tmp", "w") as f:
+                        json.dump(st, f, indent=1)
+                    os.replace(STATE + ".tmp", STATE)
+                wanted.append((key, (init - timedelta(days=back)),
+                               "%02d" % hour, cyc))
+        for key, when, hour, cyc in sorted(wanted, key=lambda w: w[1]):
+            rec_a = done.get(key) or {}
+            if not rec_a.get("cap"):
+                continue
+            t = when.strftime("%Y-%m-%d")
+            # only the days that are between the reanalysis and the
+            # forecast: the rest the reanalysis already covers
+            if core_last and t <= core_last:
+                continue
+            if t >= fc_first:
+                continue
+            # ONE ANALYSIS A DAY: when both cycles are in the series their
+            # analyses fall on the same calendar day - the 00Z cycle's at
+            # 00Z and the 12Z cycle's at 12Z - and the 12Z one is kept,
+            # because the reanalysis is measured at 12Z.
+            if t in ana_by_day and ana_by_day[t][1] >= hour:
+                continue
+            ana_by_day[t] = (rec_a, hour)
+        for t in sorted(ana_by_day):
+            rec_a, hour = ana_by_day[t]
+            ana_times.append("%s-01 %s" % (t, hour))
+            ana_values.append([rec_a["cap"][str(lev)] for lev in LEVELS])
+            for name in SECTORS:
+                ana_sectors[name].append([rec_a["sectors"][name][str(lev)]
+                                          for lev in LEVELS])
+        if ana_times:
+            print("   the model's own analysis fills %s to %s"
+                  % (ana_times[0][:10], ana_times[-1][:10]), flush=True)
+
+    run_txt = " ".join("%s %sZ" % (day, c[:2].upper()) for c in cycles)
     rec = {"times": out_times, "values": out_values,
            "sectors": out_sectors, "levels": list(LEVELS),
-           "run": "%s-%s-%s %s" % (day[0:4], day[4:6], day[6:8],
-                                   "+".join("%sZ" % c[:2].upper()
-                                            for c in cycles)),
+           "run": run_txt,
            "cycles": ["%sZ" % c[:2].upper() for c in cycles],
+           "product": "medium-range",
            "frequency": "daily", "members": min(members) if members else 0,
            "source": "ECMWF open data: the control forecast and the fifty "
-                     "perturbed members of the %s run" % day}
+                     "perturbed members of the %s run" % run_txt}
+    if ana_times:
+        rec["analysis_times"] = ana_times
+        rec["analysis_values"] = ana_values
+        rec["analysis_sectors"] = ana_sectors
     series = json.load(open(OUT)) if os.path.exists(OUT) else {}
     series[TAG] = rec
     with open(OUT + ".tmp", "w") as f:
@@ -494,9 +734,14 @@ def main():
                   "levels": list(LEVELS), "run": rec["run"],
                   "frequency": rec.get("frequency", "daily"),
                   "members": rec.get("members", 0),
-                  "cycles": rec.get("cycles")}
+                  "cycles": rec.get("cycles"),
+                  "product": rec.get("product")}
     if rec.get("sectors"):
         cache[TAG]["sectors"] = rec["sectors"]
+    if rec.get("analysis_times"):
+        cache[TAG]["analysis_times"] = rec["analysis_times"]
+        cache[TAG]["analysis_values"] = rec["analysis_values"]
+        cache[TAG]["analysis_sectors"] = rec["analysis_sectors"]
     with open(CACHE + ".tmp", "w") as f:
         json.dump(cache, f)
     os.replace(CACHE + ".tmp", CACHE)
