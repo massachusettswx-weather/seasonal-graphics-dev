@@ -1665,12 +1665,12 @@
    "members": 51,
    "init": "2026-11-26",
    "polar": {
-    "file": "assets/polar/polar_cap_eps.png?v=20261127194513",
+    "file": "assets/polar/polar_cap_eps.png?v=20261127194655",
     "caption": "Polar cap (60-90N) geopotential height anomaly - ECMWF EPS.",
     "ok": true
    },
    "polar_sectors": {
-    "file": "assets/polar/polar_sectors_eps.png?v=20261127194513",
+    "file": "assets/polar/polar_sectors_eps.png?v=20261127194655",
     "caption": "North Pacific and North Atlantic (60-90N) geopotential height anomaly - ECMWF EPS."
    },
    "snow_ok": false,
