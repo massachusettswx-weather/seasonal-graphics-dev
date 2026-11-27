@@ -676,13 +676,26 @@ The measurement is in `/workspace/era5_vs_noaa.txt`.
 **25 NOVEMBER 2026 - THE OWNER STOPPED THE SCHEDULES AND RESCOPED THE
 ARCHIVE.**
 
-* **EVERY SCHEDULED TASK IS OFF.**  The nightly `seasonal-gefs-subs`
-  task (465527736623226, `0 3 * * *` UTC) is DELETED - the list is empty
-  - and the session's own reminders are cancelled.  **DO NOT RE-CREATE
-  A SCHEDULE WITHOUT THE OWNER SAYING SO.**  The daily GEFSv12 update
-  to the live site therefore STOPS; the last cycle published is the
-  20261124 00Z (operational commit `7b21bdb`).  Everything else is
-  manual: the narrow paths still work by hand.
+* **THE AUTOMATION IS BACK (the owner, 26 Nov 2026): "why don't I see the
+  newly updated EC46 from today and GEFSv12?! It has to be automated... on
+  both dev and ops page."**  A NEW scheduled task `seasonal-polar-daily`
+  (467695594737817, `0 3 * * *` UTC) runs `tools/gefs_subs_disseminate.sh`
+  and publishes BOTH products to BOTH copies.  **THE EC46 IS NOW WIRED
+  INTO THE WATCHER** (it never was): the charts are drawn from whatever
+  has arrived and `publish_polar_ec46.py` puts them on the dev copy and
+  the operational site; the narrow path refuses an older cycle, so a
+  pass with nothing new does nothing.  The watcher also waits for the
+  EC46's pull to finish before it stops.
+* **THE EC46'S DAY TEST WAS IN UTC AND MUST BE THE OWNER'S OWN
+  WEEKDAYS.**  The job runs at 03:00 UTC, which is the PREVIOUS EVENING
+  where the owner is, so the UTC test SKIPPED THE OWNER'S THURSDAY -
+  which is why the EC46 did not update on 26 November.  It now reads
+  `TZ=America/New_York date +%u` ✓.
+* The old `seasonal-gefs-subs` task is deleted.  **DO NOT RE-CREATE A
+  SCHEDULE WITHOUT THE OWNER SAYING SO** - and do not add a second one:
+  one task does the GEFSv12 every night and the EC46 on its three days.
+  The GEFSv12's last cycle before the pause was the 20261124 00Z
+  (operational commit `7b21bdb`).
 * **THE ARCHIVE BELONGS TO THE POLAR CAP ONLY.**  The four October 2026
   seasonal runs are OFF the site: `docs/data/maps/*/2026-10/` is deleted,
   the index lists no archived run, and the maps page has no "Compare

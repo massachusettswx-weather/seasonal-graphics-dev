@@ -112,8 +112,14 @@ fi
 # The run is the NEWEST one the store has, found by probing for the 46-day
 # window, and a run that is already on disk is not asked for again.
 EC46_DAYS="${EC46_DAYS:-1 4 6}"     # date +%u: 1 = Monday ... 6 = Saturday
+# THE OWNER'S OWN WEEKDAYS, NOT UTC's.  The nightly job runs at 03:00 UTC,
+# which is the PREVIOUS EVENING where the owner is, so a UTC weekday test
+# skipped the owner's Thursday entirely (26 November 2026: the job ran at
+# 03:00 UTC on Friday and the fetch was refused - the owner's word was that
+# the EC46 had to be updated every one of their three days).
+EC46_TZ="${EC46_TZ:-America/New_York}"
 if [ -f fetch_polar_ec46.py ]; then
-    today_u=$(date -u +%u)
+    today_u=$(TZ=$EC46_TZ date +%u)
     case " $EC46_DAYS " in
         *" $today_u "*)
             setsid nohup python3 -u fetch_polar_ec46.py \
