@@ -99,6 +99,18 @@ if [ -n "$MISSING" ]; then
 fi
 
 # ------------------------------------------------------------------
+# 1c. THE ECMWF'S OWN ANALYSIS
+# Every model's polar section is drawn in three parts: the reanalysis, the
+# model's OWN analysis, and the model's forecast.  The middle part is the
+# ECMWF's own analysis - the 0-hour step of the open data - and the open
+# data only keeps about four days of it, so the analysis of a day has to
+# be captured while it is there.  This job runs every night, so it is what
+# keeps the cache fed: the seasonal's analysis day is the FIRST of its
+# month, and that is twenty-five days before the seasonal is published.
+say "the ECMWF's own analysis"
+python3 -u fetch_polar_analysis.py --days 3 >>"$LOG" 2>&1 || true
+
+# ------------------------------------------------------------------
 # 2. the fetch state
 # The state file is what a rebuild would throw away, and it holds an
 # hour of downloading.  It is committed so the next run resumes instead

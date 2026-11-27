@@ -524,10 +524,30 @@ def fit_subtitle(parts, limit=1995.0, fs=9.5, fig_w=13.5, x0=0.052):
             return s
 
 
+def _fig_text_w(fig, s, fontsize, weight="bold"):
+    """The width of a piece of text, in figure coordinates.
+
+    Used to keep the three zone labels from running into each other: the
+    name of the model's own analysis carries its dates when there is room
+    for them and drops them when there is not.
+    """
+    if not s:
+        return 0.0
+    try:
+        r = fig.canvas.get_renderer()
+        t = fig.text(0, 0, s, fontsize=fontsize, fontweight=weight)
+        bb = t.get_window_extent(renderer=r)
+        t.remove()
+        return bb.width / float(fig.bbox.width)
+    except Exception:                                    # noqa: BLE001
+        return 0.0
+
+
 def plot_section(times, norm, levels, out_path, title, subtitle,
                  split=None, split_label="", credit=None, handle="@Massachusettswx",
                  vmax=5.0, analysis_label=None, forecast_label=None,
-                 today=None, forecast_alpha=0.55, bridge_label=None):
+                 today=None, forecast_alpha=0.55, bridge_label=None,
+                 bridge_span=None, bridge_label_short=None):
     """Draw the time-height section.
 
     times:  (n,)   ISO strings
@@ -536,9 +556,12 @@ def plot_section(times, norm, levels, out_path, title, subtitle,
     split:  the index where the forecast begins, or None
     today:  the index of "now", drawn as a marker
     bridge_label: the name of the days that are the model's own analysis
-                  rather than the reanalysis - drawn just in front of the
-                  split, so the reader can see where the reanalysis ends
-                  and the model takes over
+                  rather than the reanalysis
+    bridge_span:  (i0, i1) the columns of the model's own analysis - the
+                  days between the reanalysis and the forecast.  They are
+                  washed a light grey and closed by a line at each end, so
+                  that the reader can see exactly where the observation
+                  ends and the model begins.
 
     The layout is this site's own: a bold title and a grey descriptor line
     on the LEFT, a plain-text summary on the right, the colour bar below
@@ -653,6 +676,20 @@ def plot_section(times, norm, levels, out_path, title, subtitle,
     ax2.spines["right"].set_linewidth(0.9)
     ax.tick_params(length=3, colors=C_TEXT)
 
+    # THE THREE ZONES.  The section is drawn in three parts: the
+    # reanalysis, the model's OWN analysis, and the model's forecast.  The
+    # zone of the model's own analysis - the days the reanalysis does not
+    # reach - is washed a light grey and closed by a line at each end, so
+    # that the reader can see where the observation ends and the model
+    # begins.  The wash is very light: a heavy one would mute the colours
+    # of the very days the chart is about.
+    if bridge_span:
+        i0, i1 = bridge_span
+        ax.axvspan(i0 - 0.5, i1 + 0.5, color=C_MUTED, alpha=0.10,
+                   zorder=4, lw=0)
+        ax.axvline(i0 - 0.5, color=C_SPLIT, lw=1.0, ls=(0, (1, 2.5)),
+                   zorder=6)
+
     # the boundary between the analysis and the forecast
     if split is not None and 0 < split < n:
         ax.axvline(split - 0.5, color=C_SPLIT, lw=1.3, ls=(0, (5, 3)),
@@ -665,21 +702,40 @@ def plot_section(times, norm, levels, out_path, title, subtitle,
         fig.text(0.052, 0.921, subtitle, fontsize=9.5, color=C_MUTED,
                  ha="left", va="top")
 
-    # the two sides are named just above the panel
+    # THE THREE ZONES ARE NAMED ABOVE THE PANEL: the reanalysis on the
+    # left, the model's own analysis where that zone begins, and the
+    # forecast on the right.  The model's analysis is named where the zone
+    # STARTS, so that the label points at the days it is about.
+    bx = None
+    if bridge_span:
+        i0, i1 = bridge_span
+        bx = 0.052 + (i0 + 0.5) / float(n) * 0.876
     if analysis_label and split:
-        fig.text(0.056, 0.858, analysis_label, fontsize=10,
+        txt = analysis_label
+        if bx is not None:
+            # the reanalysis's own label must not run into the label of the
+            # model's own analysis, which starts where its zone does
+            if _fig_text_w(fig, txt, 10) > (bx - 0.006 - 0.056):
+                txt = txt.replace(" reanalysis", "")
+        fig.text(0.056, 0.858, txt, fontsize=10,
                  fontweight="bold", color=C_SPLIT, ha="left", va="bottom")
     if forecast_label:
         fig.text(0.924, 0.858, forecast_label, fontsize=10,
                  fontweight="bold", color=C_SPLIT, ha="right", va="bottom")
-    # the days that are the MODEL'S OWN analysis - the run's 0-hour step,
-    # which is what closes the seam between the reanalysis and the
-    # forecast - are named just in front of the split line, so the reader
-    # can see exactly where the reanalysis ends and the model begins
-    if bridge_label and split and 0 < split < n:
-        x = 0.052 + (split - 0.5) / float(n) * 0.876
-        fig.text(x - 0.008, 0.858, bridge_label, fontsize=9,
-                 fontweight="bold", color=C_MUTED, ha="right", va="bottom")
+    if bridge_label:
+        if bridge_span:
+            x = bx
+            txt = bridge_label
+            if bridge_label_short:
+                room = 0.924 - _fig_text_w(fig, forecast_label or "", 10) - x
+                if _fig_text_w(fig, txt, 9.5) > room - 0.008:
+                    txt = bridge_label_short
+            fig.text(x + 0.005, 0.858, txt, fontsize=9.5,
+                     fontweight="bold", color=C_SPLIT, ha="left", va="bottom")
+        elif split and 0 < split < n:
+            x = 0.052 + (split - 0.5) / float(n) * 0.876
+            fig.text(x - 0.008, 0.858, bridge_label, fontsize=9,
+                     fontweight="bold", color=C_MUTED, ha="right", va="bottom")
 
     # the colour bar, below the panel.  It is drawn from a clean mappable so
     # that it always shows the colours at full strength, whatever the
@@ -904,13 +960,20 @@ def _wedge(lon0, lon1, rmax, colour, alpha=1.0):
 def plot_sector_sections(times, sectors, levels, out_path, title, subtitle,
                          split=None, credit=None, handle="@Massachusettswx",
                          order=SECTOR_ORDER,
-                         forecast_alpha=0.62):
+                         forecast_alpha=0.62, analysis_label=None,
+                         forecast_label=None, bridge_label=None,
+                         bridge_span=None, bridge_label_short=None):
     """Draw the polar cap split into two sectors, side by side.
 
     times:   (n,)    ISO strings
     sectors: {name: (n, nlev)} the geopotential height ANOMALY in metres,
              one array per sector
     levels:  (nlev,) the pressure levels, hPa
+    bridge_span: (i0, i1) the columns of the model's OWN analysis - the
+             days between the reanalysis and the forecast.  They are
+             washed a light grey and closed by a line at each end, and the
+             three zones are named above the panels, so that the reader
+             can see where the observation ends and the model begins.
 
     The same figure as the polar-cap section - the same colours, the same
     log pressure axis, the same height axis on the right - with one panel
@@ -1036,6 +1099,16 @@ def plot_sector_sections(times, sectors, levels, out_path, title, subtitle,
             ax.spines[sname].set_linewidth(0.9)
         ax.tick_params(length=3, colors=C_TEXT)
 
+        # THE THREE ZONES, in every panel: the reanalysis, the model's OWN
+        # analysis (washed a light grey and closed by a line at each end)
+        # and the model's forecast.  See plot_section.
+        if bridge_span:
+            i0, i1 = bridge_span
+            ax.axvspan(i0 - 0.5, i1 + 0.5, color=C_MUTED, alpha=0.10,
+                       zorder=4, lw=0)
+            ax.axvline(i0 - 0.5, color=C_SPLIT, lw=1.0, ls=(0, (1, 2.5)),
+                       zorder=6)
+
         if split is not None and 0 < split < n:
             ax.axvline(split - 0.5, color=C_SPLIT, lw=1.2, ls=(0, (5, 3)),
                        zorder=6)
@@ -1071,6 +1144,41 @@ def plot_sector_sections(times, sectors, levels, out_path, title, subtitle,
     if subtitle:
         fig.text(0.052, 0.918, subtitle, fontsize=9.5, color=C_MUTED,
                  ha="left", va="top")
+
+    # THE THREE ZONES ARE NAMED ABOVE THE PANELS, the way the cap section
+    # names them: the reanalysis on the left, the model's own analysis
+    # where that zone begins, and the forecast on the right.
+    bx = None
+    if bridge_span:
+        i0, i1 = bridge_span
+        bx = left0 + (i0 + 0.5) / float(n) * width
+    if analysis_label and split:
+        txt = analysis_label
+        if bx is not None:
+            # the reanalysis's own label must not run into the label of the
+            # model's own analysis, which starts where its zone does
+            if _fig_text_w(fig, txt, 10) > (bx - 0.006 - left0):
+                txt = txt.replace(" reanalysis", "")
+        fig.text(left0, 0.862, txt, fontsize=10,
+                 fontweight="bold", color=C_SPLIT, ha="left", va="bottom")
+    if forecast_label:
+        fig.text(panel_right, 0.862, forecast_label, fontsize=10,
+                 fontweight="bold", color=C_SPLIT, ha="right", va="bottom")
+    if bridge_label:
+        if bridge_span:
+            x = bx
+            txt = bridge_label
+            if bridge_label_short:
+                room = panel_right - _fig_text_w(fig, forecast_label or "",
+                                                 10) - x
+                if _fig_text_w(fig, txt, 9.5) > room - 0.008:
+                    txt = bridge_label_short
+            fig.text(x + 0.005, 0.862, txt, fontsize=9.5,
+                     fontweight="bold", color=C_SPLIT, ha="left", va="bottom")
+        elif split and 0 < split < n:
+            x = left0 + (split - 0.5) / float(n) * width
+            fig.text(x - 0.008, 0.862, bridge_label, fontsize=9,
+                     fontweight="bold", color=C_MUTED, ha="right", va="bottom")
 
     sm = ScalarMappable(norm=norm_c, cmap=cmap)
     sm.set_array([])

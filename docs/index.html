@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Home &middot; Seasonal Forecast Graphics</title>
-<link rel="canonical" href="https://massachusettswx-weather.github.io/seasonal-graphics/">
-<link rel="stylesheet" href="assets/css/style.css?v=20261124035541"><link rel="icon" href="favicon.ico">
+<title>Home &middot; Seasonal Forecast Graphics &middot; DEVELOPMENT COPY</title>
+<link rel="canonical" href="https://massachusettswx-weather.github.io/seasonal-graphics-dev/">
+<link rel="stylesheet" href="assets/css/style.css?v=20261127211923"><link rel="icon" href="favicon.ico">
 
 <script>
 /* the theme is read back before anything is drawn, so a dark screen never
@@ -16,14 +16,14 @@
 })();
 </script>
 <header class="top">
-  <h1><a href="https://massachusettswx-weather.github.io/seasonal-graphics/">Seasonal Forecast Graphics</a></h1>
-  <span class="sub">ECMWF SEAS5 &amp; C3S seasonal systems &middot; December 2026 &amp; November 2026 inits</span>
+  <h1><a href="https://massachusettswx-weather.github.io/seasonal-graphics-dev/">Seasonal Forecast Graphics</a></h1>
+  <span class="sub">ECMWF SEAS5 &amp; C3S seasonal systems &middot; December 2026 &amp; November 2026 inits &middot; <strong>DEVELOPMENT COPY</strong></span>
   <span class="spacer"></span>
   <button class="themebtn" id="themebtn" type="button">Dark</button>
-  <a href="https://github.com/massachusettswx-weather/seasonal-graphics" target="_blank"
+  <a href="https://github.com/massachusettswx-weather/seasonal-graphics-dev" target="_blank"
      rel="noopener">GitHub</a>
 </header>
-<nav class="tabs"><a href="https://massachusettswx-weather.github.io/seasonal-graphics/" class="active">Home</a><a href="https://massachusettswx-weather.github.io/seasonal-graphics/model.html">Model</a><a href="https://massachusettswx-weather.github.io/seasonal-graphics/snow.html">Snowfall</a><a href="https://massachusettswx-weather.github.io/seasonal-graphics/spv.html">Stratosphere</a><a href="https://massachusettswx-weather.github.io/seasonal-graphics/enso.html">ENSO</a><a href="https://massachusettswx-weather.github.io/seasonal-graphics/maps.html">Maps</a></nav>
+<nav class="tabs"><a href="https://massachusettswx-weather.github.io/seasonal-graphics-dev/" class="active">Home</a><a href="https://massachusettswx-weather.github.io/seasonal-graphics-dev/model.html">Model</a><a href="https://massachusettswx-weather.github.io/seasonal-graphics-dev/snow.html">Snowfall</a><a href="https://massachusettswx-weather.github.io/seasonal-graphics-dev/spv.html">Stratosphere</a><a href="https://massachusettswx-weather.github.io/seasonal-graphics-dev/enso.html">ENSO</a><a href="https://massachusettswx-weather.github.io/seasonal-graphics-dev/maps.html">Maps</a></nav>
 </head>
 <body>
 <div class="card">
@@ -36,7 +36,7 @@
   zonal-mean zonal
   wind (the stratospheric polar vortex proxy) against the ERA5
   1991&ndash;2020 climatology.
-  The <a href="https://massachusettswx-weather.github.io/seasonal-graphics/spv.html#polar">polar cap section</a> is the same stratosphere
+  The <a href="https://massachusettswx-weather.github.io/seasonal-graphics-dev/spv.html#polar">polar cap section</a> is the same stratosphere
   from the other side: the 60&ndash;90&deg;N geopotential height anomaly as a
   time-height picture, in front of NOAA&rsquo;s CORe reanalysis, for the ECMWF
   SEAS5 and for NOAA&rsquo;s GEFSv12.</p>
@@ -88,7 +88,7 @@
 </a><a class="model" href="model.html?m=ec46">
   <h3>ECMWF EC46</h3>
   <div class="meta">ECMWF sub-seasonal ensemble (EC46) · 101 members · a daily run with a 48-hour delay · the whole 46-day extended range, so this section covers the run to its end rather than whole seasons. The polar-cap geopotential height is read from ECMWF's own climate store, which carries ten pressure levels rather than the twelve the seasonal archive carries.</div>
-  <div class="tags"><span class="tag no">Snowfall</span><span class="tag no">10 hPa wind</span><span class="tag">101 members</span><span class="tag">init 2026-11-20</span></div>
+  <div class="tags"><span class="tag no">Snowfall</span><span class="tag no">10 hPa wind</span><span class="tag">101 members</span><span class="tag">init 2026-11-25</span></div>
 </a><a class="model" href="model.html?m=eps">
   <h3>ECMWF EPS</h3>
   <div class="meta">ECMWF medium-range ensemble (EPS) · 51 members (the control and the fifty perturbations) · the first fifteen days of the run · one cycle of it at a time - the 00Z suite in the morning window and the 12Z suite in the evening one · a daily run, read from ECMWF's own open data as it is published · the polar-cap geopotential height at the ten pressure levels the section is drawn on.</div>
@@ -96,7 +96,7 @@
 </a><a class="model" href="model.html?m=gefsv12">
   <h3>NOAA GEFSv12</h3>
   <div class="meta">NOAA GEFS v12 sub-seasonal ensemble · 35 days, from the 00Z cycle, which is the one that carries the extended range · the ensemble mean of all 31 members (the control and the thirty perturbations), which the archive serves at every one of those 35 days, so the mean does not change membership half way through the chart · the polar cap's geopotential height anomaly on the same scale as the reanalysis</div>
-  <div class="tags"><span class="tag no">Snowfall</span><span class="tag no">10 hPa wind</span><span class="tag">31 members</span><span class="tag">init 2026-11-23</span></div>
+  <div class="tags"><span class="tag no">Snowfall</span><span class="tag no">10 hPa wind</span><span class="tag">31 members</span><span class="tag">init 2026-11-26</span></div>
 </a></div>
 <div class="card">
   <p class="note">Snowfall is accumulated snow in inches.
@@ -111,7 +111,7 @@
   <span>Data: Copernicus CDS (ECMWF SEAS5 and C3S seasonal systems) &middot;
         ERA5 reanalysis and climatology 1991&ndash;2020 &middot;
         NOAA CORe reanalysis (the polar cap section) &middot;
-        ECMWF open data &middot; the figures are from the 24 Nov 2026 build</span>
+        ECMWF open data &middot; the figures are from the 27 Nov 2026 build</span>
   <span><strong>@Massachusettswx</strong></span>
 </footer>
 </div>

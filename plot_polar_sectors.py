@@ -27,7 +27,8 @@ DATA = os.path.join(HERE, "data")
 sys.path.insert(0, HERE)
 
 import polar_rebase  # noqa: E402
-from polar_cap import (G0, SECTOR_LABELS, daily_climate,  # noqa: E402
+import polar_analysis  # noqa: E402
+from polar_cap import (G0, SECTOR_LABELS, _short_date, daily_climate,  # noqa: E402
                        fit_subtitle, load_clim_native, plot_sector_sections)
 from ecmwf_credit import credit_for_polar  # noqa: E402
 
@@ -61,6 +62,16 @@ def cache_for(tag):
     if tag == "eps":
         return EPS_CACHE
     return MODEL_CACHE
+
+
+def _zone_dates(bridge):
+    """'25 Nov' or '26-27 Nov' - the days of the model's own analysis."""
+    if len(bridge) == 1:
+        return _short_date(bridge[0])
+    a, b = _short_date(bridge[0]), _short_date(bridge[-1])
+    if a.split()[-1] == b.split()[-1]:
+        return "%s-%s" % (a.split()[0], b)
+    return "%s-%s" % (a, b)
 
 
 def load_sector_clim():
@@ -190,24 +201,26 @@ def main(tag="gefsv12", label="NOAA GEFSv12", short=None, rebase="forecast"):
     # THE MODEL'S OWN ANALYSIS FILLS THE SEAM.  NOAA's CORe runs about two
     # days behind the day it is fetched for, so the reanalysis half of the
     # section stops short of the forecast; the run's own analysis - the
-    # 0-hour step of the open data - closes the gap, and the chart says
-    # which days are which.  See plot_polar_cap.py for the reasoning.
-    ana_levels = [int(x) for x in (rec.get("levels") or [])]
-    at = rec.get("analysis_times") or []
-    asec = rec.get("analysis_sectors") or {}
-    bridge_pairs = []
-    for i, t in enumerate(at):
-        d = t[:10]
-        if not first or d >= first:
-            continue
-        if ana_days and d <= ana_days[-1]:
-            continue
-        if not asec or any(i >= len(as_) for as_ in asec.values()):
-            continue
-        bridge_pairs.append((d, i))
-    bridge_pairs.sort()
-    bridge = [d for d, _ in bridge_pairs]
-    bridge_idx = [i for _, i in bridge_pairs]
+    # 0-hour step of the open data, or the GEFS's own f000 step - closes
+    # the gap, and the chart says which days are which.  See
+    # plot_polar_cap.py for the reasoning.
+    ana = polar_analysis.analysis_for(tag, rec)
+    bridge, bridge_vals, asec, ana_levels, ana_label = \
+        polar_analysis.fit_bridge(ana, first, ana_days)
+    if bridge and (not ana_levels
+                   or not set(levels).issubset(set(ana_levels))):
+        # THE SECTION KEEPS ITS LEVELS: the model's own analysis does not
+        # carry every level the section is drawn on, so it cannot be drawn.
+        print("   the model's own analysis does not carry all %d levels - "
+              "the section keeps the reanalysis's last day" % len(levels))
+        bridge, bridge_vals, asec = [], [], {}
+    if bridge:
+        # the model's own analysis takes the day over: the observation ends
+        # exactly where the model's own analysis begins
+        zset = set(bridge)
+        ana_days = [d for d in ana_days if d not in zset]
+        print("   the model's own analysis fills %s to %s"
+              % (bridge[0], bridge[-1]))
 
     # the monthly climate, per sector, for each month of the series
     anom = {}
@@ -222,8 +235,10 @@ def main(tag="gefsv12", label="NOAA GEFSv12", short=None, rebase="forecast"):
         fdays, fvals = fc[name]
         # the days of the whole chart: the analysis first, then the model's
         # own analysis (the seam), then the forecast
+        has_bridge = bool(bridge) and name in asec \
+            and len(asec[name]) == len(bridge)
         if name in rv and ana_days:
-            all_days = ana_days + bridge + fdays
+            all_days = ana_days + (bridge if has_bridge else []) + fdays
             avals = rv[name][[rday[d] for d in ana_days]]
         else:
             all_days = fdays
@@ -231,11 +246,10 @@ def main(tag="gefsv12", label="NOAA GEFSv12", short=None, rebase="forecast"):
         if len(all_days) < 3:
             continue
         vals = np.vstack([avals, fvals]) if len(avals) else fvals
-        if bridge and name in asec:
+        if has_bridge:
             # the model's own analysis, on the same levels
             bcols = [ana_levels.index(l) for l in levels]
-            bvals = np.array([asec[name][i] for i in bridge_idx],
-                             float)[:, bcols]
+            bvals = np.array(asec[name], float)[:, bcols]
             vals = np.vstack([avals, bvals, fvals])
         # the monthly sector climate, as arrays, and then put on the days
         # of the series: a monthly climate applied to a daily series steps
@@ -322,16 +336,37 @@ def main(tag="gefsv12", label="NOAA GEFSv12", short=None, rebase="forecast"):
     if ana_days:
         head.append(("%d days of %s reanalysis" % (len(ana_days), _ana_name),
                      False))
+    if bridge:
+        head.append(("%d %s of the %s" % (len(bridge),
+                                           "day" if len(bridge) == 1
+                                           else "days", ana_label), True))
     head.append(("the %s %s sector forecast from %s to %s"
                  % (short, kind_word, fc_first, fc_last), False))
     subtitle = fit_subtitle(head + bits, limit=2600.0, fig_w=17.6)
 
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, "polar_sectors_%s.png" % tag)
+    # THE THREE ZONES ARE NAMED ABOVE THE PANELS, the way the cap section
+    # names them: the reanalysis on the left, the model's own analysis
+    # where that zone begins, and the forecast on the right.
+    bridge_txt = None
+    if bridge:
+        bridge_txt = "%s %s" % (ana_label, _zone_dates(bridge))
     plot_sector_sections(days, anom, levels, path, label_txt, subtitle,
                          split=(len(ana_days) + len(bridge))
                          if (ana_days or bridge) else None,
-                         credit=credit_for_polar(tag))
+                         credit=credit_for_polar(tag),
+                         analysis_label=("%s reanalysis to %s"
+                                         % (_ana_name,
+                                            _short_date(ana_days[-1])))
+                         if ana_days else None,
+                         bridge_label=bridge_txt,
+                         bridge_label_short=ana_label or None,
+                         bridge_span=(len(ana_days),
+                                      len(ana_days) + len(bridge) - 1)
+                         if bridge else None,
+                         forecast_label="%s %s forecast from %s" % (
+                             short, kind_word, _short_date(fc_first)))
     print("   the figure: %s" % path)
     return path
 

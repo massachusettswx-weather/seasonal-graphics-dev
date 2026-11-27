@@ -642,6 +642,12 @@ def main():
     # it closes the seam.
     ana_times, ana_values, ana_sectors = [], [], {n: [] for n in SECTORS}
     ana_by_day = {}
+    # THE SHARED CACHE OF THE ECMWF'S OWN ANALYSIS.  Every model's chart
+    # closes its seam with it, so the EPS's own pull - which runs every
+    # day - is what keeps it fed.  (The import is here and not at the top
+    # because that module borrows this one's http machinery.)
+    import fetch_polar_analysis as FA
+    shared = FA.load()
     core_last = core_last_day()
     fc_first = out_times[0][:10] if out_times else ""
     if fc_first:
@@ -682,6 +688,19 @@ def main():
             if not rec_a.get("cap"):
                 continue
             t = when.strftime("%Y-%m-%d")
+            # THE SHARED CACHE OF THE ECMWF'S OWN ANALYSIS.  The open data
+            # keeps about four days of it, so the analysis of a day has to
+            # be captured the day it is there - and the EPS runs every day,
+            # so the EPS's own pull is what keeps the cache fed.  The
+            # seasonal's analysis day is the first of its month, and that
+            # is twenty-five days before the seasonal is published, so the
+            # cache has to have kept it.
+            try:
+                FA.put_values(shared, t.replace("-", ""), cyc, LEVELS,
+                              rec_a["cap"], rec_a["sectors"])
+            except Exception as e:                        # noqa: BLE001
+                print("      the shared analysis cache FAILED: %r" % (e,),
+                      flush=True)
             # only the days that are between the reanalysis and the
             # forecast: the rest the reanalysis already covers
             if core_last and t <= core_last:
@@ -705,6 +724,7 @@ def main():
         if ana_times:
             print("   the model's own analysis fills %s to %s"
                   % (ana_times[0][:10], ana_times[-1][:10]), flush=True)
+        FA.save(shared)
 
     run_txt = " ".join("%s %sZ" % (day, c[:2].upper()) for c in cycles)
     rec = {"times": out_times, "values": out_values,

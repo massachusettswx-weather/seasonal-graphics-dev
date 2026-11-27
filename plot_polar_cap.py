@@ -23,6 +23,7 @@ DATA = os.path.join(HERE, "data")
 sys.path.insert(0, HERE)
 
 import polar_rebase  # noqa: E402
+import polar_analysis  # noqa: E402
 from polar_cap import (CAP_N, CAP_S, G0, LEVELS, _short_date,  # noqa: E402
                        build_climatology, daily_climate, fit_subtitle,
                        load_clim_native, load_climatology, normalise,
@@ -126,6 +127,16 @@ def normalise_monthly(times, values, levels, clim):
     with np.errstate(invalid="ignore", divide="ignore"):
         norm = np.where(msig > 0, anom / msig, np.nan)
     return anom, norm
+
+
+def _zone_dates(bridge):
+    """'25 Nov' or '26-27 Nov' - the days of the model's own analysis."""
+    if len(bridge) == 1:
+        return _short_date(bridge[0])
+    a, b = _short_date(bridge[0]), _short_date(bridge[-1])
+    if a.split()[-1] == b.split()[-1]:
+        return "%s-%s" % (a.split()[0], b)
+    return "%s-%s" % (a, b)
 
 
 def cap_mean(profiles, lat, levels):
@@ -354,6 +365,36 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
     mday = {t[:10]: i for i, t in enumerate(mt)}
 
     first = mt[0][:10]
+    # The reanalysis half: the days of the reanalysis that come before the
+    # forecast begins - the last fifteen of them.
+    ana_days = sorted(d for d in rday if d < first)[-ANA_DAYS:]
+    fc_days = sorted(mday)
+
+    # THE MODEL'S OWN ANALYSIS FILLS THE SEAM.  NOAA's CORe runs about two
+    # days behind the day it is fetched for, so the reanalysis half of the
+    # section stops short of the forecast and the chart would carry a band
+    # of nothing where the two halves meet.  The model's OWN analysis - the
+    # state the run started from - closes the gap, and the chart says
+    # which days are the reanalysis and which are the model's analysis.
+    # For the ECMWF's products it is the 0-hour step of the open data; for
+    # the GEFS it is the f000 step of its own run, which is the GFS
+    # analysis the run started from.
+    ana = polar_analysis.analysis_for(tag, _rec)
+    bridge, bridge_vals, bridge_secs, ana_levels, ana_label = \
+        polar_analysis.fit_bridge(ana, first, ana_days)
+    if bridge and (not ana_levels
+                   or not set(levs).issubset(set(ana_levels))):
+        # THE SECTION KEEPS ITS LEVELS.  The model's own analysis does not
+        # carry every level the section is drawn on - the open data has no
+        # 30 hPa - so it cannot be drawn, and a chart that changed its
+        # levels because of the seam would be a chart that changed shape
+        # from one day to the next.  The seam falls back to the
+        # reanalysis's own last day, and the split line still says where
+        # the observation ends.
+        print("   the model's own analysis does not carry all %d levels - "
+              "the section keeps the reanalysis's last day" % len(levs))
+        bridge, bridge_vals, bridge_secs = [], {}, {}
+
     # the ERA5 half may carry a different level set from the forecast
     # (the ERA5 reanalysis product serves the same twelve levels, but a
     # series built from another source may not), so the section is drawn on
@@ -367,31 +408,14 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
         mv = mv[:, mcols]
         levs = common
 
-    # The ERA5 reanalysis ends the day before the model's init, and the
-    # model's own run follows from its init.  The two halves therefore meet
-    # exactly at the run's start, and no day is drawn twice.
-    ana_days = sorted(d for d in rday if d < first)[-ANA_DAYS:]
-    fc_days = sorted(mday)
-
-    # THE MODEL'S OWN ANALYSIS FILLS THE SEAM.  NOAA's CORe runs about two
-    # days behind the day it is fetched for, so the reanalysis half of the
-    # section stops short of the forecast and the chart would carry a band
-    # of nothing where the two halves meet.  The run's own analysis - the
-    # 0-hour step of the open data - closes the gap, and the chart says
-    # which days are the reanalysis and which are the model's analysis.
-    ana_levels = [int(x) for x in (_rec.get("levels") or LEVELS)]
-    at = _rec.get("analysis_times") or []
-    av = _rec.get("analysis_values") or []
-    bridge, bridge_vals = [], {}
-    for i, t in enumerate(at):
-        d = t[:10]
-        if i >= len(av) or d >= first:
-            continue
-        if ana_days and d <= ana_days[-1]:
-            continue                     # the reanalysis already covers it
-        bridge.append(d)
-        bridge_vals[d] = av[i]
-    bridge.sort()
+    if bridge:
+        # THE MODEL'S OWN ANALYSIS TAKES THE DAY OVER.  The observation
+        # ends exactly where the model's own analysis begins, so the
+        # reanalysis's own copy of that day is dropped from the left.
+        zset = set(bridge)
+        ana_days = [d for d in ana_days if d not in zset]
+        print("   the model's own analysis fills %s to %s"
+              % (bridge[0], bridge[-1]))
 
     days = ana_days + bridge + fc_days
     parts = []
@@ -401,14 +425,10 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
         parts.append(rv[[rday[d] for d in ana_days]][:, rcols])
     if bridge:
         bcols = [ana_levels.index(l) for l in levs]
-        parts.append(np.array([bridge_vals[d] for d in bridge],
-                              float)[:, bcols])
+        parts.append(np.array(bridge_vals, float)[:, bcols])
     parts.append(mv[[mday[d] for d in fc_days]])
     values = np.vstack(parts)
     split = len(ana_days) + len(bridge)
-    if bridge:
-        print("   the model's own analysis fills %s to %s"
-              % (bridge[0], bridge[-1]))
 
     # where "now" falls, so the reader can tell the model's past days from
     # the days it is still forecasting
@@ -484,6 +504,10 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
     if ana_days:
         parts.append(("%d days of %s reanalysis" % (len(ana_days), ana_name),
                        False))
+    if bridge:
+        parts.append(("%d %s of the %s" % (len(bridge),
+                                           "day" if len(bridge) == 1
+                                           else "days", ana_label), True))
     parts.append(("the %s %s forecast from %s to %s"
                   % (short, kind_word, init_day, end_day), False))
     if members:
@@ -501,13 +525,21 @@ def main(tag="ecmwf-seas5", label="ECMWF SEAS5", short=None,
     subtitle = fit_subtitle(parts)
     os.makedirs(OUT, exist_ok=True)
     p = os.path.join(OUT, "polar_cap_%s.png" % tag)
+    # THE THREE ZONES ARE NAMED ABOVE THE PANEL: the reanalysis on the
+    # left, the model's own analysis where that zone begins, and the
+    # forecast on the right.
+    bridge_txt = None
+    if bridge:
+        bridge_txt = "%s %s" % (ana_label, _zone_dates(bridge))
     plot_section(days, norm, levs, p, title, subtitle,
                  split=split if split else None,
                  credit=credit_for_polar(tag),
                  analysis_label=("%s reanalysis to %s"
                                  % (ana_name, _short_date(ana_last)))
                  if ana_days else None,
-                 bridge_label=("ECMWF analysis to %s" % _short_date(bridge[-1]))
+                 bridge_label=bridge_txt,
+                 bridge_label_short=ana_label or None,
+                 bridge_span=(len(ana_days), len(ana_days) + len(bridge) - 1)
                  if bridge else None,
                  forecast_label="%s %s forecast from %s" % (
                      short, kind_word, _short_date(init_day)),

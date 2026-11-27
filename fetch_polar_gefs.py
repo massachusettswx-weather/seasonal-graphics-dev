@@ -104,6 +104,14 @@ PARTS = {"a": "pgrb2ap5/", "b": "pgrb2bp5/"}
 # decides how long the chart can run.
 MAX_LEAD_H = 35 * 24
 
+# THE DAILY SERIES STARTS AT INIT+1 DAY (36 hours).  The init day itself
+# is the GEFS's OWN ANALYSIS - the f000 step of the run, which is the GFS
+# analysis the run started from - and it is drawn as such, so that the
+# reader can see where the reanalysis ends and the model begins.  The
+# chart therefore covers the same 35 days it always did: the analysis day
+# and then 34 days of forecast.
+FIRST_LEAD = 36
+
 # how many requests at a time
 THREADS = 20
 
@@ -545,9 +553,44 @@ def read_cap_mean(path):
     return row, srow, t
 
 
+def decode_lead(members, fstep):
+    """One lead of the cycle, decoded -> {time, values, members, sectors}.
+
+    Every member's twelve messages are written into one file and read back
+    in one pass, which averages the fields that share a time and a level:
+    the ensemble mean.
+    """
+    got = lead_members(members, fstep)
+    got = {m: v for m, v in got.items() if len(v) == len(LEVELS)}
+    if not got:
+        return None
+    tmp = os.path.join(DATA, "_gefs_f%03d.grib2" % fstep)
+    with open(tmp, "wb") as f:
+        for m in sorted(got):
+            for lev in LEVELS:
+                f.write(got[m][lev])
+    row, srow, t = read_cap_mean(tmp)
+    os.remove(tmp)
+    if not row or any(l not in row for l in LEVELS):
+        return None
+    return {"time": t, "values": [row[l] for l in LEVELS],
+            "members": len(got),
+            "sectors": {name: [sd[l] for l in LEVELS]
+                        for name, sd in srow.items()
+                        if all(l in sd for l in LEVELS)}}
+
+
 def build_record(out, date, hour):
-    """-> the record for the cache, from the decoded leads."""
-    keys = sorted(out, key=lambda k: int(k))
+    """-> the record for the cache, from the decoded leads, or None.
+
+    None when no daily lead has been decoded yet: the f000 analysis on its
+    own is not a series, and a record with no days in it would take the
+    chart's series away.
+    """
+    keys = sorted((k for k in out if int(k) >= FIRST_LEAD),
+                  key=lambda k: int(k))
+    if not keys:
+        return None
     times = [out[k]["time"] for k in keys]
     values = [out[k]["values"] for k in keys]
     nmem = min(out[k]["members"] for k in keys)
@@ -565,6 +608,20 @@ def build_record(out, date, hour):
            "lead_days": (int(keys[-1]) + 12) // 24}
     if sectors:
         rec["sectors"] = sectors
+    # THE GEFS'S OWN ANALYSIS - the f000 step of the run.  It is the state
+    # the run started from: the GFS analysis of the init time.  It is the
+    # GEFS's own analysis and not the ECMWF's, and the owner's word (27
+    # November 2026) is that the chart must say so.
+    a = out.get("0")
+    if a:
+        rec["analysis_times"] = [a["time"]]
+        rec["analysis_values"] = [a["values"]]
+        if a.get("sectors"):
+            rec["analysis_sectors"] = {name: [a["sectors"][name]]
+                                        for name in a["sectors"]}
+        rec["analysis_label"] = "GEFS analysis"
+        rec["analysis_source"] = ("the GEFS's own analysis, the 0-hour step "
+                                  "of the %s %sZ run" % (date, hour))
     return rec
 
 
@@ -575,6 +632,8 @@ def write_cache(rec):
     exactly as it was found.  It is written after every lead, so a run that
     is interrupted keeps everything it had already decoded.
     """
+    if not rec:
+        return
     cache = {}
     if os.path.exists(CACHE):
         with open(CACHE) as f:
@@ -657,6 +716,9 @@ def from_state():
     date = st.get("date") or ""
     hour = st.get("hour") or ""
     rec = build_record(out, date, hour)
+    if not rec:
+        print("   the state file holds no daily lead yet")
+        return
     write_cache(rec)
     print("   the %s series rebuilt from the state file: %d days, %s to %s"
           % (TAG, len(rec["times"]), rec["times"][0], rec["times"][-1]),
@@ -703,9 +765,37 @@ def main():
     st["date"], st["hour"] = date, hour
     out = {}
 
+    # THE GEFS'S OWN ANALYSIS - the f000 step of the run, which is the GFS
+    # analysis the run started from.  It is the model's own analysis of its
+    # init day, and it is drawn as such: between the reanalysis and the
+    # forecast, so that the reader can see where the observation ends and
+    # the GEFS begins.  It is one lead's worth of the same download as the
+    # rest, so it is fetched with the rest.
+    if st["leads"].get("0", {}).get("status") == "decoded":
+        out["0"] = st["leads"]["0"]
+        print("   the f000 analysis is already decoded", flush=True)
+    else:
+        print("   the f000 analysis (the GEFS's own analysis) ...", flush=True)
+        ana = decode_lead(members, 0)
+        if ana:
+            out["0"] = ana
+            st["leads"]["0"] = dict(ana, status="decoded")
+            with open(STATE + ".tmp", "w") as f:
+                json.dump(st, f, indent=1)
+            os.replace(STATE + ".tmp", STATE)
+            write_cache(build_record(out, date, hour))
+            print("      %d members, valid %s, 10 hPa = %.0f m2/s2 (%.0f m)"
+                  % (ana["members"], ana["time"], ana["values"][0],
+                     ana["values"][0] / G0), flush=True)
+        else:
+            print("      the f000 step did not answer - the chart will carry "
+                  "no zone of the model's own analysis", flush=True)
+
     # the daily 12Z leads: the 12Z value of a day is 12 + 24k hours from the
-    # 00Z init, the same clock as the seasonal archive and the ERA5 half
-    for fstep in range(12, MAX_LEAD_H + 1, 24):
+    # 00Z init, the same clock as the seasonal archive and the ERA5 half.
+    # The series starts at INIT+1 DAY, because the init day itself is the
+    # model's own analysis and is drawn as such.
+    for fstep in range(FIRST_LEAD, MAX_LEAD_H + 1, 24):
         key = str(fstep)
         if st["leads"].get(key, {}).get("status") == "decoded":
             # A lead that is already decoded is reused, UNLESS the sectors
@@ -723,30 +813,12 @@ def main():
                   "it is fetched again" % (key, len(have), len(want)),
                   flush=True)
         print("   the lead f%03d ..." % fstep, flush=True)
-        got = lead_members(members, fstep)
-        got = {m: v for m, v in got.items() if len(v) == len(LEVELS)}
-        if not got:
-            print("      no member has this lead; stopping", flush=True)
-            break
-        # every member's twelve messages in one file: read_grib_levels
-        # averages the fields that share a time and a level, which is the
-        # ensemble mean
-        tmp = os.path.join(DATA, "_gefs_f%03d.grib2" % fstep)
-        with open(tmp, "wb") as f:
-            for m in sorted(got):
-                for lev in LEVELS:
-                    f.write(got[m][lev])
-        row, srow, t = read_cap_mean(tmp)
-        os.remove(tmp)
-        if not row or any(l not in row for l in LEVELS):
+        row = decode_lead(members, fstep)
+        if row is None:
             print("      the lead f%03d did not carry the twelve levels"
                   % fstep, flush=True)
             continue
-        out[key] = {"time": t, "values": [row[l] for l in LEVELS],
-                     "members": len(got),
-                     "sectors": {name: [sd[l] for l in LEVELS]
-                                 for name, sd in srow.items()
-                                 if all(l in sd for l in LEVELS)}}
+        out[key] = row
         st["leads"][key] = dict(out[key], status="decoded")
         with open(STATE + ".tmp", "w") as f:
             json.dump(st, f, indent=1)
@@ -755,7 +827,8 @@ def main():
         # everything it had already decoded
         write_cache(build_record(out, date, hour))
         print("      %d members, valid %s, 10 hPa = %.0f m2/s2 (%.0f m)"
-              % (len(got), t, row[10], row[10] / G0), flush=True)
+              % (row["members"], row["time"], row["values"][0],
+                 row["values"][0] / G0), flush=True)
         # THE STATE GOES INTO GIT WHILE THE FETCH RUNS, NOT ONLY AT THE
         # END.  A new cycle takes about an hour to fetch and the sandbox is
         # rebuilt every hour or so, which kills it: a state that is only
@@ -772,6 +845,9 @@ def main():
 
     # the record, in the shape the seasonal puller writes
     rec = build_record(out, date, hour)
+    if not rec:
+        print("   no daily lead was decoded - nothing is written")
+        return
 
     # into the shared cache, under this script's own key only
     write_cache(rec)

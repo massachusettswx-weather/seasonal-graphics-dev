@@ -1,10 +1,62 @@
-# The state of the project - 24 Nov 2026, 06:20 UTC
+# The state of the project - 27 Nov 2026, 21:40 UTC
 
 Short and factual.  The long history of how it got here is in
 `notes/STATE_LOG.md`; the rules that are not negotiable are in
 `notes/PROTECTION.md` (the data) and `notes/PUBLISHING.md` (the two
 sites).  This file is the handoff: a new session reads this and does not
 need the conversation.
+
+## THE SEAM: the reanalysis, the model's OWN analysis, the forecast (27 Nov 2026)
+
+**The owner's word:** *"we need to make it obvious to tell where CORe ends /
+ECMWF analysis vs where the model forecasts start for all models (GEFS
+analysis for GEFS)"*.
+
+Every polar section is now drawn in **three named zones**, on the cap chart
+AND on the by-sector chart:
+
+```
+CORe reanalysis to 25 Nov | GEFS analysis 26 Nov | GEFSv12 sub-seasonal forecast from 27 Nov
+```
+
+* The **zone of the model's own analysis is washed a light grey** and closed
+  by a line at each end (a dotted one at the CORe's end, the dashed one at
+  the forecast's start).  The three labels are fitted to the figure
+  (`polar_cap._fig_text_w`): the model's analysis label sits where its zone
+  BEGINS, and it drops its dates rather than run into the forecast's label.
+* **The model's own analysis is the state the run started from.**
+  * the **GEFS**: its **f000** step - the GFS analysis the run started from.
+    It is the GEFS's own, so the label says **"GEFS analysis"**.
+    `fetch_polar_gefs.py` now fetches it, keeps it in the record
+    (`analysis_times`/`analysis_values`/`analysis_sectors`) and **the daily
+    series starts at f036** (init+1 day) - so the init day is the analysis
+    and the forecast begins the day after.  The chart still covers 35 days.
+  * the **ECMWF's products**: the **0-hour step of the open data**, cached
+    day by day in **`data/polar_model_analysis.json`** by
+    `fetch_polar_analysis.py` (both cycles: 12z and 00z; the run's own
+    cycle is preferred).  The label says **"ECMWF analysis"**.
+* **THE REANALYSIS'S OWN DAY IS DROPPED WHERE THE MODEL'S ANALYSIS TAKES
+  IT OVER** - the observation ends exactly where the model's analysis
+  begins, so the "CORe reanalysis to <date>" label names the day BEFORE.
+* **THE SECTION KEEPS ITS LEVELS.**  The open data has **no 30 hPa**, so
+  the SEAS5's analysis cannot be drawn on the twelve levels the seasonal
+  section uses; the zone is dropped instead of the chart changing shape
+  from one day to the next.
+* **`polar_analysis.py` is the one place that answers the question**: it
+  finds the model's analysis day (the run's own date, or the first series
+  day less one for the seasonal), reads the right source for that model,
+  and `fit_bridge()` makes sure the zone REACHES the forecast and TOUCHES
+  the reanalysis - a hole in a section is worse than no analysis at all.
+* **THE CACHE HAS TO BE FED EVERY DAY** - the open data keeps about four
+  days of it, and the seasonal's analysis day is the FIRST of its month,
+  twenty-five days before the seasonal is published.  The EPS's own pull
+  writes what it fetches into the shared cache, and the nightly GEFS job
+  tops it up (`fetch_polar_analysis.py --days 3`).  **The cache is in git**
+  (`KEEP = 90` days) - a rebuilt tree that lost it would lose the month.
+* The **November SEAS5 has no analysis zone**: the ECMWF's analysis of
+  1 Nov 2026 is gone from the open data.  Its seam is still drawn
+  ("CORe reanalysis to 1 Nov | SEAS5 seasonal forecast from 2 Nov").  The
+  December SEAS5 will have the zone.
 
 ## The two sites
 
@@ -37,13 +89,14 @@ need the conversation.
   changes every day.  The 10 hPa wind picker on the same page is a
   different product and still opens on the ECMWF SEAS5 (the GEFSv12 has no
   wind panel).
-* The GEFSv12 sub-seasonal series is at the **20261126 00Z** cycle (35
-  days, 31 members, 12 levels) on **both** sites (27 Nov 2026, 04:20Z -
-  the last run of the old combined task drew it; the two new windowed
-  jobs take over from here ✓).
+* The GEFSv12 sub-seasonal series is at the **20261126 00Z** cycle (34
+  forecast days + the analysis day = 35 days, 31 members, 12 levels) on
+  **both** sites; its own analysis (the f000 step) is drawn between the
+  CORe and the forecast.
 * **The EC46 polar-cap section is on BOTH sites** (the owner's approval,
-  22 Nov 2026): the **20261122 00Z** run, 45 days, 101 members, published
-  with `tools/publish_polar_ec46.py`.
+  22 Nov 2026): the **2026-11-25 00Z** run, 45 days, 101 members, published
+  with `tools/publish_polar_ec46.py`.  Its own analysis (the ECMWF's, the
+  0-hour step of the open data) is drawn between the CORe and the forecast.
 * **The dark mode is on the operational site** (the owner's approval,
   22 Nov 2026): every page carries the button, the theme is read back
   before anything is drawn, and the browser remembers it.  Published with
@@ -274,6 +327,18 @@ before it is allowed near the live site.
 * **The 20261121 00Z cycle is on both sites** (35 days, 31 members).
 
 ## The traps of this morning
+
+* **THE SOURCE OF A BUILT ASSET IS THE ASSET.**  The maps page's inches
+  fix had been applied to `docs/assets/js/maps.js` - the BUILT copy - and
+  not to `assets/js/maps.js`, its source.  The next build copied the old
+  source over the fixed file and the fix was gone.  A change to a built
+  file is not committed until its source carries it too.
+* **THE DEVELOPMENT BUILD NEEDS ITS ENVIRONMENT**: `SITE_DEV=1`,
+  `SITE_URL=https://massachusettswx-weather.github.io/seasonal-graphics-dev/`
+  and the dev repository URL.  A build without them writes the OPERATIONAL
+  site's links and drops the "DEVELOPMENT COPY" mark - into the dev tree.
+  Half the dev repo's pages were production builds for that reason; they
+  are all development copies again now.
 
 * **THE CHART BUILDER MUST RUN BEFORE THE REGISTRY BUILD.**  The build
   copies the drawn charts out of `output/polar_cap/` - so if the charts
