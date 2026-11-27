@@ -419,6 +419,21 @@ def main():
         print("   no step came back with a usable series")
         return
 
+    # A DAY IS A DAY OF THE "BOTH CYCLES" SERIES ONLY WHEN BOTH CYCLES
+    # ARE IN IT.  The chart says the two suites are pooled, and a day that
+    # carries only one of them is not pooled - and the open data publishes
+    # a run a file at a time, so the 12Z cycle of the newest run can be
+    # half up for a while.  The days that are not whole are left out, and
+    # the guard below keeps the last whole series until the new one is
+    # whole.
+    if len(cycles) > 1:
+        days = {d: keys for d, keys in days.items()
+                if len(keys) == len(cycles)}
+        if not days:
+            print("   no day has both cycles yet - the series stays as it "
+                  "was")
+            return
+
     out_times = []
     out_values = []
     out_sectors = {name: [] for name in SECTORS}
