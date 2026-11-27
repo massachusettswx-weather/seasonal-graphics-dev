@@ -908,3 +908,32 @@ comment that the EC46 had no by-sector chart.
   `git reset -q` afterwards**, because a checkout stages the file and the
   narrow publisher commits the whole index.  Always build the
   development copy with `SITE_DEV=1`.
+
+## The two chats that died on the owner (23 and 27 Nov 2026)
+
+The chat **"Global Snowfall Anomaly Maps"** (session `464211911843922`) has
+lost two replies to the platform, and both are recovered in the notes:
+
+* **23 Nov** - the reply came back with an **empty visible text** and a
+  damaged reasoning channel.  `notes/CHAT_RECOVERY_2026-11-23.md` holds the
+  finding (the CORe **is** the FV3-GFS reanalysis and the GEFSv12 **is** the
+  FV3-GFS forecast, so on the GEFS chart the two halves are one model and the
+  join is a tautology), with the salvaged reasoning in
+  `notes/chat_recovery_2026-11-23_salvage.txt`.
+* **27 Nov** - the reply **looped out** ("hmm: hmm: hmm" for 12,288
+  characters) twice in a row on the owner's request to put the **ECMWF EPS**
+  into the by-sector area.  `notes/CHAT_RECOVERY_2026-11-27.md` holds the
+  facts the turn had already established and **the decision it was circling
+  on**: the EPS is the ECDS `s2s-forecasts`' **15-day ensemble at 00Z and
+  12Z** (the 46-day product on the Monday/Thursday 00Z runs is already our
+  EC46).  **Do not re-derive it - read that note and build from it.**
+
+**THE REPO WAS FORCE-PUSHED AND A FILE WAS LOST**: `main` was rewritten
+during 27 Nov, and the rewrite **dropped `tools/ec46_disseminate.sh`** - the
+script the scheduled **`seasonal-ec46`** job (467751157227592) runs, so the
+Monday night job had nothing to run.  It has been **restored byte for byte**
+from `76f6466` (where it was added) and checked against the other chat's own
+`write` call.  `76f6466` added it and `526f862` deleted it again - that
+commit's tree was stale for `tools/` and `notes/STATE.md`, so **a commit made
+from a stale index can silently delete files**.  Check the tree of a commit
+before trusting its message.
