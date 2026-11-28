@@ -6,6 +6,36 @@ Short and factual.  The long history of how it got here is in
 sites).  This file is the handoff: a new session reads this and does not
 need the conversation.
 
+## The GEFS's own analysis needs TWO days (28 Nov 2026, 02:30 UTC)
+
+* **THE PROBLEM, MEASURED.**  The GEFS's own analysis is ONE instant: the
+  f000 step, the state at the init.  NOAA's CORe reanalysis runs about
+  **three days** behind (measured on the 28th: the bucket's newest day is
+  the 25th), so the day between the reanalysis and the init would be a
+  **HOLE** in the section - and a hole is worse than no analysis at all.
+  With the 27 November cycle (the forecast from the 28th) the gap is two
+  days, so `fit_bridge()` refuses the zone and the chart would have shown
+  only two zones: "CORe reanalysis to 25 Nov" and "the forecast from
+  28 Nov", with the model's own analysis nowhere.
+* **THE FIX: THE PREVIOUS CYCLE'S OWN f000.**  It is the GFS analysis of
+  the day before - the same model, its own analysis, one day earlier - so
+  the zone can be two days: the previous cycle's analysis and this one's.
+  The label still says **"GEFS analysis"**, which is what it is.
+* It is read out of the **git history** of the fetch state file
+  (`data/polar_gefs_jobs.json`, which is in git so that a rebuild does not
+  download it again): the state of the previous cycle carries its decoded
+  f000.  The record itself only ever holds the cycle that is current.
+* `polar_analysis._previous_own_analysis()` finds it; `_merge_own()` puts
+  it in front of the current one, and only when the two days are
+  CONTIGUOUS.  Anything that goes wrong -> None -> the section is drawn
+  exactly as it was before.
+* Checked on the real data: the **current** cycle (20261126) is unchanged -
+  its zone is still the one day, because the previous cycle is not in the
+  history yet - and the **next** cycle (20261127) gets the zone
+  "26-27 Nov" with the reanalysis to the 25th and the forecast from the
+  28th.  Drawn and looked at: the three zones, the wash, the dotted line
+  at the CORe end and the dashed line at the forecast's start.
+
 ## The narrow path: one publisher at a time on one tree (28 Nov 2026, 02:50 UTC)
 
 * **THE COLLISION WAS REAL.**  The GEFSv12's nightly cycle is published at

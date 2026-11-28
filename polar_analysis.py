@@ -130,6 +130,125 @@ def _record_analysis(rec):
     }
 
 
+# ------------------------------------------------------------------
+# THE DAY BEFORE: THE MODEL'S OWN ANALYSIS OF THE PREVIOUS CYCLE
+# ------------------------------------------------------------------
+# WHY THIS EXISTS.  The GEFS's own analysis is ONE instant: the state at
+# the init, the f000 step.  NOAA's CORe reanalysis runs about three days
+# behind, so the day between the reanalysis and the init would be a HOLE in
+# the section - and a hole in a section is worse than no analysis at all.
+#
+# The previous cycle's f000 is the GFS analysis of that day: the same model,
+# its own analysis, one day earlier.  So the zone can be two days - the
+# previous cycle's analysis and this cycle's - and the section has no hole
+# in it, and the label still says "GEFS analysis", which is what it is.
+#
+# It is read out of the GIT HISTORY, because the record itself only ever
+# holds the cycle that is current: the record of the previous cycle is in
+# the history of the files that carry it - the fetch state file of the
+# GEFS's own fetcher (which is in git, so that a rebuild does not download
+# it again) and the record file itself.  Anything that goes wrong here ->
+# None -> the section is drawn exactly as it was before.
+GIT_RECORD = "data/polar_model_z.json"
+GIT_STATE = "data/polar_gefs_jobs.json"
+# how many commits of each file are looked at
+GIT_LOOKBACK = 8
+
+
+def _git(*args):
+    """git in this tree -> the text, or "" when it does not answer."""
+    import subprocess
+    try:
+        r = subprocess.run(["git", "-C", HERE] + list(args),
+                           capture_output=True, timeout=60)
+    except Exception:                                    # noqa: BLE001
+        return ""
+    if r.returncode != 0:
+        return ""
+    return r.stdout.decode("utf-8", "ignore")
+
+
+def _own_from_state(text, want):
+    """The f000 of a cycle, out of a fetch state file -> a dict, or None.
+
+    The state file holds the cycle's date and hour and its decoded leads,
+    and the f000 lead is the cycle's own analysis.
+    """
+    try:
+        d = json.loads(text)
+    except Exception:                                    # noqa: BLE001
+        return None
+    if not isinstance(d, dict):
+        return None
+    f0 = (d.get("leads") or {}).get("0") or {}
+    if not f0.get("values") or not f0.get("time"):
+        return None
+    if str(f0["time"])[:10] != want:
+        return None
+    run = "%s %sZ" % (d.get("date") or "", d.get("hour") or "")
+    return {
+        "day": want,
+        "values": list(f0["values"]),
+        "sectors": {n: list(row) for n, row in (f0.get("sectors") or {}).items()},
+        "run": run,
+    }
+
+
+def _own_from_record(text, tag, want):
+    """The own analysis of a cycle, out of a record file -> a dict, or None."""
+    try:
+        d = json.loads(text)
+    except Exception:                                    # noqa: BLE001
+        return None
+    old = (d or {}).get(tag)
+    if not isinstance(old, dict):
+        return None
+    at = [str(x)[:10] for x in (old.get("analysis_times") or [])]
+    av = old.get("analysis_values") or []
+    if not at or not av or at[0] != want:
+        return None
+    secs = old.get("analysis_sectors") or {}
+    return {
+        "day": at[0],
+        "values": list(av[0]),
+        "sectors": {n: list(row[0]) for n, row in secs.items()},
+        "run": str(old.get("run") or ""),
+    }
+
+
+def _previous_own_analysis(rec, tag):
+    """The model's own analysis of the day BEFORE the init -> a dict, or None.
+
+    The dict holds one day: the day before the run's own analysis day.
+    """
+    got = _record_analysis(rec)
+    if not got or not got["days"]:
+        return None
+    try:
+        want = (date.fromisoformat(got["days"][0]) - timedelta(days=1)).isoformat()
+    except Exception:                                    # noqa: BLE001
+        return None
+    run = str(rec.get("run") or "")
+    for path, reader in ((GIT_RECORD, lambda t: _own_from_record(t, tag, want)),
+                          (GIT_STATE, lambda t: _own_from_state(t, want))):
+        shas = _git("log", "--format=%H", "--", path).split()
+        for sha in shas[:GIT_LOOKBACK]:
+            text = _git("show", "%s:%s" % (sha, path))
+            if not text:
+                continue
+            try:
+                old = reader(text)
+            except Exception:                            # noqa: BLE001
+                continue
+            if not old:
+                continue
+            # the same cycle, committed again - it says nothing new
+            if old.get("run") and run and old["run"] == run:
+                continue
+            return old
+    return None
+
+
 def _cached_analysis(rec, init, hour):
     """The ECMWF's own analysis, out of the shared cache -> a dict, or None.
 
@@ -182,6 +301,40 @@ def _cached_analysis(rec, init, hour):
             "levels": levels, "label": "", "source": ""}
 
 
+def _merge_own(got, prev):
+    """The model's own analysis of the day before, in front of this one.
+
+    The two are put together only when they are CONTIGUOUS days and they
+    carry the same values; otherwise the section is drawn with this one
+    alone, exactly as it was before.
+    """
+    if not prev or not prev.get("day") or not got.get("days"):
+        return got
+    # the two must be CONTIGUOUS: the day before, and this one
+    try:
+        if (date.fromisoformat(got["days"][0])
+                - date.fromisoformat(prev["day"])).days != 1:
+            return got
+    except Exception:                                    # noqa: BLE001
+        return got
+    out = {
+        "days": [prev["day"]] + list(got["days"]),
+        "values": [list(prev["values"])] + list(got["values"]),
+        "sectors": {},
+        "levels": list(got.get("levels") or []),
+        "label": got.get("label") or "",
+        "source": got.get("source") or "",
+    }
+    for name, rows in (got.get("sectors") or {}).items():
+        prow = (prev.get("sectors") or {}).get(name)
+        if prow is not None and len(rows) == len(got["days"]):
+            out["sectors"][name] = [list(prow)] + list(rows)
+    if prev.get("run") and got.get("run"):
+        out["source"] = ("the model's own analysis, the 0-hour steps of the "
+                         "%s and %s runs" % (prev["run"], got["run"]))
+    return out
+
+
 def analysis_for(tag, rec):
     """The model's own analysis -> a dict, or None when there is none.
 
@@ -191,6 +344,12 @@ def analysis_for(tag, rec):
     got = _record_analysis(rec)
     if got:
         got["label"] = got["label"] or LABELS.get(tag, DEFAULT_LABEL)
+        # THE DAY BEFORE, WHEN THE REANALYSIS IS FURTHER BACK THAN THE
+        # RUN'S OWN ANALYSIS: the previous cycle's own analysis closes the
+        # gap, and it is the same model's own analysis.
+        prev = _previous_own_analysis(rec, tag)
+        if prev:
+            got = _merge_own(got, prev)
         return got
     init = init_day(rec)
     if not init:
