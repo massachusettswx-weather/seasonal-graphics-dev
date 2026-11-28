@@ -489,9 +489,16 @@ def main():
             # with the next run of the fetcher.  The series keeps the last
             # whole one until the new one is whole.
             print("      not there yet: %s" % e, flush=True)
-            done[key] = {"ok": False, "step": step, "day": k, "cycle": cyc,
-                         "missing": str(e)}
+            # THE MARK IS PUT UNDER THE LOCK, with the write.  The lock
+            # keeps two threads from writing the file at once, but the
+            # DUMP walks the steps dict - and a mark put in by another
+            # thread WHILE this one is dumping made the dump die with
+            # "dictionary changed size during iteration" (28 November
+            # 2026, the 12Z cycle: the mark and the write have to be one
+            # piece of work).
             with lock:
+                done[key] = {"ok": False, "step": step, "day": k, "cycle": cyc,
+                             "missing": str(e)}
                 with open(STATE + ".tmp", "w") as f:
                     json.dump(st, f, indent=1)
                 os.replace(STATE + ".tmp", STATE)
@@ -509,13 +516,17 @@ def main():
         # THE VALUES GO INTO THE STATE FILE, not just a "done" mark: a
         # restart must not fetch a step again, and the series is written
         # from the state - so the numbers have to be in it.
-        done[key] = {"ok": True, "step": step, "day": k, "cycle": cyc,
-                     "members": members,
-                     "cap": {str(lev): cap[lev] for lev in LEVELS},
-                     "sectors": {name: {str(lev): sec[lev][name]
-                                        for lev in LEVELS}
-                                 for name in SECTORS}}
+        # THE MARK AND THE WRITE ARE UNDER THE LOCK TOGETHER: the dump
+        # walks the steps dict, and a mark put in by another thread while
+        # this one was dumping killed it with "dictionary changed size
+        # during iteration" (28 November 2026, the 12Z cycle).
         with lock:
+            done[key] = {"ok": True, "step": step, "day": k, "cycle": cyc,
+                         "members": members,
+                         "cap": {str(lev): cap[lev] for lev in LEVELS},
+                         "sectors": {name: {str(lev): sec[lev][name]
+                                            for lev in LEVELS}
+                                     for name in SECTORS}}
             with open(STATE + ".tmp", "w") as f:
                 json.dump(st, f, indent=1)
             os.replace(STATE + ".tmp", STATE)
@@ -671,13 +682,13 @@ def main():
                     print("      the %s %s analysis FAILED: %r"
                           % (d, cyc, e), flush=True)
                     continue
-                done[key] = {"ok": True, "cycle": cyc, "analysis": True,
-                             "cap": {str(lev): vals[lev][0]
-                                     for lev in LEVELS},
-                             "sectors": {name: {str(lev): vals[lev][1][name]
-                                                for lev in LEVELS}
-                                         for name in SECTORS}}
                 with lock:
+                    done[key] = {"ok": True, "cycle": cyc, "analysis": True,
+                                 "cap": {str(lev): vals[lev][0]
+                                         for lev in LEVELS},
+                                 "sectors": {name: {str(lev): vals[lev][1][name]
+                                                    for lev in LEVELS}
+                                             for name in SECTORS}}
                     with open(STATE + ".tmp", "w") as f:
                         json.dump(st, f, indent=1)
                     os.replace(STATE + ".tmp", STATE)
