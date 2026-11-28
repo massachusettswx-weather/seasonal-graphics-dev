@@ -61,6 +61,32 @@ if [ ! -d "$DEV/.git" ]; then
 fi
 
 # ------------------------------------------------------------------
+# 0b. THE TOOLCHAIN.  The sandbox resets its python packages every
+# hour or so, and this job needs the most of them: the CDS stack
+# (cdsapi, xarray, netCDF4, scipy) is NOT in the system site at all,
+# so a rebuilt sandbox would fail on the first C3S request.
+#
+# The 2 a.m. job of 28 November 2026 repaired the environment BY HAND and
+# the repair was INCOMPLETE - xarray, cdsapi, netCDF4 and scipy were
+# still missing, and the 6 December release would have failed on them.
+# They are part of tools/restore_env.sh now, so this job puts back
+# everything it needs by itself.
+#
+# ONLY THE PACKAGES.  This job publishes one product and nothing else,
+# so the general publisher and the other workers are NOT started from
+# here - tools/auto_run.sh would start them, and the general publisher
+# would carry the whole development site across.
+if ! python3 -c "import requests, eccodes, xarray, cdsapi, netCDF4, scipy" \
+        >/dev/null 2>&1; then
+    say "the python packages are gone - putting them back"
+    bash tools/restore_env.sh >>"$LOG" 2>&1 || true
+fi
+if ! python3 -c "import requests, eccodes, xarray, cdsapi, netCDF4, scipy" \
+        >/dev/null 2>&1; then
+    say "the toolchain did NOT come back - the seasonal pull will fail"
+fi
+
+# ------------------------------------------------------------------
 # 1. the plan: which init is each centre on, and has it moved?
 say "the release calendar"
 python3 -u tools/seasonal_init_plan.py --apply 2>&1 | tee -a "$LOG"

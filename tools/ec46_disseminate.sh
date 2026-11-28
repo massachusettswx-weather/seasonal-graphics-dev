@@ -95,6 +95,24 @@ case " $EC46_DAYS " in
 esac
 
 # ------------------------------------------------------------------
+# 1b. THE TOOLCHAIN.  The sandbox resets its python packages every
+# hour or so, and `requests` and `eccodes` go with them - which kills
+# the fetch without saying why.  The user site survives the reset, so
+# the packages are put back there.
+#
+# ONLY THE PACKAGES.  This job publishes ONE product and nothing else,
+# so the general publisher and the other workers are NOT started from
+# here - tools/auto_run.sh would start them, and the general publisher
+# would carry the whole development site across.
+if ! python3 -c "import requests, eccodes" >/dev/null 2>&1; then
+    say "the python packages are gone - putting them back"
+    bash tools/restore_env.sh >>"$LOG" 2>&1 || true
+fi
+if ! python3 -c "import requests, eccodes" >/dev/null 2>&1; then
+    say "the toolchain did NOT come back - the pull will fail"
+fi
+
+# ------------------------------------------------------------------
 # 2. THE EC46's run, in the foreground
 say "the EC46's run"
 python3 -u fetch_polar_ec46.py >>"logs_fetch_polar_ec46.py.log" 2>&1

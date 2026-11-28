@@ -73,6 +73,23 @@ need the conversation.
   is readable by anyone with the link.  `push_to_github.sh` says so out
   loud when it builds.  It is a deliberate act, not a broken build - do
   not "fix" it without the owner's word.
+* **THE NIGHTLY JOBS NOW PUT THEIR OWN TOOLCHAIN BACK.**  The sandbox
+  resets its python packages every hour or so, and `requests` and
+  `eccodes` go with them - which kills a fetch without saying why.  Only
+  `tools/gefs_subs_disseminate.sh` restored them (through
+  `tools/auto_run.sh`); the EC46, the EPS and the seasonal jobs did not,
+  and the 2 a.m. job of 28 November had to repair the environment BY
+  HAND - and that repair was INCOMPLETE: `xarray`, `cdsapi`, `netCDF4`
+  and `scipy` were still missing, so the 6 December release would have
+  failed on the first C3S request.
+  * `tools/restore_env.sh` now installs the December rollover's packages
+    as well, and says which of them are missing.
+  * The EC46, the EPS and the seasonal scripts call it before their
+    fetch, if the import fails.
+  * They restore the PACKAGES ONLY: `tools/auto_run.sh` would also start
+    the general publisher, and these jobs publish one product each.
+  * The EC46 job matters tonight: the 27 November run is still not in
+    ECMWF's archive, and the 21:00Z job is the path that takes it.
 
 ## The CFSv2's mixed init: the cause, and the fix (28 Nov 2026, 02:50 UTC)
 
