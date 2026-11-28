@@ -96,6 +96,18 @@ def main():
     src = os.path.abspath(args.src)
     target = os.path.abspath(args.repo)
     is_operational = P.remote_repo(P.remote_url(target)) == OPERATIONAL_REPO
+
+    # ONE PUBLISH AT A TIME ON THIS TREE - the archive commits into the
+    # same tree as the charts, and a commit beside another commit is a
+    # collision.
+    try:
+        with P.publish_lock(target):
+            return publish_body(src, target, args, is_operational)
+    except P.LockTimeout:
+        return 2
+
+
+def publish_body(src, target, args, is_operational):
     if is_operational and not (args.prod and args.approved):
         say("   the operational site needs --prod --approved.  NOTHING IS CHANGED.")
         return 2

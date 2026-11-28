@@ -6,6 +6,33 @@ Short and factual.  The long history of how it got here is in
 sites).  This file is the handoff: a new session reads this and does not
 need the conversation.
 
+## The narrow path: one publisher at a time on one tree (28 Nov 2026, 02:50 UTC)
+
+* **THE COLLISION WAS REAL.**  The GEFSv12's nightly cycle is published at
+  03:10 UTC, and the EC46's run lands in the S2S archive at about the same
+  hour - so the two narrow publishers were about to run **beside each
+  other**, and they write into the SAME tree: the registry
+  (`docs/data/models.json`) and the pages that carry it inlined.  Two of
+  them side by side would overwrite each other's entry, and one of the two
+  git commits would collide with the other.
+* **THE FIX IS A LOCK, AND IT IS PER TREE.**  `publish_lock()` in
+  `tools/publish_polar_subseasonal.py` (the shared machinery of the narrow
+  path) takes an exclusive `flock` on a file BESIDE the tree
+  (`/workspace/.publish-lock-<tree>`), so the lock is never committed.  The
+  development copy and the operational site are two different trees and may
+  be worked on at the same time; only one publisher at a time may work on a
+  tree.  A publisher that cannot take the lock within 30 minutes says so
+  and changes nothing (exit code 2, the "nothing to publish" code).
+* `tools/publish_polar_subseasonal.py`, `tools/publish_polar_ec46.py` and
+  `tools/publish_polar_archive.py` all take it, and the lock is held around
+  the WHOLE publish - the read of the registry, the write, the commit and
+  the push - not only around the git part.
+* Each of those three scripts now has its `main()` split in two: `main()`
+  parses the arguments and takes the lock, and `publish_body()` does the
+  work.  The body is unchanged, so the diff is small.
+* Tested: a publisher waits for the lock and carries on when it is
+  released; the timeout path says so instead of writing.
+
 ## The owner's three asks of 27 November 2026 (evening)
 
 1. **"for the -0.2 to 0.2C needs to be white"** - the colour ladder's

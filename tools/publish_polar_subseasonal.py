@@ -49,7 +49,9 @@ previous cycle.  Nothing is half published.
         to push to the live site, whatever the remote says)
 """
 import argparse
+import contextlib
 import copy
+import fcntl
 import hashlib
 import json
 import os
@@ -260,8 +262,59 @@ def set_polar_default(text):
     return new, what
 
 
+# ---- ONE PUBLISH AT A TIME ON ONE TREE ---------------------------------------
+# Two of the narrow publishers can be asked to publish at the same moment: the
+# GEFSv12's nightly cycle and the EC46's run, for instance.  They write into
+# the SAME tree - the registry (docs/data/models.json) and the pages that
+# carry it inlined - so two of them side by side would overwrite each other's
+# entry, and one of the two git commits would collide with the other.
+#
+# So every publisher takes a lock, and the lock is PER TREE: the development
+# copy and the operational site are two different trees and may be worked on
+# at the same time, but only one publisher at a time may work on a tree.
+#
+# The lock is a file beside the tree, not inside it, so it is never committed.
+LOCK_WAIT = 1800
+
+
+class LockTimeout(Exception):
+    """Another publisher held the tree for too long."""
+
+
+def lock_path(target):
+    t = os.path.abspath(target)
+    return os.path.join(os.path.dirname(t),
+                        ".publish-lock-" + os.path.basename(t))
+
+
+@contextlib.contextmanager
+def publish_lock(target, wait=LOCK_WAIT):
+    """One publisher at a time on one tree."""
+    path = lock_path(target)
+    fh = open(path, "a+")
+    deadline = time.time() + wait
+    held = False
+    try:
+        while True:
+            try:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                held = True
+                break
+            except OSError:
+                if time.time() >= deadline:
+                    raise LockTimeout(path)
+                say("   another publisher holds %s - waiting" % path)
+                time.sleep(10)
+        yield
+    finally:
+        if held:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+        fh.close()
+
+
 def commit_files(target, written, msg):
     """Commit ONLY the files this run wrote, and say what happened."""
+
     git(target, "add", "--", *written)
     # the identity is given here, not taken from the machine: a clone that
     # has never committed anything has no user.name, and the commit would
@@ -494,6 +547,15 @@ def main():
     # the DESTINATION, not on a flag
     is_operational = remote_repo(remote_url(target)) == OPERATIONAL_REPO
 
+    # ONE PUBLISH AT A TIME ON THIS TREE - see publish_lock() above.
+    try:
+        with publish_lock(target):
+            return publish_body(src, target, args, is_operational)
+    except LockTimeout:
+        return 2
+
+
+def publish_body(src, target, args, is_operational):
     say("== the narrow path: the daily %s update ==" % MODEL_ID)
 
     if args.default_only:

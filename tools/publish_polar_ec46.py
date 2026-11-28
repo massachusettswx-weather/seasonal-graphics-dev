@@ -65,7 +65,7 @@ sys.path.insert(0, HERE)
 # the GEFSv12 script runs nightly and must not be touched.
 from publish_polar_subseasonal import (            # noqa: E402
     git, remote_url, remote_repo, token_for, push, commit_files, push_to,
-    inline_registry, new_version, md5, say,
+    inline_registry, new_version, md5, say, publish_lock, LockTimeout,
 )
 
 SRC_DEFAULT = os.path.dirname(HERE)
@@ -298,6 +298,17 @@ def main():
     target = os.path.abspath(args.repo)
     is_operational = remote_repo(remote_url(target)) == OPERATIONAL_REPO
 
+    # ONE PUBLISH AT A TIME ON THIS TREE - the nightly GEFSv12 update and
+    # this one write into the same registry, and a second publisher beside
+    # the first would overwrite its entry.
+    try:
+        with publish_lock(target):
+            return publish_body(src, target, args, is_operational)
+    except LockTimeout:
+        return 2
+
+
+def publish_body(src, target, args, is_operational):
     say("== the narrow path: the %s polar-cap section ==" % NAME)
 
     series = load_series(src)
