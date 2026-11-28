@@ -6,6 +6,35 @@ Short and factual.  The long history of how it got here is in
 sites).  This file is the handoff: a new session reads this and does not
 need the conversation.
 
+## The owner's three asks of 27 November 2026 (evening)
+
+1. **"for the -0.2 to 0.2C needs to be white"** - the colour ladder's
+   centre band, the +-0.2 sigma band, is **white** again
+   (`polar_cap.COLORS`).  It had been a very pale cool grey (`#eef1f4`)
+   for a day, on the argument that a field of white reads as a hole in
+   the chart; the owner has now said which it is, and the white stands.
+   All eight polar charts were redrawn and published.
+2. **"we also don't see the archive for dev page"** - the archive was
+   BUILT and PUBLISHED, but nothing on the page offered it: the control
+   that reads it (`assets/js/polar_archive.js`) was only ever injected
+   into the **operational** tree by `tools/publish_polar_archive.py`, and
+   the script itself existed only as a **built** copy
+   (`docs/assets/js/polar_archive.js`) with no source - so a rebuild of
+   the site would have lost it.  The script is in the source tree now,
+   `build_site.py` copies it, and `build_polar_page.py`'s polar block
+   carries **the control and the script tag**.  Checked in a browser: the
+   picker lists the current run and the five archived GEFS runs, the
+   chart and the caption follow the choice, the by-sector view still
+   works on an archived run, and nothing throws.
+3. **"no sign of 11/27 EC46"** - the EC46's runs are DAILY, but the S2S
+   archive holds a run about **27 hours late** (measured: the 26
+   November run was in the store at 03:15 UTC on the 27th).  At 01:24
+   UTC on the 28th the newest run in the store was the **26 November
+   00Z** one, and it was pulled by hand (the pull was running when this
+   note was written); the **27 November** run is not in the archive yet
+   and lands at about 03:00 UTC.  The owner's pull days (Mon, Thu, Sat)
+   are unchanged - the fetch was run by hand on Friday.
+
 ## THE SEAM: the reanalysis, the model's OWN analysis, the forecast (27 Nov 2026)
 
 **The owner's word:** *"we need to make it obvious to tell where CORe ends /
