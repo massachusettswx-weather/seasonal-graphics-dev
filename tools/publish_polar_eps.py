@@ -427,7 +427,20 @@ def main():
         say("   (plan only - add --apply to write it)")
         return 0
 
-    # the working tree must be clean of anybody else's work
+    # THE TARGET'S WORKING TREE.  The OPERATIONAL clone is curated: anything
+    # else in it is somebody else's work and this change is refused.  The
+    # DEVELOPMENT copy is busy all the time - the workers are always writing
+    # to it - so there the rule is the opposite: only OUR files are touched
+    # and only OUR files are staged (commit_files below), and a file that
+    # another worker has in hand is simply left alone.
+    #
+    # THIS MATTERED ON 28 NOVEMBER 2026.  The pull itself writes
+    # data/polar_model_analysis.json - the model's own analysis cache - so
+    # the tree was NEVER clean when this section was published, and the
+    # refusal below meant the EPS could not be published at all: the pull
+    # dirtying the file that the publication refuses is a deadlock.  The
+    # refusal is therefore for the operational clone ONLY, exactly as the
+    # GEFS section's publisher does it (publish_polar_subseasonal.py).
     st = git(target, "status", "--porcelain")
     # THE LINES ARE CUT BY POSITION, and the first line used to lose a
     # character: the status is TWO characters and a space, and the whole
@@ -449,7 +462,7 @@ def main():
             path = path[1:-1]
         if path not in ours:
             others.append(l)
-    if others:
+    if others and remote_repo(remote_url(target)) == OPERATIONAL_REPO:
         say("   the target's working tree has changes that are not ours -")
         say("   refusing to mix them with this one:")
         for line in others[:10]:
