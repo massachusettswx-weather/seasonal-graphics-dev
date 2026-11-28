@@ -144,6 +144,8 @@ def polar_block(reg=None):
       <option value="cap">Whole polar cap</option>
       <option value="sectors">By sector</option>
     </select>
+    <label for="polarArchive">Archived run</label>
+    <select id="polarArchive" class="ctrl" disabled></select>
   </div>
 </div>
 
@@ -188,7 +190,14 @@ psel.addEventListener('change',()=>{syncView();renderPolar();});
 pview.addEventListener('change',renderPolar);
 syncView();
 renderPolar();
-</script>"""
+</script>
+<script src="assets/js/polar_archive.js?v=__VER__"></script>"""
+    ver = (reg or {}).get("version", "")
+    return (block
+            + js.replace("__POLARMODELS__", json.dumps({i["id"]: i for i in its}))
+                   .replace("__POLARSECTORS__",
+                            json.dumps({i["id"]: i for i in sector_items(reg)}))
+                   .replace("__VER__", ver))
     return (block
             + js.replace("__POLARMODELS__", json.dumps({i["id"]: i for i in its}))
                    .replace("__POLARSECTORS__",

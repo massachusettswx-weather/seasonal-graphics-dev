@@ -431,14 +431,13 @@ COLORS = [
     # reads as a hole in the chart rather than as a strong cold anomaly.
     "#1017c4", "#101fda", "#1230ec", "#1c4cf1", "#3a77f4",
     "#5c9cf7", "#87befa", "#b2d6fb", "#d9e9fc",
-    # THE CENTRE IS NOT PURE WHITE.  A diverging scale is usually white in
-    # the middle, and here the middle is the +-0.2 sigma band - which the
-    # quiet troposphere sits in for days at a time, and a field of white
-    # reads as a HOLE in the chart rather than as an ordinary quiet
-    # atmosphere.  The owner asked for the white gap to be filled on
-    # 27 November 2026.  The band is now a very pale cool grey: still the
-    # quietest colour on the ladder, but visibly a colour.
-    "#eef1f4",
+    # THE CENTRE IS WHITE.  The middle of the ladder is the +-0.2 sigma
+    # band - the quiet troposphere sits in it for days at a time - and the
+    # owner's word (27 November 2026) is that this band "needs to be
+    # white".  It was a very pale cool grey for a day, on the argument that
+    # a field of white reads as a hole in the chart; the owner has now
+    # said which of the two it is, and the white stands.
+    "#ffffff",
     # seven warms: a bright yellow, then gold, orange, vermilion, a vivid
     # red and a deep red.  These are the saturated colours, not the dusty
     # ones - a muted ramp makes a strong anomaly look like a weak one.

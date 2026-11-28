@@ -1261,6 +1261,24 @@ def build_maps_page(reg):
         page("Maps", "maps.html", body, VER))
 
 
+def copy_polar_archive_script():
+    """Copy the polar cap's archive script into the site.
+
+    THE SCRIPT IS THE CONTROL, and the control is the archive: the archived
+    runs of the chosen model are chosen from it.  It lives in the source
+    tree (assets/js/) and is copied here, so that a BUILD of the site has
+    it - the copy that was only ever in the built tree was lost the first
+    time the page was rebuilt.
+    """
+    import shutil
+    src = os.path.join(HERE, "assets", "js", "polar_archive.js")
+    if not os.path.exists(src):
+        return
+    jsdir = os.path.join(ASSETS, "js")
+    os.makedirs(jsdir, exist_ok=True)
+    shutil.copy(src, os.path.join(jsdir, "polar_archive.js"))
+
+
 def copy_map_assets():
     """Copy the map script, the library and the Natural Earth files.
 
@@ -1325,6 +1343,7 @@ def main():
     build_spv(reg)
     build_maps_page(reg)
     copy_map_assets()
+    copy_polar_archive_script()
     if SITE_DEV and GATE_HASH:
         build_login_page()
     else:
