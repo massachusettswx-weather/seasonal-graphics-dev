@@ -186,9 +186,16 @@ def inline_registry(text, name="MODELS"):
     tree's own registry can never match the pages' - and the entry we
     are here to change lives in the page.
     """
-    i = text.find("const %s=" % name)
-    if i < 0:
+    # THE SPACES MATTER.  A page declares the registry as `const MODELS={...}`
+    # or as `const MODELS = {...}` - the snow page was rebuilt with spaces
+    # around the `=` (the dark mode, 23 November 2026), and a literal search
+    # for "const MODELS=" then found nothing and the page was SKIPPED: the
+    # snow page's chart link stayed on the cycle of 22 November while the
+    # other two pages moved on every night.  So the whitespace is allowed.
+    m = re.search(r"const\s+%s\s*=" % re.escape(name), text)
+    if not m:
         return None
+    i = m.start()
     j = text.find("{", i)
     if j < 0:
         return None
