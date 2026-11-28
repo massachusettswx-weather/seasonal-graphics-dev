@@ -6,6 +6,46 @@ Short and factual.  The long history of how it got here is in
 sites).  This file is the handoff: a new session reads this and does not
 need the conversation.
 
+## The EC46: every night, and a status line on the page (28 Nov 2026, 04:45 UTC)
+
+* **THE OWNER'S DAYS WERE BASED ON A WRONG BELIEF.**  The EC46 was pulled
+  on Monday, Thursday and Saturday, because the extended range was thought
+  to run on Mondays and Thursdays.  It does not: measured 22 November 2026,
+  every run from 10 to 21 November served the 46-day window - the Saturdays
+  and the Sundays included - and `fetch_polar_ec46.py`'s own docstring says
+  so.  The stale note that said "MONDAYS and THURSDAYS" has been corrected.
+* **THE ARCHIVE IS SLOWER THAN THE SITE.**  A run lands about **27 hours
+  after its date** (the 2026-11-26 run was in the store at 03:15 UTC on the
+  27th).  On three days a week that left the site two to four days behind -
+  the owner's word on 26 November 2026: *"why don't I see the newly updated
+  EC46 from today"*.
+* **SO IT IS PULLED EVERY NIGHT**, at 21:00 UTC: `EC46_DAYS` now holds all
+  seven days and the job's schedule is `0 21 * * *`.  A night with nothing
+  new is a no-op - the fetch does not ask the archive for a run that is
+  already on disk, and the publisher refuses a target that already carries
+  the section (rc=4).
+* **THE SIGN OF A 27 NOVEMBER EC46, ON THE DEV PAGE.**  The chart carries
+  the 26 November run and the run of 27 November is not in ECMWF's archive
+  yet, so the page now SAYS SO, under the chart, where the reader is
+  looking at it:
+  * `fetch_polar_ec46.py` writes `data/polar_ec46_status.json` every time
+    it probes - the run the archive holds and when it was looked for.
+  * `build_polar_page.py` reads it and renders the line: the run the chart
+    carries, the run the archive has, the run that is **not there yet**, and
+    the time of the last check.  The line follows the model picker: it is
+    shown when the EC46 is the model on the screen.
+  * It is a **development copy** line: the operational clone has no status
+    file and its own (older) `build_polar_page.py`, so the operational page
+    carries no status line.
+* **THE ENVIRONMENT IS WHOLE AGAIN.**  The rebuilt sandbox had lost
+  `xarray`, `cdsapi`, `netCDF4` and `scipy` - the December rollover's
+  packages.  They are installed (pypi.org; the aliyun mirror resets on
+  `xarray`), and `requests, numpy, PIL, eccodes, h5netcdf, zarr, s3fs,
+  matplotlib, pandas, xarray, cdsapi, netCDF4, scipy` all import.
+* **THE 27 NOVEMBER RUN IS STILL NOT IN THE ARCHIVE.**  Probed at 04:37 and
+  again at 04:41 UTC: the archive's newest is the 2026-11-26 00Z run.  The
+  watchers take it the moment it lands.
+
 ## The CFSv2's mixed init: the cause, and the fix (28 Nov 2026, 02:50 UTC)
 
 * **THE SYMPTOM.**  `audit_inits.py --gate` said the CFSv2 sat on two
@@ -469,10 +509,12 @@ before it is allowed near the live site.
    development copy has one (`assets/favicon.ico`, copied by
    `copy_favicon()`).  Putting one on the operational site needs the
    owner's word.
-5. **The EC46's pull days**: the owner's days are Monday, Thursday and
-   Saturday.  A question is on the table - the run lands about 27 hours
-   after its init, so it could be pulled every night at 21:00 UTC - and
-   the answer has not come.
+5. **The EC46's pull days: DONE, and it is every night.**  The owner's
+   days were Monday, Thursday and Saturday, on the wrong belief that the
+   extended range runs on Mondays and Thursdays.  It runs every day, so
+   the pull is every night at 21:00 UTC (`EC46_DAYS` = all seven, the job's
+   schedule = `0 21 * * *`).  Reversible in one line in
+   `tools/ec46_disseminate.sh` and one field in the job.
 6. **The polar archive's picker on the operational page**: it is there
    now (the narrow archive path injects it).  The owner's word is asked
    for on whether it may stay.

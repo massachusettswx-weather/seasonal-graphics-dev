@@ -75,6 +75,12 @@ ECDS = "https://ecds.ecmwf.int/api"
 EXEC = "%s/retrieve/v1/processes/s2s-forecasts/execute" % ECDS
 OUT = os.path.join(DATA, "polar_ec46_z.json")
 STATE = os.path.join(DATA, "polar_ec46_jobs.json")
+# What the ARCHIVE holds, as opposed to what the site carries.  The two are
+# not the same thing: the archive gets a run about 27 hours after its date,
+# so for a day and a half there is always a run that is not there yet, and
+# the page says so rather than leaving the reader to wonder why the chart
+# is a day old.
+STATUS = os.path.join(DATA, "polar_ec46_status.json")
 # the shared cache the plotter reads; the series is merged into it under its
 # own key, and every other model's record is left exactly as it was found
 CACHE = os.path.join(DATA, "polar_model_z.json")
@@ -268,6 +274,23 @@ def wait_for_queue(s, room, tries=180):
     return False
 
 
+def write_status(run):
+    """Record the run the ARCHIVE holds, and when it was looked for.
+
+    This is what the page reads, so the reader can see both halves of the
+    truth: the run the chart was drawn from, and the run the archive has
+    (which is often a newer one, and always a run that is still on its way
+    somewhere).
+    """
+    try:
+        with open(STATUS, "w") as f:
+            json.dump({"newest_in_store": run.isoformat(),
+                       "checked": datetime.datetime.now(datetime.timezone.utc)
+                       .strftime("%Y-%m-%d %H:%M UTC")}, f, indent=1)
+    except OSError:
+        pass
+
+
 def latest_run(s, tries=8):
     """The most recent ECMWF sub-seasonal run the archive holds.
 
@@ -348,6 +371,7 @@ def latest_run(s, tries=8):
                     if not extended:
                         print("   the run %s %s does not serve the far end of "
                               "the extended range" % (d, t), flush=True)
+                    write_status(d)
                     print("   the EC46 run: %s %s" % (d, t), flush=True)
                     return d, t, None
                 if r.status_code == 403:

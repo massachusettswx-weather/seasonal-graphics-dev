@@ -24,6 +24,8 @@ products this section is about.
 The charts are rendered into output/polar_cap/ and copied into
 docs/assets/polar/ by build_registry.py.
 """
+import datetime
+import html
 import json
 import os
 import shutil
@@ -31,6 +33,10 @@ import shutil
 HERE = os.path.dirname(os.path.abspath(__file__))
 SITE = os.path.join(HERE, "docs")
 OUT = os.path.join(HERE, "output")
+
+# What ECMWF's archive holds, as opposed to what the site carries.  The
+# fetch writes it; the page reads it.
+STATUS = os.path.join(HERE, "data", "polar_ec46_status.json")
 
 # The models the section is for, in the order they are shown.
 #
@@ -96,6 +102,77 @@ def sector_items(reg=None):
     return out
 
 
+def long_date(iso):
+    """'2026-11-26' -> '26 November 2026'."""
+    try:
+        d = datetime.date.fromisoformat(str(iso))
+    except (TypeError, ValueError):
+        return str(iso)
+    return "%d %s %d" % (d.day, d.strftime("%B"), d.year)
+
+
+def long_stamp(s):
+    """'2026-11-28 04:43 UTC' -> '28 November 2026, 04:43 UTC'."""
+    s = str(s or "").strip()
+    try:
+        d = datetime.datetime.strptime(s, "%Y-%m-%d %H:%M UTC")
+    except (TypeError, ValueError):
+        return s
+    return "%s, %s UTC" % (long_date(d.date().isoformat()), d.strftime("%H:%M"))
+
+
+def ec46_note(reg=None):
+    """The EC46's status line, or "" when there is nothing to say.
+
+    THE ARCHIVE IS SLOWER THAN THE SITE.  ECMWF's S2T archive gets a run
+    about 27 hours after its date, so for a day and a half there is always
+    a run that is not there yet, and the reader is better served by being
+    told WHICH one than by wondering why the chart is a day old.
+
+    The run the page carries comes from the registry; the run the archive
+    holds comes from the last probe, with the time it was made.  Both are
+    said, so the two are never confused.
+    """
+    if not os.path.exists(STATUS):
+        return ""
+    try:
+        st = json.load(open(STATUS))
+        if reg is None:
+            reg = json.load(open(os.path.join(SITE, "data", "models.json")))
+    except (OSError, ValueError):
+        return ""
+    newest = str(st.get("newest_in_store") or "")
+    checked = str(st.get("checked") or "")
+    if not newest:
+        return ""
+    carried = ""
+    for m in reg.get("models", []):
+        if m.get("id") == "ec46":
+            carried = str(m.get("init") or "")
+    if not carried:
+        carried = newest
+    try:
+        nd = datetime.date.fromisoformat(newest)
+        pending = nd + datetime.timedelta(days=1)
+    except (TypeError, ValueError):
+        return ""
+    today = datetime.date.today()
+    s = []
+    if carried and carried < newest:
+        s.append("The chart carries the run of %s (00Z).  ECMWF's archive "
+                 "already has the run of %s - it is pulled the moment it "
+                 "lands." % (long_date(carried), long_date(newest)))
+    else:
+        s.append("The chart carries the run of %s (00Z), which is the newest "
+                 "in ECMWF's archive." % long_date(carried))
+    if pending <= today:
+        s.append("The run of %s is not there yet - it is pulled the moment "
+                 "it lands." % long_date(pending))
+    if checked:
+        s.append("(Checked %s.)" % long_stamp(checked))
+    return html.escape(" ".join(s))
+
+
 def polar_block(reg=None):
     """The HTML for the polar-cap section, or "" when there is nothing."""
     its = items(reg)
@@ -152,6 +229,7 @@ def polar_block(reg=None):
 <div class="card">
   <div class="stage"><img id="polarImg" alt="Polar cap geopotential height anomaly"></div>
   <div class="cap" id="polarCap"></div>
+  __NOTE__
 </div>""" % sel
 
     js = """
@@ -160,7 +238,14 @@ const POLARMODELS=__POLARMODELS__;
 const POLARSECTORS=__POLARSECTORS__;
 const psel=document.getElementById('polarSel');
 const pview=document.getElementById('polarView');
+const pnote=document.getElementById('polarNote');
 function pq(p){const m=new URLSearchParams(location.search);return m.get(p);}
+// The status line belongs to one model, and it is shown only when that
+// model is the one on the picker.
+function syncNote(){
+  if(!pnote) return;
+  pnote.hidden = pnote.dataset.model!==psel.value;
+}
 if(pq('m') && POLARMODELS[pq('m')]) psel.value=pq('m');
 // The sector option is only offered for a model that HAS a sector chart.
 // A control that does nothing when it is chosen is worse than no control.
@@ -179,6 +264,7 @@ function renderPolar(){
   const wantSector=pview.value==='sectors' && s;
   const img=document.getElementById('polarImg');
   const cap=document.getElementById('polarCap');
+  syncNote();
   if(wantSector){
     img.src=s.file; img.alt=s.caption; cap.textContent=s.caption; return;
   }
@@ -193,6 +279,17 @@ renderPolar();
 </script>
 <script src="assets/js/polar_archive.js?v=__VER__"></script>"""
     ver = (reg or {}).get("version", "")
+    # THE EC46's STATUS LINE.  It is put in the page as a block that is
+    # hidden until the EC46 is the model on the picker, so the reader sees
+    # it exactly when it is about the chart in front of them.
+    note = ec46_note(reg)
+    if note:
+        block = block.replace(
+            "__NOTE__",
+            '<p class="note" id="polarNote" data-model="ec46" hidden>%s</p>'
+            % note)
+    else:
+        block = block.replace("__NOTE__", "")
     return (block
             + js.replace("__POLARMODELS__", json.dumps({i["id"]: i for i in its}))
                    .replace("__POLARSECTORS__",

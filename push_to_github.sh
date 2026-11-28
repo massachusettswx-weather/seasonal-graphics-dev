@@ -63,6 +63,25 @@ if [ "$TARGET" = "prod" ] && [ "$APPROVED" != "1" ]; then
   exit 2
 fi
 
+# ----------------------------------------------------------------------
+# ONE PUBLISHER AT A TIME ON THIS TREE
+#
+# The narrow publishers take an exclusive lock - a file BESIDE the tree,
+# /workspace/.publish-lock-<tree> - for the whole publish: read, write,
+# commit, push.  The general publisher has to take it as well, or it can
+# land in the middle of a narrow publish and the two can commit over each
+# other.
+#
+# flock(1) is used here because the lock has to be held across a whole
+# shell script.  It is the SAME advisory lock the Python publishers take
+# with fcntl.flock, on the same file, so the two agree.
+LOCKFILE="$(dirname "$HERE")/.publish-lock-$(basename "$HERE")"
+if [ "${PUBLISH_LOCK_HELD:-}" != "1" ]; then
+    export PUBLISH_LOCK_HELD=1
+    echo ">> waiting for the publish lock: $LOCKFILE"
+    exec flock -w 1800 "$LOCKFILE" "$HERE/$(basename "$0")" "$@"
+fi
+
 DEV_REPO_NAME="seasonal-graphics-dev"
 if [ "$TARGET" = "prod" ]; then
   REPO="seasonal-graphics"
