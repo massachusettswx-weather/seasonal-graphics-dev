@@ -438,6 +438,16 @@ before it is allowed near the live site.
    development copy has one (`assets/favicon.ico`, copied by
    `copy_favicon()`).  Putting one on the operational site needs the
    owner's word.
+5. **The EC46's pull days**: the owner's days are Monday, Thursday and
+   Saturday.  A question is on the table - the run lands about 27 hours
+   after its init, so it could be pulled every night at 21:00 UTC - and
+   the answer has not come.
+6. **The polar archive's picker on the operational page**: it is there
+   now (the narrow archive path injects it).  The owner's word is asked
+   for on whether it may stay.
+7. **The EPS on the operational site**: it is on the development copy
+   only, and `tools/publish_polar_eps.py` refuses the operational clone
+   outright until the owner approves it.
 
 ## Done on 22 Nov 2026
 
