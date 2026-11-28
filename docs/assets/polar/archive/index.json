@@ -66,5 +66,13 @@
    "label": "20 November 2026",
    "cap": "assets/polar/archive/ec46/2026-11-20/polar_cap_ec46.png"
   }
+ ],
+ "eps": [
+  {
+   "init": "2026-11-27",
+   "label": "27 November 2026",
+   "cap": "assets/polar/archive/eps/2026-11-27/polar_cap_eps.png",
+   "sectors": "assets/polar/archive/eps/2026-11-27/polar_sectors_eps.png"
+  }
  ]
 }
