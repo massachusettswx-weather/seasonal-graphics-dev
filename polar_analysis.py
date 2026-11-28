@@ -301,6 +301,14 @@ def _cached_analysis(rec, init, hour):
             "levels": levels, "label": "", "source": ""}
 
 
+# THE MODELS WHOSE OWN ANALYSIS IS ONE INSTANT.  The GEFS's own analysis
+# is the f000 step - a single state - so the day before it has to come
+# from the previous cycle's own f000.  The ECMWF's products carry the
+# analysis of every day they cover, so they never need it, and they must
+# never be given one: their zone is the ECMWF's analysis from end to end.
+ONE_INSTANT = ("gefsv12",)
+
+
 def _merge_own(got, prev):
     """The model's own analysis of the day before, in front of this one.
 
@@ -347,7 +355,9 @@ def analysis_for(tag, rec):
         # THE DAY BEFORE, WHEN THE REANALYSIS IS FURTHER BACK THAN THE
         # RUN'S OWN ANALYSIS: the previous cycle's own analysis closes the
         # gap, and it is the same model's own analysis.
-        prev = _previous_own_analysis(rec, tag)
+        prev = None
+        if tag in ONE_INSTANT:
+            prev = _previous_own_analysis(rec, tag)
         if prev:
             got = _merge_own(got, prev)
         return got
