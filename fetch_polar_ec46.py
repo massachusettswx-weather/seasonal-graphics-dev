@@ -604,7 +604,7 @@ def newest_run(s):
 def main():
     if "--run-for-today" in sys.argv:
         # the run the store has, found by probing for the 46-day window
-        d, t = latest_run(session())
+        d, t, _ = latest_run(session())
         print(d.isoformat() if d else "")
         return
     s = session()
