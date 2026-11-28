@@ -6,6 +6,32 @@ Short and factual.  The long history of how it got here is in
 sites).  This file is the handoff: a new session reads this and does not
 need the conversation.
 
+## The CFSv2's mixed init: the cause, and the fix (28 Nov 2026, 02:50 UTC)
+
+* **THE SYMPTOM.**  `audit_inits.py --gate` said the CFSv2 sat on two
+  inits - its snowfall on 2026-12 and its ENSO on 2026-11 - and the
+  seasonal publish was blocked.  It is the last thing standing between
+  the site and the December seasonals.
+* **THE CAUSE WAS NOT THE DATA.**  The CFSv2's own run really is on the
+  December init (CPC has published it), and its **Niño index file was
+  stale in our cache**: `fetch_enso_noaa._cpc_index()` only downloaded
+  the file when it was **missing**, so the copy in `data/cpc_index/`
+  (downloaded on 17 November) was never refreshed.  CPC replaces that
+  file when a new run starts, and the fresh file carries the **December**
+  run's forecast months (2026-12 .. 2027-08) - but we kept reading the
+  November one, so the init never moved.
+* **THE FIX.**  `_cpc_index()` now re-downloads the file every time, into
+  a temporary file, and only replaces the cached copy when the download
+  succeeded - a failed download leaves the cached copy alone.  The file
+  is about 18 kB.
+* Checked: the CFSv2's ENSO is now on the **2026-12** init with the nine
+  forecast months, and `audit_inits.py --gate` says **COHERENT** - the
+  seasonal publish is no longer blocked.
+* The refreshed index files are committed, so a rebuilt sandbox reads the
+  December run's file and not the November one.  (`data/models/` is
+  gitignored, so the series itself lives in the working tree; the site's
+  ENSO charts are redrawn from it by the next build.)
+
 ## The GEFS's own analysis needs TWO days (28 Nov 2026, 02:30 UTC)
 
 * **THE PROBLEM, MEASURED.**  The GEFS's own analysis is ONE instant: the

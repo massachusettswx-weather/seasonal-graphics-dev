@@ -120,16 +120,42 @@ def _cpc_index(name, cache):
     The file holds the 40 forecast members and one observed series for 21
     months: the hindcast months are filled with -9999, so the forecast
     months are the ones where the members are present.
+
+    THE FILE IS REPLACED BY CPC WHEN A NEW RUN STARTS, so the cached copy
+    HAS TO BE REFRESHED.  Measured on 28 November 2026: the cache still
+    held the November run's file - downloaded on the 17th - days after
+    CPC had put the December run's out, so the CFSv2's own init could not
+    move to December and the CFSv2 sat on two inits at once, which is
+    exactly what the publish gate refuses.
+
+    The download is small (about 18 kB) and it goes to a temporary file,
+    so a failed download leaves the cached copy alone.
     """
     import datetime
     import h5netcdf
     import urllib.request
     os.makedirs(cache, exist_ok=True)
     p = os.path.join(cache, name)
-    if not (os.path.exists(p) and os.path.getsize(p) > 1000):
-        url = "%s/%s" % (CPC_IDX, name)
-        print("  downloading", url, flush=True)
-        urllib.request.urlretrieve(url, p)
+    url = "%s/%s" % (CPC_IDX, name)
+    tmp = p + ".new"
+    try:
+        urllib.request.urlretrieve(url, tmp)
+        if os.path.getsize(tmp) < 1000:
+            raise OSError("the download is too small to be the file")
+        os.replace(tmp, p)
+        print("  downloaded", url, flush=True)
+    except Exception as e:                             # noqa: BLE001
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        if not (os.path.exists(p) and os.path.getsize(p) > 1000):
+            print("  the download of %s FAILED (%r) and there is no cached"
+                  " copy of it" % (name, e), flush=True)
+            raise
+        print("  the download of %s FAILED (%r) - the cached copy is kept"
+              % (name, e), flush=True)
     with h5netcdf.File(p, "r") as f:
         t = np.asarray(f["time"][:], float)
         a = np.asarray(f["anom"][:], float)
