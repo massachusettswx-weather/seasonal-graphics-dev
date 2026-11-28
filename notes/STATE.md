@@ -45,6 +45,34 @@ need the conversation.
 * **THE 27 NOVEMBER RUN IS STILL NOT IN THE ARCHIVE.**  Probed at 04:37 and
   again at 04:41 UTC: the archive's newest is the 2026-11-26 00Z run.  The
   watchers take it the moment it lands.
+* **IT IS LIVE.**  Published 04:47 UTC; the line is on the development
+  page's Stratosphere page under the EC46 chart, and it follows the model
+  picker - hidden while the GEFSv12 is the model on the screen, shown when
+  the EC46 is.  Checked in a real browser: no console errors.
+
+### Three traps of this morning
+
+* **A REDRAW OF THE GEFSv12 CHART CHANGES ITS DESCRIPTOR.**  The publisher
+  draws with TWO arguments - `plot_polar_cap.main(MODEL_ID, LABEL)`, with
+  LABEL = "NOAA GEFSv12 (35-day extended)" - and the chart's subtitle reads
+  "the NOAA GEFSv12 (35-day extended) sub-seasonal forecast".  Redrawing
+  with the third argument (the short label "GEFSv12") makes the subtitle
+  read "the GEFSv12 sub-seasonal forecast": the plot is identical but the
+  picture is not, and the published chart is replaced by a near-copy.  The
+  three-argument form in the old notes is the wrong one for the GEFSv12.
+* **`output/polar_cap/` CAN BE STALE.**  The nightly job draws the charts
+  into `output/` at one point and publishes a chart drawn later into a
+  staging directory, so `output/` can hold the PREVIOUS cycle.  A build
+  copies `output/` over `docs/assets/polar/`, so a stale `output/` quietly
+  puts the older cycle back on the site.  It happened on 28 November 2026
+  (the 20261126 chart in `output/` against the published 20261127 chart);
+  it was caught, the chart was redrawn with the publisher's own label, and
+  the two then matched byte for byte.
+* **THE DEVELOPMENT COPY'S PASSWORD GATE IS DELIBERATELY OFF.**
+  `data/.no_gate` (17 November 2026) turns it off, so the development site
+  is readable by anyone with the link.  `push_to_github.sh` says so out
+  loud when it builds.  It is a deliberate act, not a broken build - do
+  not "fix" it without the owner's word.
 
 ## The CFSv2's mixed init: the cause, and the fix (28 Nov 2026, 02:50 UTC)
 
