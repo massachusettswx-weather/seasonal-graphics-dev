@@ -33,6 +33,12 @@
  ],
  "ec46": [
   {
+   "init": "2026-11-25",
+   "label": "25 November 2026",
+   "cap": "assets/polar/archive/ec46/2026-11-25/polar_cap_ec46.png",
+   "sectors": "assets/polar/archive/ec46/2026-11-25/polar_sectors_ec46.png"
+  },
+  {
    "init": "2026-11-22",
    "label": "22 November 2026",
    "cap": "assets/polar/archive/ec46/2026-11-22/polar_cap_ec46.png",
