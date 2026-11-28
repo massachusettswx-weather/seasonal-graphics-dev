@@ -5,8 +5,8 @@
 #
 #   1. put the trees back (a sandbox rebuild takes the working tree with
 #      it; the credentials come back from the environment);
-#   2. pull the newest EC46 run the store has - Monday, Thursday and
-#      Saturday, the owner's days - in the FOREGROUND, so that "the run
+#   2. pull the newest EC46 run the store has - every day, because the
+#      archive holds one every day - in the FOREGROUND, so that "the run
 #      has arrived" is an answer and not a hope;
 #   3. draw the EC46's polar-cap charts from it;
 #   4. publish them: the development copy and the operational site;
@@ -45,10 +45,23 @@ LIVE=/workspace/repo
 DEV_REPO="https://github.com/massachusettswx-weather/seasonal-graphics-dev.git"
 LIVE_REPO="https://github.com/massachusettswx-weather/seasonal-graphics.git"
 
-# the owner's days: Monday, Thursday and Saturday.  The test is the
-# OWNER'S OWN weekday, because the window is in the afternoon where the
-# owner is (20:00 UTC is 16:00 in New York).
-EC46_DAYS="${EC46_DAYS:-1 4 6}"
+# THE EC46's days: EVERY DAY.  The owner's own days were Monday, Thursday
+# and Saturday (22 November 2026), chosen because the extended range was
+# thought to run on Mondays and Thursdays.  It does not: measured 22 November
+# 2026, every run from 10 to 21 November served the 46-day window, the
+# Saturdays and the Sundays included - the archive holds a run every day.
+#
+# And the archive holds it LATE: about 27 hours after its date (the
+# 2026-11-26 run was in the store at 03:15 UTC on the 27th).  So a pull on
+# three days a week left the site two, three, sometimes four days behind -
+# the owner's word on 26 November 2026: "why don't I see the newly updated
+# EC46 from today".  A pull every night at 21:00 UTC takes the run the
+# moment it lands.
+#
+# The pull is cheap when there is nothing new: the fetch does not ask the
+# archive for a run that is already on disk, and the publisher refuses a
+# target that already carries the section.
+EC46_DAYS="${EC46_DAYS:-1 2 3 4 5 6 7}"
 EC46_TZ="${EC46_TZ:-America/New_York}"
 
 # ------------------------------------------------------------------
@@ -67,7 +80,8 @@ for pair in "$DEV:$DEV_REPO" "$LIVE:$LIVE_REPO"; do
 done
 
 # ------------------------------------------------------------------
-# 1. is today one of the owner's days?
+# 1. is today one of the EC46's days?  (all of them, unless the caller
+#    says otherwise)
 today_u=$(TZ=$EC46_TZ date +%u)
 case " $EC46_DAYS " in
     *" $today_u "*)

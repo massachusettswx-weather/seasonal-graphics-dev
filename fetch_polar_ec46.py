@@ -98,11 +98,12 @@ SYSTEM = 46
 # window 1104_1128 would be day 47, which the run does not have.)
 WEEKLY = ["%d_%d" % (h, h + 24) for h in range(24, 1081, 24)]
 
-# The extended range runs on MONDAYS and THURSDAYS at 00Z, and only those runs
-# carry the 46 days: on the other days the archive serves the 15-day
-# ensemble, which stops at lead 360 h.  The catalogue has no `system`
-# parameter - the product is picked by the RUN DATE - so the run is found by
-# asking for a lead window that only an extended-range run has.
+# The extended range is DAILY (measured 22 Nov 2026: every run from 10 to
+# 21 November served the 46-day window, the Saturdays and the Sundays
+# included), so the earlier belief that it ran on Mondays and Thursdays only
+# was wrong.  The catalogue has no `system` parameter - the product is picked
+# by the RUN DATE - so the run is found by asking for a lead window that only
+# an extended-range run has.
 EXTENDED_ONLY = ["1080_1104"]
 
 # WHERE THE SEARCH FOR THE NEWEST RUN STARTS.  The archive holds the run
