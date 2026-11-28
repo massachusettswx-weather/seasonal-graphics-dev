@@ -79,11 +79,21 @@ FILES = ("docs/assets/polar/polar_cap_gefsv12.png",
          "docs/model.html", "docs/snow.html", "docs/spv.html")
 # the live site: a push to it needs the approval flags
 OPERATIONAL_REPO = ("massachusettswx-weather", "seasonal-graphics")
-# the GEFSv12's 00Z cycle carries 35 days (f012 to f840).  The fetcher writes
-# the series into the cache after EVERY lead, so a series that is still being
-# downloaded is on disk and is SHORTER than this.  A partial series is never
-# published: the panel would show half a season.
-EXPECTED_DAYS = 35
+# THE LENGTH OF THE FORECAST SERIES THE PUBLISHER NEEDS.
+#
+# The GEFSv12's 00Z cycle carries 35 days (f012 to f840).  The DAILY values
+# are the 12Z ones, and they start at f036 - the init day itself is the
+# model's OWN analysis (the f000 step), and it is drawn as such.  So the
+# forecast series is f036 to f828: **34 values**, and the panel covers 35
+# days in all (the analysis day and the 34 forecast days).
+#
+# The fetcher writes the series into the cache after EVERY lead, so a
+# series that is still being downloaded is on disk and is SHORTER than
+# this.  A partial series is never published: the panel would show half a
+# season.  (Measured on 28 November 2026: this number was still 35 after
+# the daily series had moved to f036, and every publish was refused with
+# "the series is only 34 of 35 days" - the panel never reached the site.)
+EXPECTED_DAYS = 34
 
 
 def say(msg):

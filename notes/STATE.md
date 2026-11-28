@@ -62,6 +62,37 @@ need the conversation.
   28th.  Drawn and looked at: the three zones, the wash, the dotted line
   at the CORe end and the dashed line at the forecast's start.
 
+## The GEFS panel could not be published at all (28 Nov 2026, 03:50 UTC)
+
+* **THE BUG.**  When the daily series moved to f036 - so that the init day
+  is the model's OWN analysis and the forecast begins the day after - the
+  series became **34** daily values (f036 to f828) and no longer 35.  The
+  narrow path still asked for 35 (`EXPECTED_DAYS` in
+  `tools/publish_polar_subseasonal.py`), so every publish was refused with
+  "the series is only 34 of 35 days - the run is still being downloaded"
+  and **the daily GEFSv12 panel could not reach either site**.  The chart
+  on the sites was the one that was published before the change.
+* **THE FIX.**  `EXPECTED_DAYS = 34`: the forecast series is the 34 daily
+  values from f036 to f828, and the panel covers 35 days in all (the
+  analysis day and the 34 forecast days).
+* Found while the 20261127 cycle was being fetched - the fetch writes the
+  series after every lead, so the series was on disk at 1 day and the
+  publisher's refusal was the correct answer at that moment.
+
+## The operational site's two charts without the seam (28 Nov 2026, 03:45 UTC)
+
+* The **operational** site carried the GEFSv12 and the SEAS5 polar charts
+  from **before** the seam work: two zones, no wash, no "GEFS analysis".
+  The EC46's charts (published on the 28th) carried the seam ✓.
+* The SEAS5's charts are now published to the operational site through
+  `tools/publish_polar_seas5.py --prod --approved` ✓ (that product has
+  been on the operational site since 24 November).
+* The GEFSv12's charts go with the next cycle: the fetch was running when
+  this was checked, so the publisher rightly refused a one-day series.
+* The operational clone was **behind the server** (a run had pushed the
+  archive from another clone): `git fetch origin && git reset --hard
+  origin/main` and then the narrow path again - the same dance as before.
+
 ## The narrow path: one publisher at a time on one tree (28 Nov 2026, 02:50 UTC)
 
 * **THE COLLISION WAS REAL.**  The GEFSv12's nightly cycle is published at

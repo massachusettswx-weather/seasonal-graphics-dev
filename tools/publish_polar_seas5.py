@@ -33,7 +33,7 @@ sys.path.insert(0, HERE)
 
 from publish_polar_subseasonal import (            # noqa: E402
     git, remote_url, remote_repo, token_for, push, commit_files, push_to,
-    inline_registry, new_version, md5, say,
+    inline_registry, new_version, md5, say, publish_lock, LockTimeout,
 )
 
 SRC_DEFAULT = os.path.dirname(HERE)
@@ -133,6 +133,16 @@ def main():
     src = os.path.abspath(args.src)
     target = os.path.abspath(args.repo)
 
+    # ONE PUBLISH AT A TIME ON THIS TREE - the seasonal's charts and the
+    # daily GEFSv12 update write into the same registry and the same pages.
+    try:
+        with publish_lock(target):
+            return publish_body(src, target, args)
+    except LockTimeout:
+        return 2
+
+
+def publish_body(src, target, args):
     say("== the narrow path: the ECMWF SEAS5 polar-cap section ==")
     entry = source_entry(src)
     if entry is None:
