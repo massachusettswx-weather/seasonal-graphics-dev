@@ -28,12 +28,25 @@ need the conversation.
    works on an archived run, and nothing throws.
 3. **"no sign of 11/27 EC46"** - the EC46's runs are DAILY, but the S2S
    archive holds a run about **27 hours late** (measured: the 26
-   November run was in the store at 03:15 UTC on the 27th).  At 01:24
-   UTC on the 28th the newest run in the store was the **26 November
-   00Z** one, and it was pulled by hand (the pull was running when this
-   note was written); the **27 November** run is not in the archive yet
-   and lands at about 03:00 UTC.  The owner's pull days (Mon, Thu, Sat)
-   are unchanged - the fetch was run by hand on Friday.
+   November run was in the store at 03:15 UTC on the 27th).  Probed on
+   the 28th at 01:50 UTC: **the 27 November 00Z run is not in the
+   archive yet** ("the run 2026-11-27 00:00 is not in the archive yet
+   (failed)"), and the newest run there is the **26 November 00Z** one.
+   That one was pulled by hand and is published on **both** sites (the
+   owner's approval of 22 November 2026 covers the EC46 on both).  The
+   27 November run should land at about 03:00 UTC; a watcher was left
+   running to pull it the moment it is there.
+   * The owner's pull days (Mon, Thu, Sat) are unchanged - the Friday
+     pull was run by hand.
+   * **THE OPS CLONE WAS BEHIND THE SERVER**, so the narrow path's push
+     was refused ("! [rejected] HEAD -> main (fetch first)") and the
+     commit stayed local.  The clone was fetched and reset onto
+     `origin/main` and the two narrow paths were re-run, which is the
+     way to do it: a rebase of the two commits conflicts in the pages'
+     inlined registries, and the publishers patch those pages properly.
+   * `fetch_polar_ec46.py --run-for-today` unpacked two values where
+     `latest_run()` returns three, so the probe had never been run by
+     hand.  Fixed.
 
 ## THE SEAM: the reanalysis, the model's OWN analysis, the forecast (27 Nov 2026)
 
